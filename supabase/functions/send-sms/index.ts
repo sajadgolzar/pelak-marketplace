@@ -38,11 +38,25 @@ Deno.serve(async (req) => {
     return reply({ error: "Invalid signature" }, 401);
   }
 
-  const phone = event.user?.phone ?? "";
-  const otp = event.sms?.otp ?? "";
+  const rawPhone = String(event.user?.phone ?? "").trim().replace(/[\s()-]/g, "");
+  const phone = rawPhone.startsWith("0098")
+    ? "+98" + rawPhone.slice(4)
+    : rawPhone.startsWith("98")
+    ? "+" + rawPhone
+    : rawPhone.startsWith("09")
+    ? "+98" + rawPhone.slice(1)
+    : rawPhone.startsWith("9")
+    ? "+98" + rawPhone
+    : rawPhone;
+  const otp = String(event.sms?.otp ?? "");
 
-  if (!/^\+989\d{9}$/.test(phone) || !/^\d{4,8}$/.test(otp)) {
-    return reply({ error: "Invalid phone or code" }, 400);
+  if (!/^\+989\d{9}$/.test(phone)) {
+    console.error("SMS hook: invalid phone format", { phoneLength: rawPhone.length });
+    return reply({ error: "Invalid phone format" }, 400);
+  }
+  if (!/^\d{4,8}$/.test(otp)) {
+    console.error("SMS hook: invalid OTP format", { otpPresent: Boolean(otp), otpLength: otp.length });
+    return reply({ error: "Invalid OTP format" }, 400);
   }
 
   const params = new URLSearchParams({
@@ -75,3 +89,4 @@ Deno.serve(async (req) => {
     return reply({ error: "SMS unavailable" }, 502);
   }
 });
+  
