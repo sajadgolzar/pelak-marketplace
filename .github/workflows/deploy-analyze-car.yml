@@ -14,4 +14,4 @@ jobs:
       - name: Deploy analyze-car
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: supabase functions deploy analyze-car --project-ref wzhnkciopeqdbnbknwu --no-verify-jwtn
+        run: supabase functions deploy analyze-car --project-ref wzhnkciopeqdbnbknwun --no-verify-jwt
