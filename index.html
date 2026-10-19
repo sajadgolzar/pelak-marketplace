@@ -1155,11 +1155,11 @@ document.querySelectorAll('.brand-tile').forEach(tile=>tile.addEventListener('cl
  const aliases={'تویوتا':'Toyota','پژو':'Peugeot','ایران خودرو':'Iran Khodro IKCO','مرسدس بنز':'Mercedes Mercedes-Benz Benz','بی‌ام‌و':'BMW','مزدا':'Mazda','سایپا':'Saipa','هیوندای':'Hyundai','کیا':'Kia','مدیران خودرو':'MVM Chery','کرمان موتور':'KMC JAC','بهمن موتور':'Bahman Motor','آئودی':'Audi','فولکس‌واگن':'Volkswagen VW','نیسان':'Nissan','رنو':'Renault','لکسوس':'Lexus','سوزوکی':'Suzuki'};
  const modelAliases={'کمری':'Camry','کرولا':'Corolla','راو۴':'RAV4','لندکروزر':'Land Cruiser','۲۰۷':'207 Peugeot','پژو ۲۰۷':'Peugeot 207','۲۰۶':'206 Peugeot','پژو ۲۰۶':'Peugeot 206','سری ۳':'3 Series','سری ۵':'5 Series','سانتافه':'Santa Fe','توسان':'Tucson','مزدا ۳':'Mazda 3','پراید':'Pride','ساینا':'Saina'};
  const rows=[];
- const add=(make,model,trim,kind,alt)=>{
+ const add=(make,model,trim,kind,alt,target=rows)=>{
    const name=kind==='brand'?make:kind==='model'?model:trim;
    const path=[make,model,trim].filter(Boolean).join(' / ');
    const key=normalize([make,model,trim,aliases[make]||'',modelAliases[model]||'',alt||''].join(' '));
-   rows.push({make,model:model||'',trim:trim||'',kind,name,path,key,ownKey:normalize(name+' '+(alt||''))});
+   target.push({make,model:model||'',trim:trim||'',kind,name,path,key,ownKey:normalize(name+' '+(alt||''))});
  };
  const allMakes=[...new Set([...makeSelect.options].map(x=>x.value).filter(Boolean).concat(Object.keys(catalog)))];
  for(const make of allMakes){add(make,'','','brand',aliases[make]||'');const models=catalog[make]||{};
@@ -1168,11 +1168,32 @@ document.querySelectorAll('.brand-tile').forEach(tile=>tile.addEventListener('cl
      for(const trim of trims||[])add(make,model,trim,'trim',(modelAliases[model]||''));
    }
  }
- // Stored ads may have models/variants missing from the static catalogue.
+ // Include models and trims from published ads even when absent from the
+ // static catalogue. Rebuild only after loadPublic replaces its array.
+ let indexedPublicRows=null,listingRows=[];
+ function searchableRows(){
+   const published=typeof publicRows!=='undefined'&&Array.isArray(publicRows)?publicRows:[];
+   if(published!==indexedPublicRows){
+     indexedPublicRows=published;listingRows=[];
+     const known=new Set(rows.map(r=>normalize([r.make,r.model,r.trim,r.kind].join('|'))));
+     for(const ad of published){
+       const make=String(ad.make||'').trim(),model=String(ad.model||'').trim(),trim=String(ad.trim||'').trim();
+       if(!make)continue;
+       const entries=[['','','brand'],[model,'','model'],[model,trim,'trim']];
+       for(const [m,t,kind] of entries){
+         if(kind==='model'&&!m||kind==='trim'&&(!m||!t))continue;
+         const key=normalize([make,m,t,kind].join('|'));
+         if(known.has(key))continue;
+         known.add(key);add(make,m,t,kind,'',listingRows);
+       }
+     }
+   }
+   return rows.concat(listingRows);
+ }
  function matching(q){
    if(!q)return [];
    const terms=normalize(q);
-   return rows.filter(r=>r.key.includes(terms)).sort((a,b)=>{
+   return searchableRows().filter(r=>r.key.includes(terms)).sort((a,b)=>{
       const score=r=>r.ownKey===terms?0:r.ownKey.startsWith(terms)?1:r.kind==='brand'&&r.key.startsWith(terms)?2:r.kind==='model'?3:4;
       return score(a)-score(b)||a.path.length-b.path.length;
    }).slice(0,10);
@@ -1439,6 +1460,7 @@ show('listings',{noHistory:true,scroll:false});
    setSelect(model,item.model||'');
    setSelect(trim,item.trim||'');
    input.value=item.path;
+   selectedPath=item.path;
    if(typeof window.renderPublic==='function')window.renderPublic();
  }
  const attached=api.attach(input,holder,chooseHere,true);
@@ -1455,9 +1477,13 @@ show('listings',{noHistory:true,scroll:false});
  input.addEventListener('input',()=>{
    // Do not leave a previous selection invisibly active while typing a new query.
    if(selectedPath&&norm(input.value)!==norm(selectedPath)){
+     const typed=input.value;
      selectedPath='';make.value='';make.dispatchEvent(new Event('change',{bubbles:true}));
      model.value='';model.dispatchEvent(new Event('change',{bubbles:true}));
      trim.value='';trim.dispatchEvent(new Event('change',{bubbles:true}));
+     // The make-change listener clears its field when the filter resets;
+     // keep the new search text the visitor just typed.
+     input.value=typed;
    }
  });
  input.addEventListener('keydown',e=>{
