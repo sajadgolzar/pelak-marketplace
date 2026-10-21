@@ -2501,13 +2501,14 @@ window.pelakSellerReset();
 <div id="pelakProOverlay" hidden aria-label="پنجره نمایشگاه" role="dialog" aria-modal="true"><div class="pelak-pro-dialog">
 <div class="pelak-pro-dialog-head"><h2 id="pelakProOverlayTitle">نمایشگاه‌های پلاک</h2><button type="button" class="pelak-pro-close" id="pelakProOverlayClose" aria-label="بستن">×</button></div>
 <div id="pelakProOverlayBody"></div></div></div>
+<!-- PELAK v5.37.2: dealer PRO panel safe DOM lookup; no feature removal -->
 <script id="pelak-v525-pro">
 /* PELAK 5.25 — paid professional showroom UI; all permissions enforced in Supabase RPC. */
 (()=>{'use strict';
  const $=id=>document.getElementById(id), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const base='https://sajadgolzar.github.io/pelak-marketplace/';
  const S={context:null,data:null,tab:'profile',busy:false,featured:new Set(),publicMap:new Map()};
- const suite=$('pelakProSuite'), status=$('pelakProStatus'), approvedPanel=$('pelakDealerPanel')?.querySelector(':scope > .wrap > .panel');
+ const suite=$('pelakProSuite'), status=$('pelakProStatus'), approvedPanel=$('pelakDealerPanel')?.querySelector('.pelak-dealer-panel') || document.querySelector('.pelak-dealer-panel');
  const overlay=$('pelakProOverlay'), overlayBody=$('pelakProOverlayBody');
  function note(msg,error=false){status.textContent=msg;status.className='pelak-pro-note'+(error?' error':'');status.hidden=false;}
  function button(label,fn,kind='outline'){const b=document.createElement('button');b.type='button';b.className='btn '+kind+' mini';b.textContent=label;b.addEventListener('click',fn);return b;}
@@ -2523,14 +2524,14 @@ window.pelakSellerReset();
  function pack(){return S.data||{inventory:[],inquiries:[],team:[],promotions:[],metrics:{}};}
  async function refreshPro(){if(S.busy)return;S.busy=true;status.hidden=true;
   try{const c=await rpc('pelak_pro_my_context');S.context=c;
-    if(!c?.dealer_id){suite.hidden=true;approvedPanel.hidden=false;return;}
-    suite.hidden=false;approvedPanel.hidden=true;
+    if(!c?.dealer_id){suite.hidden=true;if(approvedPanel)approvedPanel.hidden=false;else note('بخش درخواست عضویت نمایشگاه در صفحه پیدا نشد؛ لطفاً نسخه سایت را بررسی کنید.',true);return;}
+    suite.hidden=false;if(approvedPanel)approvedPanel.hidden=true;
     $('pelakProDealerName').textContent=c.profile?.business_name||'نمایشگاه';
     $('pelakProBadge').textContent=c.paid?(c.subscription.plan==='vip'?'VIP فعال':'PRO فعال'):(c.subscription?.status==='pending'?'پرداخت در انتظار تأیید':'اشتراک غیرفعال');
     $('pelakProPaywall').hidden=active();$('pelakProControls').hidden=!active();
     if(!active()){S.data=null;note('عضویت نمایشگاه تأیید شده است، ولی امکانات تجاری فقط پس از تأیید پرداخت واقعی فعال می‌شوند.');return;}
     S.data=await rpc('pelak_pro_my_dashboard');renderTab();
-  }catch(e){suite.hidden=false;note('دریافت اطلاعات پنل ویژه انجام نشد: '+e.message+' — ابتدا SQL نسخه 5.25 را اجرا کن.',true);}finally{S.busy=false;}
+  }catch(e){suite.hidden=false;note('دریافت اطلاعات پنل ویژه انجام نشد: '+e.message+' — لطفاً جزئیات خطا را بررسی کن.',true);}finally{S.busy=false;}
  }
  const labels={profile:'صفحه نمایشگاه',inventory:'موجودی',inquiries:'مشتریان',analytics:'آمار',team:'کارکنان',promotions:'تبلیغات'};
  function renderTab(){if(!active())return;
