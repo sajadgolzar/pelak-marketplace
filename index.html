@@ -629,6 +629,9 @@ html[lang="fa"] table {
 .pelak-reset-feedback{color:#275976;font-size:12px;margin-top:9px;white-space:pre-wrap}
 .pelak-reset-feedback.is-error{color:#aa2626}
 .pelak-reset-feedback.is-good{color:#146b51}
+.pelak-reset-code-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.pelak-reset-code-actions .btn{margin-top:2px;flex:1;min-width:120px}
+#pelakResetCode{letter-spacing:7px;text-align:center;direction:ltr;font-variant-numeric:tabular-nums}
 @media(max-width:600px){#listingForm .pelak-listing-step{grid-template-columns:minmax(0,1fr);gap:12px}#listingForm .pelak-step-extra{grid-template-columns:minmax(0,1fr)}#listingForm .pelak-step-tabs{gap:4px}#listingForm .pelak-step-tab{flex-direction:column;gap:3px;padding:8px 2px;font-size:10px;line-height:1.4}#listingForm .pelak-step-tab b{width:23px;height:23px;min-width:23px}#listingForm .pelak-step-title{font-size:15px}#listingForm .pelak-step-navigation button{flex:1}}
 </style>
 <style id="pelak-v5374-navigation">
@@ -2861,12 +2864,34 @@ panel.hidden=true; // Assistant stays closed until the user explicitly chooses V
   <button type="button" id="pelakResetClose" class="pelak-reset-close" aria-label="بستن">×</button>
   <h3 id="pelakResetTitle">بازیابی رمز عبور پلاک</h3>
   <div id="pelakResetRequestPane">
-   <p>ایمیل حساب خود را وارد کنید تا لینک تنظیم رمز جدید برای شما فرستاده شود.</p>
-   <form id="pelakResetRequestForm"><label for="pelakResetEmail">ایمیل ثبت‌شده</label><input id="pelakResetEmail" type="email" required autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com"/><button type="submit" class="btn primary">ارسال لینک بازیابی</button></form>
+   <p>ایمیل ثبت‌شده در پلاک را وارد کنید تا کد یک‌بارمصرف ۶ رقمی بازیابی برایتان ارسال شود.</p>
+   <form id="pelakResetRequestForm">
+    <label for="pelakResetEmail">ایمیل حساب</label>
+    <input id="pelakResetEmail" type="email" required autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com"/>
+    <button type="submit" class="btn primary">ارسال کد ۶ رقمی بازیابی</button>
+   </form>
+  </div>
+  <div id="pelakResetCodePane" hidden>
+   <p>کد ۶ رقمی ارسال‌شده به ایمیل <strong id="pelakResetCodeAddress" dir="ltr"></strong> را وارد کنید.</p>
+   <form id="pelakResetCodeForm">
+    <label for="pelakResetCode">کد ۶ رقمی بازیابی</label>
+    <input id="pelakResetCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" minlength="6" pattern="[0-9]{6}" dir="ltr" placeholder="123456" required />
+    <button type="submit" class="btn primary">تأیید کد و ادامه</button>
+   </form>
+   <div class="pelak-reset-code-actions">
+    <button type="button" class="btn outline mini" id="pelakResetResendCode">ارسال دوباره کد</button>
+    <button type="button" class="btn outline mini" id="pelakResetChangeEmail">تغییر ایمیل</button>
+   </div>
   </div>
   <div id="pelakResetChangePane" hidden>
-   <p>لینک بازیابی تأیید شد. رمز جدید خود را تعیین کنید.</p>
-   <form id="pelakResetChangeForm"><label for="pelakNewPassword">رمز جدید (حداقل ۸ نویسه)</label><input id="pelakNewPassword" type="password" minlength="8" autocomplete="new-password" required/><label for="pelakConfirmPassword">تکرار رمز جدید</label><input id="pelakConfirmPassword" type="password" minlength="8" autocomplete="new-password" required/><button type="submit" class="btn primary">ذخیره رمز جدید</button></form>
+   <p>هویت شما تأیید شد. رمز جدید خود را وارد کنید.</p>
+   <form id="pelakResetChangeForm">
+    <label for="pelakNewPassword">رمز جدید (حداقل ۸ نویسه)</label>
+    <input id="pelakNewPassword" type="password" minlength="8" autocomplete="new-password" required/>
+    <label for="pelakConfirmPassword">تکرار رمز جدید</label>
+    <input id="pelakConfirmPassword" type="password" minlength="8" autocomplete="new-password" required/>
+    <button type="submit" class="btn primary">ذخیره رمز جدید</button>
+   </form>
   </div>
   <p id="pelakResetFeedback" role="status" aria-live="polite" class="pelak-reset-feedback"></p>
  </div>
@@ -2919,50 +2944,95 @@ panel.hidden=true; // Assistant stays closed until the user explicitly chooses V
  // Preserve the existing editListing() behavior while opening edits at step one.
  window.pelakShowListingStep=show;
  show(1);
- const shade=$('pelakResetShade'),resume=$('pelakResumeReset'),request=$('pelakResetRequestPane'),change=$('pelakResetChangePane'),feedback=$('pelakResetFeedback');
- let recovery=false;
+ const shade=$('pelakResetShade'),resume=$('pelakResumeReset'),request=$('pelakResetRequestPane'),codePane=$('pelakResetCodePane'),change=$('pelakResetChangePane'),feedback=$('pelakResetFeedback');
+ let resetStage='request',resetEmail='',recoveryAuthorized=false,resetCodeResendUntil=0,resetCodeTimer=null,resetVerificationInProgress=false;
  function resetFeedback(t,isError=false,good=false){feedback.textContent=t;feedback.className='pelak-reset-feedback'+(isError?' is-error':good?' is-good':'');}
- function open(mode='request'){
-  recovery=mode==='change';request.hidden=recovery;change.hidden=!recovery;
+ function normalizeResetCode(v){return String(v||'').replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[^0-9]/g,'').slice(0,6);}
+ function showResetStage(stage){
+  resetStage=stage;request.hidden=stage!=='request';codePane.hidden=stage!=='code';change.hidden=stage!=='change';
   shade.hidden=false;resume.hidden=true;resetFeedback('');
-  if(!recovery){$('pelakResetEmail').value=$('email')?.value.trim()||'';$('pelakResetTitle').textContent='بازیابی رمز عبور پلاک';}
-  else{$('pelakResetTitle').textContent='تعیین رمز عبور جدید';}
-  setTimeout(()=>{(recovery?$('pelakNewPassword'):$('pelakResetEmail')).focus({preventScroll:true});},50);
+  $('pelakResetTitle').textContent=stage==='request'?'بازیابی رمز عبور پلاک':stage==='code'?'تأیید کد ۶ رقمی بازیابی':'تعیین رمز عبور جدید';
+  if(stage==='request'){$('pelakResetEmail').value=resetEmail||$('email')?.value.trim()||'';}
+  if(stage==='code'){$('pelakResetCodeAddress').textContent=resetEmail;$('pelakResetCode').value='';}
+  const focus=stage==='request'?'pelakResetEmail':stage==='code'?'pelakResetCode':'pelakNewPassword';
+  setTimeout(()=>$(focus).focus({preventScroll:true}),50);
  }
- function close(){shade.hidden=true;resume.hidden=!recovery;}
- $('pelakForgotPassword').addEventListener('click',()=>open(recovery?'change':'request'));
+ function closeReset(){shade.hidden=true;resume.hidden=resetStage==='request';resume.textContent=resetStage==='code'?'🔑 ادامه واردکردن کد بازیابی':'🔑 ادامه تعیین رمز جدید';}
+ $('pelakForgotPassword').addEventListener('click',()=>showResetStage(resetStage==='request'?'request':resetStage));
  const loginRecovery=$('pelakLoginRecovery');
  window.pelakShowLoginRecovery=()=>{if(loginRecovery)loginRecovery.hidden=false;};
  window.pelakHideLoginRecovery=()=>{if(loginRecovery)loginRecovery.hidden=true;};
- $('pelakLoginRecoveryAction').addEventListener('click',()=>open(recovery?'change':'request'));
- resume.addEventListener('click',()=>open('change'));$('pelakResetClose').addEventListener('click',close);
- shade.addEventListener('click',e=>{if(e.target===shade)close();});
- document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!shade.hidden)close();});
- $('pelakResetRequestForm').addEventListener('submit',async e=>{e.preventDefault();const mail=$('pelakResetEmail').value.trim().toLowerCase();
+ $('pelakLoginRecoveryAction').addEventListener('click',()=>showResetStage(resetStage==='request'?'request':resetStage));
+ resume.addEventListener('click',()=>showResetStage(resetStage));$('pelakResetClose').addEventListener('click',closeReset);
+ shade.addEventListener('click',e=>{if(e.target===shade)closeReset();});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!shade.hidden)closeReset();});
+ function updateResendButton(){
+  const btn=$('pelakResetResendCode'),remaining=Math.max(0,Math.ceil((resetCodeResendUntil-Date.now())/1000));
+  btn.disabled=remaining>0;btn.textContent=remaining?'ارسال دوباره ('+remaining+' ثانیه)':'ارسال دوباره کد';
+  if(!remaining&&resetCodeTimer){clearInterval(resetCodeTimer);resetCodeTimer=null;}
+ }
+ function setResendCooldown(seconds=60){resetCodeResendUntil=Date.now()+seconds*1000;if(resetCodeTimer)clearInterval(resetCodeTimer);updateResendButton();resetCodeTimer=setInterval(updateResendButton,1000);}
+ async function sendRecoveryCode(email){
+  const url=window.location.href.split(/[?#]/)[0];
+  const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:url});
+  if(error)throw error;
+ }
+ $('pelakResetRequestForm').addEventListener('submit',async e=>{
+  e.preventDefault();const mail=$('pelakResetEmail').value.trim().toLowerCase();
   if(!mail||!$('pelakResetEmail').checkValidity())return resetFeedback('ایمیل معتبر وارد کنید.',true);
   if(typeof db==='undefined'||!db)return resetFeedback('اتصال Supabase برقرار نیست؛ دوباره تلاش کنید.',true);
   const btn=e.target.querySelector('[type="submit"]');btn.disabled=true;btn.textContent='در حال ارسال…';
-  try{const url=window.location.href.split(/[?#]/)[0];const {error}=await db.auth.resetPasswordForEmail(mail,{redirectTo:url});if(error)throw error;
-   resetFeedback('اگر این ایمیل حساب ثبت‌شده داشته باشد، لینک بازیابی برای آن ارسال می‌شود. صندوق ورودی و Spam را بررسی کنید.',false,true);
-  }catch(ex){resetFeedback('ارسال لینک ناموفق بود: '+(ex?.message||String(ex)),true);}
-  finally{btn.disabled=false;btn.textContent='ارسال لینک بازیابی';}
+  try{
+   await sendRecoveryCode(mail);resetEmail=mail;recoveryAuthorized=false;showResetStage('code');setResendCooldown(60);
+   resetFeedback('اگر حسابی با این ایمیل ثبت شده باشد، کد بازیابی ارسال می‌شود. صندوق ورودی و Spam را بررسی کنید.',false,true);
+  }catch(ex){resetFeedback('ارسال کد ناموفق بود: '+(ex?.message||String(ex)),true);}
+  finally{btn.disabled=false;btn.textContent='ارسال کد ۶ رقمی بازیابی';}
  });
- $('pelakResetChangeForm').addEventListener('submit',async e=>{e.preventDefault();if(!recovery||typeof db==='undefined'||!db)return resetFeedback('ابتدا از طریق لینک ایمیل وارد بازیابی رمز شوید.',true);
+ $('pelakResetCode').addEventListener('input',e=>{const value=normalizeResetCode(e.target.value);if(e.target.value!==value)e.target.value=value;});
+ $('pelakResetChangeEmail').addEventListener('click',()=>{recoveryAuthorized=false;showResetStage('request');});
+ $('pelakResetResendCode').addEventListener('click',async()=>{
+  if(!db||!resetEmail||Date.now()<resetCodeResendUntil)return;
+  const btn=$('pelakResetResendCode');btn.disabled=true;
+  try{await sendRecoveryCode(resetEmail);setResendCooldown(60);resetFeedback('اگر حساب ثبت‌شده باشد، کد جدید درخواست شد؛ Inbox و Spam را بررسی کنید.',false,true);}
+  catch(ex){resetFeedback('ارسال دوباره ناموفق بود: '+(ex?.message||String(ex)),true);updateResendButton();}
+ });
+ $('pelakResetCodeForm').addEventListener('submit',async e=>{
+  e.preventDefault();if(!db||!resetEmail)return resetFeedback('ابتدا ایمیل خود را وارد کنید.',true);
+  const token=normalizeResetCode($('pelakResetCode').value);
+  if(!/^\d{6}$/.test(token))return resetFeedback('کد بازیابی باید دقیقاً ۶ رقم باشد.',true);
+  const btn=e.target.querySelector('[type="submit"]');btn.disabled=true;btn.textContent='در حال تأیید…';
+  try{
+   resetVerificationInProgress=true;
+   const {data,error}=await db.auth.verifyOtp({email:resetEmail,token,type:'recovery'});
+   if(error)throw error;
+   if(!data?.session?.user||data.user.email?.toLowerCase()!==resetEmail)throw Error('تأیید هویت کامل نشد. دوباره تلاش کنید.');
+   recoveryAuthorized=true;showResetStage('change');
+   resetFeedback('کد تأیید شد. حالا رمز جدید خود را ثبت کنید.',false,true);
+  }catch(ex){recoveryAuthorized=false;resetFeedback('کد تأیید نشد یا منقضی شده است: '+(ex?.message||String(ex)),true);}
+  finally{resetVerificationInProgress=false;btn.disabled=false;btn.textContent='تأیید کد و ادامه';}
+ });
+ $('pelakResetChangeForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  if(!recoveryAuthorized||!db)return resetFeedback('ابتدا کد بازیابی ایمیل را تأیید کنید.',true);
   const pwd=$('pelakNewPassword').value,conf=$('pelakConfirmPassword').value;
   if(pwd.length<8)return resetFeedback('رمز جدید باید حداقل ۸ نویسه باشد.',true);
   if(pwd!==conf)return resetFeedback('رمز و تکرار رمز با هم یکسان نیستند.',true);
   const btn=e.target.querySelector('[type="submit"]');btn.disabled=true;btn.textContent='در حال ذخیره…';
-  try{const {error}=await db.auth.updateUser({password:pwd});if(error)throw error;
-   resetFeedback('رمز جدید با موفقیت ذخیره شد. اکنون می‌توانید با رمز جدید وارد شوید.',false,true);
-   $('pelakNewPassword').value='';$('pelakConfirmPassword').value='';
-   try{await db.auth.signOut();}catch(_){}
-   recovery=false;resume.hidden=true;request.hidden=false;change.hidden=true;
-   $('pelakResetTitle').textContent='بازیابی رمز انجام شد';
-   request.hidden=true;
+  try{
+   const {data:sessionData,error:sessionError}=await db.auth.getUser();
+   if(sessionError||!sessionData?.user)throw Error('نشست تأیید بازیابی منقضی شده است. دوباره کد درخواست کنید.');
+   if(resetEmail&&sessionData.user.email?.toLowerCase()!==resetEmail)throw Error('ایمیل حساب تأییدشده مطابقت ندارد.');
+   const {error}=await db.auth.updateUser({password:pwd});if(error)throw error;
+   $('pelakNewPassword').value='';$('pelakConfirmPassword').value='';$('pelakResetCode').value='';
+   recoveryAuthorized=false;resetStage='request';resume.hidden=true;request.hidden=true;codePane.hidden=true;change.hidden=true;
+   $('pelakResetTitle').textContent='رمز جدید ثبت شد';
+   resetFeedback('✅ رمز جدید ذخیره شد. پنجره را ببندید و با رمز جدید وارد پلاک شوید.',false,true);
+   try{await db.auth.signOut();}catch(_e){}
   }catch(ex){resetFeedback('تغییر رمز انجام نشد: '+(ex?.message||String(ex)),true);}
   finally{btn.disabled=false;btn.textContent='ذخیره رمز جدید';}
  });
- window.pelakResetRecoveryReady=()=>{window.pelakPasswordRecoveryPending=false;open('change');};
+ // Legacy recovery links still work if an earlier email was sent before the six-digit-code update.
+ window.pelakResetRecoveryReady=()=>{window.pelakPasswordRecoveryPending=false;if(resetVerificationInProgress||resetStage==='code'||(resetStage==='change'&&resetEmail))return;recoveryAuthorized=true;resetEmail='';showResetStage('change');};
  if(window.pelakPasswordRecoveryPending)window.pelakResetRecoveryReady();
 })();
 </script>
@@ -4007,6 +4077,24 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
  const supa=()=>typeof db!=='undefined'?db:null;
  const keyBytes=s=>{const v=s.replace(/-/g,'+').replace(/_/g,'/');const b=atob(v+'='.repeat((4-v.length%4)%4));return Uint8Array.from(b,c=>c.charCodeAt(0));};
  function supports(){return window.isSecureContext&&'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;}
+ // Register without prompting for notifications so a first-time install can activate in advance.
+ // A completed register() is not necessarily an ACTIVE service worker (notably on iOS).
+ let workerReadyPromise=null;
+ function activeWorker(){
+  if(!workerReadyPromise){
+   const activate=(async()=>{
+    const initial=await navigator.serviceWorker.register('./pelak-sw.js',{scope:'./'});
+    if(initial.active)return initial;
+    const ready=await navigator.serviceWorker.ready;
+    if(!ready?.active)throw Error('سرویس اعلان گوشی هنوز آماده نشده است. دوباره تلاش کنید.');
+    return ready;
+   })();
+   const timeout=new Promise((_,reject)=>setTimeout(()=>reject(Error('آماده‌سازی اعلان بیش از حد طول کشید. اتصال اینترنت را بررسی و دوباره تلاش کنید.')),20000));
+   workerReadyPromise=Promise.race([activate,timeout]).catch(err=>{workerReadyPromise=null;throw err;});
+  }
+  return workerReadyPromise;
+ }
+ function warmUpWorker(){if(supports()&&(!/iPad|iPhone|iPod/.test(navigator.userAgent)||isStandalone()))activeWorker().catch(()=>{});}
  async function existing(){const reg=await navigator.serviceWorker.getRegistration('./');return await reg?.pushManager?.getSubscription();}
  async function refresh(){
   const bound=localStorage.getItem(bindingKey);
@@ -4022,11 +4110,16 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   const sub=await existing().catch(()=>null);
   button.textContent=sub?txt('خاموش‌کردن اعلان‌های این گوشی','Disable alerts on this device','تعطيل إشعارات هذا الجهاز','ამ მოწყობილობაზე გამორთვა'):txt('فعال‌سازی اعلان‌های گوشی','Enable phone notifications','تفعيل إشعارات الهاتف','ტელეფონის შეტყობინებები');
  }
+ let busy=false;
  button.addEventListener('click',async()=>{
+  if(busy)return;
   if(!me()||!supa()){status.textContent='ابتدا وارد حساب خود شوید.';return;}
-  button.disabled=true;status.textContent='';
+  if(!supports()){status.textContent='این مرورگر اعلان وب را پشتیبانی نمی‌کند.';return;}
+  busy=true;button.disabled=true;status.textContent='در حال آماده‌سازی اعلان‌های گوشی…';
+  // iOS requires the permission prompt to start in the ORIGINAL button gesture.
+  // Start it before awaiting Storage/Supabase/worker registration.
+  const permissionPromise=Notification.permission==='default' ? Notification.requestPermission() : Promise.resolve(Notification.permission);
   try{
-   if(!supports())throw Error('این مرورگر اعلان وب را پشتیبانی نمی‌کند.');
    let old=await existing();
    // A shared device may have a stale subscription from a previous account.
    if(old){const {data:mine,error:checkError}=await supa().from('pelak_push_subscriptions').select('id').eq('endpoint',old.endpoint).eq('user_id',me().id).maybeSingle();
@@ -4039,22 +4132,32 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     if(error)throw error;
     await old.unsubscribe();localStorage.removeItem(bindingKey);status.textContent='🔕 اعلان‌های این گوشی خاموش شد.';
    }else{
-    // Request permission directly from the click gesture (required on iPhone).
-    const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
+    const permission=await permissionPromise;
     if(permission!=='granted')throw Error('برای دریافت اعلان، باید اجازه نمایش اعلان را بدهید.');
-    const reg=await navigator.serviceWorker.register('./pelak-sw.js',{scope:'./'});
-    const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:keyBytes(publicKey)});
+    const reg=await activeWorker();
+    // Retry once on a brief iOS activation race instead of exposing the transient error.
+    const options={userVisibleOnly:true,applicationServerKey:keyBytes(publicKey)};
+    let sub;
+    try{sub=await reg.pushManager.subscribe(options);}
+    catch(firstError){
+     if(!/active service worker|service worker.*activ/i.test(String(firstError?.message||'')))throw firstError;
+     const ready=await navigator.serviceWorker.ready;
+     if(!ready?.active)throw firstError;
+     await new Promise(resolve=>setTimeout(resolve,400));
+     sub=await ready.pushManager.subscribe(options);
+    }
     const payload=sub.toJSON();
     const {error}=await supa().from('pelak_push_subscriptions').upsert({user_id:me().id,endpoint:sub.endpoint,p256dh:payload.keys.p256dh,auth_key:payload.keys.auth,updated_at:new Date().toISOString()},{onConflict:'endpoint'});
     if(error){await sub.unsubscribe().catch(()=>{});throw error;}
     localStorage.setItem(bindingKey,me().id);status.textContent='✅ اعلان‌ها روی این گوشی فعال شدند.';
    }
   }catch(e){status.textContent='⚠️ '+(e?.message||'فعالسازی اعلان موفق نبود.');}
-  finally{button.disabled=false;refresh().catch(()=>{});}
+  finally{busy=false;button.disabled=false;refresh().catch(()=>{});}
  });
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh().catch(()=>{});});
  setInterval(()=>{if(!document.hidden)refresh().catch(()=>{});},15000);
  window.addEventListener('load',()=>{
+  warmUpWorker();
   refresh().catch(()=>{});
   const url=new URL(location.href);const go=url.searchParams.get('pelakView');
   if(go&&['admin','messages','support'].includes(go)){
@@ -4063,5 +4166,6 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    if(!attempt())setTimeout(attempt,1600);
   }
  });
+ if(document.readyState==='complete')warmUpWorker();
 })();
 </script></body></html>
