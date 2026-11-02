@@ -4725,10 +4725,10 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   let active='listings',scheduled=false;
   const lang=()=>titles[document.documentElement.lang]||titles.fa;
   function translate(){
-   for(const id in tabs)tabs[id].textContent=lang()[id];
+   for(const id in tabs)if(tabs[id].textContent!==lang()[id])tabs[id].textContent=lang()[id];
    for(const id of ['support','bugs']){
     const note=panes[id].querySelector('[data-admin-wait]');
-    if(note)note.textContent=lang().waiting;
+    if(note&&note.textContent!==lang().waiting)note.textContent=lang().waiting;
    }
   }
   function show(id){
