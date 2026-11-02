@@ -2502,7 +2502,7 @@ window.pelakSellerReset();
  const groups=['pelakDealerGuest','pelakDealerPending','pelakDealerDashboard'];
  function reveal(id){groups.forEach(k=>$(k).classList.toggle('hidden',k!==id));}
  let inFlight=false;
- async function fetchProfile(){const {data,error}=await db.from('pelak_showroom_profiles').select('user_id,display_name,city,contact_phone,profile_type').eq('user_id',user.id).maybeSingle();if(error)throw error;return data;}
+ async function fetchProfile(){const {data,error}=await db.rpc('pelak_my_dealer_profile');if(error)throw error;const row=Array.isArray(data)?data[0]:data;return row?.profile||row||null;}
  async function refreshDashboard(){
   const {data,error}=await db.from('listings').select('id,title,listing_status,created_at,expires_at').eq('user_id',user.id).order('created_at',{ascending:false}).limit(100);
   // Gracefully support an installation where the optional expiration migration is not yet applied.
@@ -2529,14 +2529,14 @@ window.pelakSellerReset();
    if(typeof user==='undefined'||!user){reveal('pelakDealerGuest');$('pelakDealerNotice').classList.add('hidden');return;}
    const profile=await fetchProfile();
    $('pelakDealerNotice').classList.add('hidden');
-       if(!profile){
+       if(!profile || profile.free_profile_public!==true){
      reveal('pelakDealerPending');
      $('pelakDealerStatusTitle').textContent='عضویت رایگان نمایشگاه';
      $('pelakDealerStatusText').textContent='فرم جداگانه درخواست عضویت حذف شده است. پروفایل نمایشگاه را در بالای همین صفحه تکمیل و ذخیره کن تا عضویت رایگان فعال شود.';
      return;
     }
     reveal('pelakDealerDashboard');
-    $('pelakDealerBrandTitle').textContent='✓ '+profile.display_name+' — عضویت رایگان فعال';
+    $('pelakDealerBrandTitle').textContent='✓ '+profile.business_name+' — عضویت رایگان فعال';
     await refreshDashboard();
   }catch(err){
    reveal('pelakDealerPending');$('pelakDealerStatusTitle').textContent='تنظیمات پنل آماده نیست';$('pelakDealerStatusText').textContent='برای فعال‌شدن درخواست‌های نمایشگاهی باید SQL مربوط به نسخه جدید در Supabase اجرا شود.';
@@ -2613,7 +2613,7 @@ window.pelakSellerReset();
    <div class="field"><label>آدرس نمایشگاه</label><input name="address" maxlength="220" value="${esc(p.address||'')}"></div>
    <div class="field"><label>لینک موقعیت نمایشگاه (HTTPS)</label><input type="url" name="map" value="${esc(p.map_url||'')}"></div>
    <button class="btn primary" type="submit">ذخیره صفحه نمایشگاه</button></form>`:'<p class="hint">ویرایش اطلاعات عمومی فقط برای مالک نمایشگاه است.</p>'}`);
- $('proCopyShowroom').onclick=()=>copy(base+'?showroom='+p.slug);$('proOpenShowroom').onclick=()=>showPublic(p.slug);
+ $('proCopyShowroom').onclick=()=>copy(base+'?showroom='+p.slug);$('proOpenShowroom').onclick=()=>showFreePublic(p.slug);
  $('proProfileForm')?.addEventListener('submit',async e=>{e.preventDefault();await action(e.submitter,async()=>{
   const f=new FormData(e.target);await rpc('pelak_pro_update_showroom',{p_bio:f.get('bio'),p_logo_url:f.get('logo'),p_public_phone:f.get('phone'),p_address:f.get('address'),p_map_url:f.get('map')});
   await refreshPro();note('اطلاعات صفحه نمایشگاه ذخیره شد.');});});
@@ -2661,17 +2661,84 @@ window.pelakSellerReset();
  }
  async function action(btn,handler){if(!btn||btn.disabled)return;btn.disabled=true;const before=btn.textContent;btn.textContent='در حال انجام…';try{await handler();}catch(e){note('عملیات ناموفق: '+e.message,true);alert('عملیات ناموفق: '+e.message);}finally{btn.disabled=false;btn.textContent=before;}}
  async function copy(t){try{await navigator.clipboard.writeText(t);alert('لینک کپی شد.');}catch(e){window.prompt('لینک:',t);}}
- async function showDirectory(){openModal('نمایشگاه‌های آنلاین پلاک','<p>در حال دریافت نمایشگاه‌ها…</p>');
-  try{const {data,error}=await db.from('pelak_showroom_profiles').select('user_id,display_name,city,profile_type').order('created_at',{ascending:false}).limit(100);
-   if(error)throw error;overlayBody.replaceChildren();
-   const rows=(data||[]).filter(r=>r.profile_type==='business');
-   if(!rows.length){overlayBody.textContent='هنوز نمایشگاهی با پروفایل تکمیل‌شده ثبت نشده است.';return;}
-   for(const r of rows){const el=document.createElement('div');el.className='pelak-pro-item';
-    const title=document.createElement('strong');title.textContent=r.display_name;
-    const city=document.createElement('small');city.textContent=r.city||'شهر ثبت نشده';
-    el.append(title,city,button('مشاهده نمایشگاه',()=>{closeModal();window.pelakOpenPublicShowroomProfile?.(r.user_id);},'outline'));overlayBody.append(el);}
+
+ async function showDirectory(){
+  openModal('نمایشگاه‌های آنلاین پلاک','<p>در حال دریافت نمایشگاه‌ها…</p>');
+  try{
+   const data=await rpc('pelak_public_showroom_directory');
+   overlayBody.replaceChildren();
+   const rows=Array.isArray(data)?data:[];
+   if(!rows.length){overlayBody.textContent='هنوز نمایشگاه عمومی ثبت نشده است.';return;}
+   for(const r of rows){
+    const el=document.createElement('div');el.className='pelak-pro-item';
+    const title=document.createElement('strong');title.textContent=r.name||'نمایشگاه پلاک';
+    const location=document.createElement('small');location.textContent='📍 '+(r.city||'شهر ثبت نشده')+' · '+Number(r.cars||0).toLocaleString('fa-IR')+' آگهی منتشرشده';
+    const row=document.createElement('div');row.className='row';
+    if(r.verified){const tag=document.createElement('span');tag.className='badge';tag.textContent='تأییدشده توسط پلاک';row.append(tag);}
+    if(['pro','vip'].includes(r.plan)){const tag=document.createElement('span');tag.className='badge';tag.textContent=r.plan.toUpperCase();row.append(tag);}
+    if(r.logo&&/^https:\/\//i.test(r.logo)){const im=document.createElement('img');im.alt='لوگوی نمایشگاه';im.loading='lazy';im.src=r.logo;im.style.cssText='width:54px;height:54px;object-fit:cover;border-radius:12px';el.append(im);}
+    else if(r.avatar_path&&db?.storage){const im=document.createElement('img');im.alt='لوگوی نمایشگاه';im.loading='lazy';im.src=db.storage.from('pelak-showrooms').getPublicUrl(r.avatar_path).data.publicUrl;im.style.cssText='width:54px;height:54px;object-fit:cover;border-radius:12px';el.append(im);}
+    el.append(title,location,row,button('مشاهده نمایشگاه',()=>showFreePublic(r.slug),'outline'));
+    overlayBody.append(el);
+   }
   }catch(e){overlayBody.textContent='بارگذاری نمایشگاه‌های رایگان ناموفق: '+e.message;}
  }
+ async function showFreePublic(slug){
+  if(!slug||!/^[a-z0-9-]{4,100}$/i.test(slug))return;
+  openModal('نمایشگاه پلاک','<p>در حال دریافت صفحه عمومی نمایشگاه…</p>');
+  try{
+   let p=null;
+   try{p=await rpc('pelak_free_showroom_public',{p_slug:slug});}
+   catch(err){
+    // The basic directory remains usable until the optional public-detail migration is installed.
+    const list=await rpc('pelak_public_showroom_directory');
+    p=Array.isArray(list)?list.find(x=>x.slug===slug):null;
+    if(!p)throw err;
+   }
+   if(!p){overlayBody.textContent='این نمایشگاه عمومی نیست یا پیدا نشد.';return;}
+   $('pelakProOverlayTitle').textContent=p.name||'نمایشگاه پلاک';
+   overlayBody.replaceChildren();
+   const intro=document.createElement('div');intro.className='pelak-pro-showroom';
+   const logo=p.avatar_path?db.storage.from('pelak-showrooms').getPublicUrl(p.avatar_path).data.publicUrl:p.logo;
+   if(logo&&/^https:\/\//i.test(logo)){const img=document.createElement('img');img.className='pelak-pro-logo';img.alt='لوگوی نمایشگاه';img.src=logo;intro.append(img);}
+   if(p.cover_path&&db?.storage){
+    const img=document.createElement('img');img.alt='کاور نمایشگاه';img.loading='lazy';
+    img.src=db.storage.from('pelak-showrooms').getPublicUrl(p.cover_path).data.publicUrl;
+    img.style.cssText='width:100%;max-height:180px;object-fit:cover;border-radius:12px';intro.append(img);
+   }
+   const name=document.createElement('h3');name.textContent=p.name||'نمایشگاه پلاک';intro.append(name);
+   const identity=document.createElement('p');identity.textContent=p.verified?'✓ نمایشگاه تأییدشده توسط پلاک':'پروفایل نمایشگاه (بدون نشان تأیید مدیریت)';intro.append(identity);
+   const city=document.createElement('p');city.textContent='📍 '+(p.city||'');intro.append(city);
+   if(p.bio){const bio=document.createElement('p');bio.textContent=p.bio;bio.style.whiteSpace='pre-wrap';intro.append(bio);}
+   if(p.address){const address=document.createElement('p');address.textContent='آدرس: '+p.address;intro.append(address);}
+   if(p.phone){const contact=document.createElement('a');contact.className='btn outline';contact.textContent='📞 تماس با نمایشگاه';contact.href='tel:'+String(p.phone).replace(/[^0-9+]/g,'');intro.append(contact);}
+   if(p.map&&/^https:\/\//i.test(p.map)){const a=document.createElement('a');a.className='btn outline';a.href=p.map;a.target='_blank';a.rel='noopener noreferrer';a.textContent='موقعیت روی نقشه';intro.append(a);}
+   overlayBody.append(intro);
+   const listings=Array.isArray(p.listings)?p.listings:[];
+   const sub=document.createElement('h3');sub.textContent='آگهی‌های منتشرشده';overlayBody.append(sub);
+   if(!listings.length){
+    const note=document.createElement('p');note.className='hint';
+    note.textContent=p.listings===undefined?'این نمایشگاه '+Number(p.cars||0).toLocaleString('fa-IR')+' آگهی منتشرشده دارد؛ نمایش جزئیات نیازمند نصب SQL تکمیلی است.':'فعلاً آگهی منتشرشده‌ای برای این نمایشگاه ثبت نشده است.';
+    overlayBody.append(note);
+   }
+   for(const x of listings){
+    const card=document.createElement('div');card.className='pelak-pro-item';
+    const head=document.createElement('strong');head.textContent=x.title||'آگهی خودرو';card.append(head);
+    const meta=document.createElement('small');meta.textContent=[x.make,x.model,x.year].filter(Boolean).join(' · ');card.append(meta);
+    const cost=document.createElement('b');cost.textContent=price(x.price,x.currency,x.price_negotiable);card.append(cost);
+    card.append(button('جزئیات آگهی',async()=>{
+     try{
+      const {data,error}=await db.from('listings').select('*').eq('id',x.id).eq('listing_status','published').maybeSingle();
+      if(error)throw error;if(!data)throw Error('این آگهی دیگر منتشر نیست.');
+      closeModal();window.pelakOpenDetails?.(data);
+     }catch(e){alert('نمایش آگهی ممکن نشد: '+e.message);}
+    },'outline'));
+    overlayBody.append(card);
+   }
+   overlayBody.append(button('کپی لینک نمایشگاه',()=>copy(base+'?showroom='+slug),'outline'));
+  }catch(e){overlayBody.textContent='صفحه نمایشگاه بارگذاری نشد: '+e.message;}
+ }
+ window.pelakShowFreeShowroom=showFreePublic;
  async function showPublic(slug){openModal('نمایشگاه پلاک','<p>در حال دریافت ویترین خودروها…</p>');try{const p=await rpc('pelak_pro_public_showroom',{p_slug:slug});if(!p){overlayBody.textContent='نمایشگاه پیدا نشد یا اشتراکش فعال نیست.';return;}
  $('pelakProOverlayTitle').textContent=p.name;const safeUrl=v=>/^https:\/\//.test(v||'')?v:'';
  overlayBody.innerHTML=`<div class="pelak-pro-showroom">${safeUrl(p.logo)?`<img class="pelak-pro-logo" src="${esc(p.logo)}" alt="لوگوی نمایشگاه">`:''}<h3>${esc(p.name)} ${p.plan==='vip'?'★ VIP':''}</h3>
@@ -2738,7 +2805,7 @@ window.pelakSellerReset();
  const ordered=[...cards.filter(c=>S.featured.has(c.dataset.listingId)),...cards.filter(c=>!S.featured.has(c.dataset.listingId))];if(ordered.some((c,i)=>c!==cards[i]))ordered.forEach(c=>grid.appendChild(c));
  }catch(e){}}
  const publicGrid=$('carsGrid');if(publicGrid){const mo=new MutationObserver(()=>{if(window.__proOrderPending)return;window.__proOrderPending=true;setTimeout(()=>{window.__proOrderPending=false;highlightFeatured();},500);});mo.observe(publicGrid,{childList:true});}
- const match=new URLSearchParams(location.search).get('showroom');if(match&&/^[a-z0-9-]{4,80}$/.test(match))setTimeout(()=>showPublic(match),1100);
+ const match=new URLSearchParams(location.search).get('showroom');if(match&&/^[a-z0-9-]{4,100}$/.test(match))setTimeout(()=>showFreePublic(match),1100);
  $('pelakMenuItems').addEventListener('click',e=>{if(e.target?.dataset?.target==='dealer')setTimeout(refreshPro,200);});
  // The original onboarding UI still handles users who are not approved dealers.
  window.addEventListener('pelakProOpen',refreshPro);
@@ -3545,9 +3612,9 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
  profileEl.innerHTML=`<div class="pelak-profile-preview" id="pelakProfilePreview"><img class="pelak-profile-avatar" id="pelakProfileAvatar" alt="تصویر پروفایل نمایشگاه" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect width='200' height='200' rx='35' fill='%231b4b71'/%3E%3Ctext x='100' y='118' text-anchor='middle' font-size='65' fill='white'%3EP%3C/text%3E%3C/svg%3E"><div class="pelak-profile-preview-label"><strong id="pelakProfilePreviewName">ویترین شخصی شما در پلاک</strong><small id="pelakProfilePreviewCity">برای افراد و نمایشگاه‌های واقعی</small></div></div>
  <h3 style="color:white;margin:2px 0 6px">🏬 پروفایل نمایشگاه مجازی من</h3><p class="pelak-profile-note">عضویت و ثبت آگهی نمایشگاه رایگان است؛ با ذخیره پروفایل، عضویت فعال می‌شود. دستیار هوش مصنوعی اختیاری و پولی است.</p>
  <form id="pelakProfileForm" class="pelak-profile-editor">
- <label>نوع فعالیت<select id="pelakProfileType"><option value="personal">نمایشگاه شخصی / فروشنده چند خودرو</option><option value="business" selected>نمایشگاه خودرو واقعی</option></select></label>
+ <p class="wide pelak-profile-note">عضویت پایه برای فروشنده و نمایشگاه رایگان است؛ نشان تأیید مدیریت جداگانه بررسی می‌شود.</p>
  <label>نام نمایشی<input id="pelakProfileName" required maxlength="100" placeholder="مثلاً گالری خودروی من"></label>
- <label>شهر فعالیت<input id="pelakProfileCity" maxlength="80" placeholder="مثلاً رشت"></label>
+ <label>شهر فعالیت<input id="pelakProfileCity" required minlength="2" maxlength="80" placeholder="مثلاً رشت"></label>
  <label>شماره کاری (اختیاری، عمومی)<input id="pelakProfilePhone" maxlength="22" inputmode="tel" placeholder="شماره تماس نمایشگاه"></label>
  <label class="wide">درباره نمایشگاه<textarea id="pelakProfileBio" maxlength="700" placeholder="در چند خط درباره خودت یا نمایشگاهت بگو..."></textarea></label>
  <label>لوگو / عکس پروفایل<input id="pelakProfileAvatarFile" type="file" accept="image/*"></label>
@@ -3557,14 +3624,31 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
  if(dealer){const head=dealer.querySelector('.p526-head');if(head)head.insertAdjacentElement('afterend',profileEl);else dealer.prepend(profileEl);}
  let lastProfile=null;
  const profNotice=t=>{const n=$('pelakProfileNotice');if(n)n.textContent=t;};
- function profilePaint(r){if(!r)return;$('pelakProfilePreviewName').textContent=r.display_name||'نمایشگاه مجازی من';$('pelakProfilePreviewCity').textContent=r.city||'نمایشگاه شخصی / نمایشگاه واقعی';
-  $('pelakProfileName').value=r.display_name||'';$('pelakProfileCity').value=r.city||'';$('pelakProfileBio').value=r.bio||'';$('pelakProfilePhone').value=r.contact_phone||'';$('pelakProfileType').value=r.profile_type||'personal';
-  if(r.avatar_path)$('pelakProfileAvatar').src=db.storage.from('pelak-showrooms').getPublicUrl(r.avatar_path).data.publicUrl;
-  if(r.cover_path)$('pelakProfilePreview').style.backgroundImage='url("'+db.storage.from('pelak-showrooms').getPublicUrl(r.cover_path).data.publicUrl+'")';
+
+ function profilePaint(r){
+  if(!r)return;
+  $('pelakProfilePreviewName').textContent=r.business_name||'نمایشگاه مجازی من';
+  $('pelakProfilePreviewCity').textContent=r.city||'نمایشگاه مجازی';
+  $('pelakProfileName').value=r.business_name||'';
+  $('pelakProfileCity').value=r.city||'';
+  $('pelakProfileBio').value=r.bio||'';
+  $('pelakProfilePhone').value=r.public_phone||r.contact_phone||'';
+  const avatar=r.free_avatar_path?db.storage.from('pelak-showrooms').getPublicUrl(r.free_avatar_path).data.publicUrl:r.logo_url;
+  if(avatar&&/^https:\/\//i.test(avatar))$('pelakProfileAvatar').src=avatar;
+  if(r.free_cover_path){
+   const cover=db.storage.from('pelak-showrooms').getPublicUrl(r.free_cover_path).data.publicUrl;
+   $('pelakProfilePreview').style.backgroundImage='url("'+cover+'")';
+  }
  }
- async function getMyProfile(){if(!db||!user){profNotice('برای ساخت نمایشگاه مجازی وارد حسابت شو.');return;}
-  try{const {data,error}=await db.from('pelak_showroom_profiles').select('*').eq('user_id',user.id).maybeSingle();if(error)throw error;lastProfile=data;if(data)profilePaint(data);profNotice(data?'پروفایل ذخیره‌شده‌ات آماده و قابل ویرایش است.':'نام، لوگو یا عکس دلخواهت را وارد کن و ذخیره بزن.');}
-  catch(e){profNotice('پروفایل هنوز به دیتابیس متصل نیست: SQL نسخه ۵.۳۸ را نصب کن. ('+(e?.message||e)+')');}
+ async function getMyProfile(){
+  if(!db||!user){profNotice('برای ساخت نمایشگاه مجازی وارد حسابت شو.');return;}
+  try{
+   const {data,error}=await db.rpc('pelak_my_dealer_profile');if(error)throw error;
+   const row=Array.isArray(data)?data[0]:data;
+   lastProfile=row?.profile||row||null;
+   if(lastProfile)profilePaint(lastProfile);
+   profNotice(lastProfile?(lastProfile.free_profile_public?'پروفایل رایگان فعال است و قابل ویرایش.':'برای فعال‌کردن نمایشگاه رایگان، پروفایل موجود را ذخیره کن.'):'نام نمایشگاه و شهر را وارد کن و ذخیره بزن.');
+  }catch(e){profNotice('دریافت پروفایل ممکن نشد: '+e.message);}
  }
  window.addEventListener('pelak:dealer-panel-open',()=>{setTimeout(getMyProfile,150);});
  async function jpegOf(file,limit=1200){if(!file)return null;if(file.size>15*1024*1024)throw Error('حجم تصویر انتخابی بالای ۱۵ مگابایت است.');
@@ -3573,40 +3657,60 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
    canvas.getContext('2d').drawImage(im,0,0,canvas.width,canvas.height);return await new Promise((res,rej)=>canvas.toBlob(b=>b?res(b):rej(Error('تبدیل عکس ممکن نیست')),'image/jpeg',.78));
   }finally{URL.revokeObjectURL(url);}
  }
- async function saveProfile(e){e.preventDefault();if(!user){profNotice('اول وارد حساب شو.');return;}
-  const btn=$('pelakProfileSave');btn.disabled=true;profNotice('در حال ذخیره پروفایل…');
-  try{const avatar=$('pelakProfileAvatarFile').files[0],cover=$('pelakProfileCoverFile').files[0];
-   const uploaded={};for(const [which,file] of [['avatar',avatar],['cover',cover]])if(file){const blob=await jpegOf(file,which==='avatar'?650:1400);
-    if(blob.size>5*1024*1024)throw Error('حجم تصویر پس از کاهش اندازه هنوز زیاد است.');
-    const path=user.id+'/'+which+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)+'.jpg';
-    const {error}=await db.storage.from('pelak-showrooms').upload(path,blob,{contentType:'image/jpeg',upsert:false});if(error)throw error;
-    uploaded[which+'_path']=path;
+
+ async function saveProfile(e){
+  e.preventDefault();if(!user){profNotice('اول وارد حساب شو.');return;}
+  const submit=$('pelakProfileSave');submit.disabled=true;
+  profNotice('در حال ذخیره پروفایل رایگان…');
+  let mainSaved=false;
+  try{
+   const name=$('pelakProfileName').value.trim(),city=$('pelakProfileCity').value.trim();
+   const {data,error}=await db.rpc('pelak_free_showroom_save',{
+    p_business_name:name,p_city:city,
+    p_public_phone:$('pelakProfilePhone').value.trim()||null,
+    p_bio:$('pelakProfileBio').value.trim()||null
+   });
+   if(error)throw error;
+   mainSaved=true;
+   const avatar=$('pelakProfileAvatarFile').files[0],cover=$('pelakProfileCoverFile').files[0];
+   let mediaNotice='';
+   if(avatar||cover){
+    try{
+     // Check optional media RPC BEFORE upload; no orphan files when SQL has not been installed.
+     const probe=await db.rpc('pelak_free_showroom_media_save',{p_avatar_path:null,p_cover_path:null});
+     if(probe.error)throw probe.error;
+     const uploaded={};
+     for(const [kind,file] of [['avatar',avatar],['cover',cover]]){
+      if(!file)continue;
+      const blob=await jpegOf(file,kind==='avatar'?650:1400);
+      if(blob.size>5*1024*1024)throw Error('عکس بیش از ۵ مگابایت است.');
+      const path=user.id+'/'+kind+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)+'.jpg';
+      const {error:uploadError}=await db.storage.from('pelak-showrooms').upload(path,blob,{contentType:'image/jpeg',upsert:false});
+      if(uploadError)throw uploadError;
+      uploaded[kind]=path;
+     }
+     const saved=await db.rpc('pelak_free_showroom_media_save',{
+      p_avatar_path:uploaded.avatar||null,p_cover_path:uploaded.cover||null
+     });
+     if(saved.error)throw saved.error;
+     $('pelakProfileAvatarFile').value='';$('pelakProfileCoverFile').value='';
+    }catch(mediaError){
+     mediaNotice=' متن پروفایل ذخیره شد اما عکس ذخیره نشد: '+mediaError.message+' (SQL تکمیلی تصاویر را بررسی کن).';
+    }
    }
-   const doc={user_id:user.id,profile_type:$('pelakProfileType').value,display_name:$('pelakProfileName').value.trim(),city:$('pelakProfileCity').value.trim(),bio:$('pelakProfileBio').value.trim(),contact_phone:$('pelakProfilePhone').value.trim()||null,...uploaded};
-   if(!doc.display_name)throw Error('نام نمایشگاه را وارد کن.');
-   const {data,error}=await db.from('pelak_showroom_profiles').upsert(doc,{onConflict:'user_id'}).select('*').single();if(error)throw error;
-   lastProfile=data;profilePaint(data);profNotice('✅ پروفایل ذخیره شد و عضویت رایگان نمایشگاه فعال است.');window.dispatchEvent(new Event('pelak:free-dealer-profile-saved'));
-  }catch(ex){profNotice('ذخیره نشد: '+(ex?.message||ex)+' — بررسی کن SQL نسخه ۵.۳۸ اجرا شده باشد.');}
-  finally{btn.disabled=false;}
+   lastProfile={...(lastProfile||{}),business_name:name,city,
+    bio:$('pelakProfileBio').value.trim(),public_phone:$('pelakProfilePhone').value.trim(),
+    free_profile_public:true,slug:data?.slug||lastProfile?.slug};
+   await getMyProfile();
+   profNotice('✅ عضویت پایه رایگان نمایشگاه ذخیره و فعال شد.'+mediaNotice);
+   window.dispatchEvent(new Event('pelak:free-dealer-profile-saved'));
+  }catch(ex){
+   profNotice((mainSaved?'پروفایل ذخیره شد، اما ادامه کار با خطا مواجه شد: ':'ذخیره نشد: ')+(ex?.message||ex));
+  }finally{submit.disabled=false;}
  }
  $('pelakProfileForm')?.addEventListener('submit',saveProfile);
   $('pelakFreeAiActivate')?.addEventListener('click',()=>{if(!user){window.pelakNavigate?.('auth');return;}if(typeof window.pelakOpenVipAssistant==='function')window.pelakOpenVipAssistant();else profNotice('خدمات دستیار هنوز در این نسخه به سرور متصل نیست؛ فعال‌سازی انجام نشده است.');});
- async function viewShowroom(uid){if(!isUUID(uid))return;
-  try{const {data,error}=await db.from('pelak_showroom_profiles').select('display_name,profile_type,city,bio,contact_phone,avatar_path,cover_path,user_id').eq('user_id',uid).maybeSingle();if(error)throw error;
-   if(!data){alert('فروشنده هنوز پروفایل نمایشگاه مجازی نساخته است.');return;}
-   const shade=document.createElement('div');shade.className='pelak-detail-backdrop';const pop=document.createElement('div');pop.className='pelak-detail-dialog';pop.style.maxWidth='540px';
-   const close=document.createElement('button');close.className='pelak-detail-close';close.textContent='×';close.setAttribute('aria-label','بستن نمایشگاه');close.onclick=()=>shade.remove();
-   const info=document.createElement('div');info.className='pelak-showroom-profile';
-   const hero=document.createElement('div');hero.className='pelak-profile-preview';if(data.cover_path){const u=db.storage.from('pelak-showrooms').getPublicUrl(data.cover_path).data.publicUrl;hero.style.backgroundImage='url("'+u+'")';}
-   const avatar=document.createElement('img');avatar.className='pelak-profile-avatar';avatar.alt='تصویر نمایشگاه';if(data.avatar_path)avatar.src=db.storage.from('pelak-showrooms').getPublicUrl(data.avatar_path).data.publicUrl;
-   const labels=document.createElement('div');labels.className='pelak-profile-preview-label';const title=document.createElement('strong');title.textContent=data.display_name;const tag=document.createElement('small');tag.textContent=(data.profile_type==='business'?'نمایشگاه خودرو':'نمایشگاه شخصی')+(data.city?' · '+data.city:'');labels.append(title,tag);hero.append(avatar,labels);info.append(hero);
-   const bio=document.createElement('p');bio.textContent=data.bio||'معرفی درج نشده است.';bio.style.whiteSpace='pre-wrap';info.append(bio);
-   if(data.contact_phone){const a=document.createElement('a');a.className='btn primary';a.textContent='📞 تماس با نمایشگاه';const n=data.contact_phone.replace(/[^0-9+]/g,'');a.href='tel:'+n;info.append(a);}
-   const list=document.createElement('button');list.className='btn outline';list.textContent='دیدن خودروهای این فروشنده';list.onclick=()=>{shade.remove();window.pelakNavigate?.('listings');const cards=[...document.querySelectorAll('#carsGrid .car-card')];const one=cards.find(c=>lookupRow(c)?.user_id===uid);one?.scrollIntoView({behavior:'smooth',block:'center'});};info.append(list);
-   pop.append(close,info);shade.append(pop);shade.onclick=e=>{if(e.target===shade)shade.remove();};document.body.append(shade);
-  }catch(e){alert('نمایش پروفایل ممکن نیست. شاید SQL نسخه ۵.۳۸ اجرا نشده باشد. '+(e?.message||e));}
- }
-  window.pelakOpenPublicShowroomProfile=viewShowroom;
+ window.pelakOpenPublicShowroomProfile=slug=>window.pelakShowFreeShowroom?.(slug);
  // Report a site error, optionally with a screenshot. Private storage and RLS are in companion SQL.
  const support=$('pelakBugReportBody');
  if(support)support.innerHTML=`<p>اگر خطایی دیدی، توضیح بده و در صورت تمایل اسکرین‌شات بفرست. گزارش و تصویر فقط برای رسیدگی تیم پلاک ذخیره می‌شوند.</p><form class="pelak-bug-form" id="pelakBugForm">
