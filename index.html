@@ -4237,6 +4237,12 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   finally{busy=false;button.disabled=false;refresh().catch(()=>{});}
  });
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh().catch(()=>{});});
+ // Re-check immediately after sign-in, rather than waiting for the periodic status refresh.
+ function watchAuth(){
+  if(!supa()?.auth){setTimeout(watchAuth,300);return;}
+  supa().auth.onAuthStateChange(()=>setTimeout(()=>refresh().catch(()=>{}),0));
+ }
+ watchAuth();
  setInterval(()=>{if(!document.hidden)refresh().catch(()=>{});},15000);
  window.addEventListener('load',()=>{
   warmUpWorker();
