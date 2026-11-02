@@ -3936,6 +3936,48 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 #s47AdminBox .s47-danger:hover{background:#ffe9e9}
 #pelakSupportApp .s47-row button,#s47AdminBox .s47-row button{white-space:normal}
 </style>
+
+<style id="pelak-support-admin-clarity-v1">
+/* Isolated presentation upgrade for the staff support inbox only. */
+#s47AdminBox{display:block;min-width:0}
+#s47AdminBox .s47-two{grid-template-columns:minmax(255px,.8fr) minmax(0,1.5fr);align-items:start;gap:15px}
+#s47AdminBox .s47-admin-column{min-width:0;border:1px solid #dce5ef;border-radius:16px;background:#fff;padding:13px;display:grid;gap:11px}
+#s47AdminBox .s47-section-title{margin:0;color:#10233f;font-size:1rem;font-weight:800}
+#s47AdminBox .s47-list{max-height:520px;overflow:auto;gap:9px}
+#s47AdminBox .s47-admin-item{border:1px solid #dce5ef;text-align:start;display:grid;gap:6px;padding:12px 13px;border-radius:12px;background:#f8fafc;overflow-wrap:anywhere}
+#s47AdminBox .s47-admin-item[aria-current="true"]{border:2px solid #bd9549;background:#fffaf0}
+#s47AdminBox .s47-item-head{display:flex;align-items:flex-start;gap:8px;justify-content:space-between}
+#s47AdminBox .s47-subject{color:#10233f;font-weight:800;min-width:0}
+#s47AdminBox .s47-state{flex:0 0 auto;padding:2px 9px;border-radius:20px;background:#e7edf3;color:#40536a;font-size:.76rem;font-weight:700;white-space:nowrap}
+#s47AdminBox .s47-state[data-status="open"]{background:#fff1d1;color:#805500}
+#s47AdminBox .s47-state[data-status="answered"]{background:#e2f3e9;color:#1e6842}
+#s47AdminBox .s47-person{font-size:.86rem;line-height:1.5;color:#526780;overflow-wrap:anywhere}
+#s47AdminBox .s47-current-head{display:grid;gap:7px;padding:12px;border:1px solid #dce5ef;background:#f6f9fc;border-radius:12px;overflow-wrap:anywhere}
+#s47AdminBox .s47-current-head strong{color:#10233f;font-size:1.05rem}
+#s47AdminBox .s47-thread{max-height:440px;min-height:70px;background:#f9fbfe;border-color:#e3e9f0}
+#s47AdminBox .s47-bubble{max-width:88%;font-size:.93rem;border:1px solid #dfe8f1}
+#s47AdminBox .s47-bubble.s47-from-staff{background:#e5eefb}
+#s47AdminBox .s47-bubble.s47-from-customer{background:#fff}
+#s47AdminBox .s47-bubble strong,#s47AdminBox .s47-bubble small{display:block;font-size:.82rem}
+#s47AdminBox .s47-answer{padding:12px;border:1px solid #dce5ef;border-radius:12px;background:#fff}
+#s47AdminBox .s47-answer label{margin:0;font-size:.92rem}
+#s47AdminBox .s47-answer textarea{min-height:105px}
+#s47AdminBox .s47-manage{margin-top:2px;border:1px solid #dce5ef;border-radius:12px;background:#f8fafc;padding:10px}
+#s47AdminBox .s47-manage summary{font-weight:750;color:#435a73;cursor:pointer;line-height:1.8}
+#s47AdminBox .s47-action-row{margin-top:10px;padding-top:10px;border-top:1px solid #e1e7ef;gap:8px}
+#s47AdminBox .s47-action-row button{font-size:.88rem;min-height:42px}
+#s47AdminBox .s47-danger{margin-inline-start:auto}
+@media(max-width:700px){
+ #s47AdminBox .s47-two{grid-template-columns:minmax(0,1fr);gap:12px}
+ #s47AdminBox .s47-admin-column{padding:11px;gap:10px}
+ #s47AdminBox .s47-list{max-height:340px}
+ #s47AdminBox .s47-current-head{padding:11px}
+ #s47AdminBox .s47-bubble{max-width:92%}
+ #s47AdminBox .s47-row>button{font-size:.88rem;min-height:40px}
+ #s47AdminBox .s47-action-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ #s47AdminBox .s47-action-row .s47-danger{grid-column:1/-1;margin:0}
+}
+</style>
 <script id="pelak-v547-support-chat">
 (function(){'use strict';
 const $=id=>document.getElementById(id);
@@ -3949,6 +3991,11 @@ Object.assign(LANG.fa,{hideMine:'حذف از صندوق من',showHidden:'گفت
 Object.assign(LANG.en,{hideMine:'Remove from my inbox',showHidden:'Removed conversations',showVisible:'My conversations',restoreMine:'Restore to inbox',hideWarn:'This hides the conversation from your inbox only. Support retains the history. Continue?',archiveStaff:'Archive conversation',unarchiveStaff:'Unarchive conversation',showArchived:'View archive',showInbox:'Main inbox',deleteForever:'Delete permanently (owner only)',deleteWarn:'This permanently deletes the entire conversation for everyone. Type DELETE to confirm:',actionError:'Action failed.',actionDone:'Done.'});
 Object.assign(LANG.ar,{hideMine:'إزالة من صندوقي',showHidden:'المحادثات المخفية',showVisible:'محادثاتي',restoreMine:'استعادة المحادثة',hideWarn:'ستُخفى المحادثة من صندوقك فقط، ويبقى سجلها لدى الدعم. هل تريد المتابعة؟',archiveStaff:'أرشفة المحادثة',unarchiveStaff:'إلغاء الأرشفة',showArchived:'عرض الأرشيف',showInbox:'صندوق الوارد',deleteForever:'حذف نهائي (للمالك فقط)',deleteWarn:'سيتم حذف جميع الرسائل نهائياً للجميع. اكتب DELETE للتأكيد:',actionError:'تعذّر التنفيذ.',actionDone:'تم.'});
 Object.assign(LANG.ka,{hideMine:'ჩემი სიიდან წაშლა',showHidden:'დამალული საუბრები',showVisible:'ჩემი საუბრები',restoreMine:'სიაში დაბრუნება',hideWarn:'საუბარი დაიმალება მხოლოდ თქვენთვის; მხარდაჭერას ისტორია დარჩება. განვაგრძოთ?',archiveStaff:'საუბრის არქივში გადატანა',unarchiveStaff:'არქივიდან დაბრუნება',showArchived:'არქივის ნახვა',showInbox:'მთავარი სია',deleteForever:'სამუდამოდ წაშლა (მხოლოდ მფლობელი)',deleteWarn:'საუბარი და ყველა შეტყობინება წაიშლება ყველასთვის. დასადასტურებლად აკრიფეთ DELETE:',actionError:'ოპერაცია ვერ შესრულდა.',actionDone:'შესრულებულია.'});
+
+Object.assign(LANG.fa,{conversations:'۱. انتخاب گفتگو',conversationDetail:'۲. گفتگو و پاسخ',manageThread:'تنظیمات گفتگو (بستن، بایگانی و حذف)',answerCustomer:'پاسخ به کاربر'});
+Object.assign(LANG.en,{conversations:'1. Select a conversation',conversationDetail:'2. Messages and reply',manageThread:'Conversation actions (close, archive, delete)',answerCustomer:'Reply to customer'});
+Object.assign(LANG.ar,{conversations:'١. اختيار المحادثة',conversationDetail:'٢. الرسائل والرد',manageThread:'إدارة المحادثة (إغلاق، أرشفة، حذف)',answerCustomer:'الرد على المستخدم'});
+Object.assign(LANG.ka,{conversations:'1. საუბრის არჩევა',conversationDetail:'2. შეტყობინებები და პასუხი',manageThread:'საუბრის მართვა (დახურვა, არქივი, წაშლა)',answerCustomer:'მომხმარებლისთვის პასუხი'});
 let lang='fa',isStaff=false,isOwnerAdmin=false,showUserHidden=false,showStaffArchived=false,personal=[],adminRows=[],selectedPersonal=null,selectedAdmin=null,personalMessages=[],adminMessages=[];
 const client=()=>typeof db==='undefined'?null:db;
 const account=()=>typeof user==='undefined'?null:user;
@@ -3982,14 +4029,24 @@ function build(){
   panel.style.marginTop='22px';panel.style.borderTop='1px solid #dce5ef';panel.style.paddingTop='18px';
   const top=n('div','s47-row');const h=n('h3','',tr('admin'));h.id='s47AdminHeading';const badge=n('span','s47-badge');badge.id='s47AdminCounter';top.append(h,badge,btn(tr('refresh'),refreshAdmin),btn(showStaffArchived?tr('showInbox'):tr('showArchived'),ev=>{showStaffArchived=!showStaffArchived;ev.currentTarget.textContent=showStaffArchived?tr('showInbox'):tr('showArchived');selectedAdmin=null;adminMessages=[];refreshAdmin();}));
   const intro=n('p','s47-muted',tr('adminHint'));
-  const panes=n('div','s47-two');const inbox=n('div','s47-list');inbox.id='s47AdminList';const reply=n('div','s47-stack');reply.id='s47AdminDetails';panes.append(inbox,reply);
+  const panes=n('div','s47-two');const inbox=n('div','s47-list');inbox.id='s47AdminList';const reply=n('div','s47-stack');reply.id='s47AdminDetails';
+  const inboxColumn=n('div','s47-admin-column');inboxColumn.append(n('h4','s47-section-title',tr('conversations')),inbox);
+  const replyColumn=n('div','s47-admin-column');replyColumn.append(n('h4','s47-section-title',tr('conversationDetail')),reply);
+  panes.append(inboxColumn,replyColumn);
   panel.append(top,intro,panes);
   const anchor=$('adminOwnerTools');if(anchor?.parentNode)anchor.parentNode.insertBefore(panel,anchor);else adminPanel.querySelector('.panel')?.append(panel);
  }
  renderPersonal();renderAdmin();
 }
-function bubbleList(el,arr,ownerId){const wrap=n('div','s47-thread');if(!arr.length)wrap.append(n('p','s47-muted',tr('empty')));
- for(const row of arr){const me=row.sender_id===account()?.id;const b=n('div','s47-bubble'+(me?' mine':''));b.append(n('strong','',me?tr('you'):tr('support')),n('div','',row.body),n('small','s47-muted',fmt(row.created_at)));wrap.append(b);}
+function bubbleList(el,arr,ownerId,staffView=false){
+ const wrap=n('div','s47-thread');if(!arr.length)wrap.append(n('p','s47-muted',tr('empty')));
+ for(const row of arr){
+  const fromCustomer=row.sender_id===ownerId;
+  const mine=staffView?!fromCustomer:fromCustomer;
+  const bubble=n('div','s47-bubble'+(mine?' mine':'')+(fromCustomer?' s47-from-customer':' s47-from-staff'));
+  const sender=staffView?(fromCustomer?tr('owner'):tr('support')):(fromCustomer?tr('you'):tr('support'));
+  bubble.append(n('strong','',sender),n('div','',row.body),n('small','s47-muted',fmt(row.created_at)));wrap.append(bubble);
+ }
  el.append(wrap);
 }
 function renderPersonal(){const list=$('s47MyList'),d=$('s47MyDetails');if(!list||!d)return;list.replaceChildren();d.replaceChildren();
@@ -4027,13 +4084,55 @@ async function refreshPersonal(keep=false){if(!client()||!account()){personal=[]
  if(!keep&&(!selectedPersonal||!personal.some(x=>x.id===selectedPersonal)))selectedPersonal=personal[0]?.id||null;
  if(selectedPersonal){await selectPersonal(selectedPersonal);}else renderPersonal();
 }
-function renderAdmin(){const panel=$('s47AdminBox'),list=$('s47AdminList'),details=$('s47AdminDetails');if(!panel||!list||!details)return;
- panel.hidden=!isStaff;list.replaceChildren();details.replaceChildren();$('s47AdminCounter').textContent=tr('pending')+': '+adminRows.filter(x=>x.status==='open'&&!x.archived_for_staff).length;
- if(!adminRows.length){list.append(n('p','s47-muted',tr('noAdmin')));return;}
- for(const t of adminRows){const e=n('button','s47-item');e.type='button';e.setAttribute('aria-current',String(t.id===selectedAdmin));e.append(n('strong','',t.subject),n('div','s47-muted',stateText(t.status)+' · '+fmt(t.last_message_at)),n('small','s47-muted',adminOwnerLabel(t)));e.onclick=()=>selectAdmin(t.id);list.append(e);}
- const active=adminRows.find(x=>x.id===selectedAdmin);if(!active){details.append(n('p','s47-muted',tr('pick')));return;}
- details.append(n('strong','',active.subject+' · '+stateText(active.status)),n('small','s47-muted',tr('owner')+': '+adminOwnerLabel(active)));bubbleList(details,adminMessages,active.user_id);
- const controls=n('div','s47-row');const toggle=btn(active.status==='closed'?tr('reopen'):tr('close'),async()=>{
+function renderAdmin(){
+ const panel=$('s47AdminBox'),list=$('s47AdminList'),details=$('s47AdminDetails');
+ if(!panel||!list||!details)return;
+ panel.hidden=!isStaff;list.replaceChildren();details.replaceChildren();
+ $('s47AdminCounter').textContent=tr('pending')+': '+adminRows.filter(x=>x.status==='open'&&!x.archived_for_staff).length;
+ if(!adminRows.length){
+  list.append(n('p','s47-muted',tr('noAdmin')));
+  details.append(n('p','s47-muted',tr('pick')));
+  return;
+ }
+ for(const t of adminRows){
+  const item=n('button','s47-item s47-admin-item');item.type='button';
+  item.setAttribute('aria-current',String(t.id===selectedAdmin));
+  const head=n('div','s47-item-head');
+  const state=n('span','s47-state',stateText(t.status));state.dataset.status=t.status||'open';
+  head.append(n('strong','s47-subject',t.subject),state);
+  item.append(head,n('div','s47-person',tr('owner')+': '+adminOwnerLabel(t)),n('small','s47-muted',fmt(t.last_message_at)));
+  item.onclick=async()=>{
+   await selectAdmin(t.id);
+   if(window.matchMedia('(max-width:700px)').matches)$('s47AdminDetails')?.scrollIntoView({behavior:'smooth',block:'start'});
+  };
+  list.append(item);
+ }
+ const active=adminRows.find(x=>x.id===selectedAdmin);
+ if(!active){details.append(n('p','s47-muted',tr('pick')));return;}
+ const current=n('div','s47-current-head');
+ const badge=n('span','s47-state',stateText(active.status));badge.dataset.status=active.status||'open';
+ current.append(n('strong','',active.subject),n('div','s47-person',tr('owner')+': '+adminOwnerLabel(active)),badge);
+ details.append(current);
+ bubbleList(details,adminMessages,active.user_id,true);
+ if(active.status==='closed')details.append(n('p','s47-muted',tr('closedHint')));
+ else{
+  const form=n('form','s47-stack s47-answer');
+  const label=n('label','',tr('answerCustomer'));
+  const ta=n('textarea');ta.required=true;ta.maxLength=3000;ta.placeholder=tr('replyPh');
+  const send=n('button','btn primary',tr('reply'));send.type='submit';
+  const notice=n('p','s47-notice');form.append(label,ta,send,notice);
+  form.onsubmit=async e=>{
+   e.preventDefault();const val=ta.value.trim();if(!val||!account())return;send.disabled=true;
+   try{const {error}=await client().from('pelak_support_messages').insert({thread_id:active.id,sender_id:account().id,body:val});if(error)throw error;ta.value='';await refreshAdmin();}
+   catch(er){notice.textContent=explain(er);notice.classList.add('s47-error');}
+   finally{send.disabled=false;}
+  };
+  details.append(form);
+ }
+ const manage=n('details','s47-manage');
+ const summary=n('summary','',tr('manageThread'));manage.append(summary);
+ const controls=n('div','s47-row s47-action-row');
+ const toggle=btn(active.status==='closed'?tr('reopen'):tr('close'),async()=>{
   const next=active.status==='closed'?'open':'closed';toggle.disabled=true;
   try{const {error}=await client().from('pelak_support_threads').update({status:next}).eq('id',active.id);if(error)throw error;await refreshAdmin();}
   catch(e){details.append(n('p','s47-error',explain(e)));}finally{toggle.disabled=false;}
@@ -4043,19 +4142,16 @@ function renderAdmin(){const panel=$('s47AdminBox'),list=$('s47AdminList'),detai
   try{const {data,error}=await client().rpc('pelak_support_archive_thread',{p_thread_id:active.id,p_archive:!active.archived_for_staff});if(error)throw error;if(data!==true)throw Error(tr('actionError'));selectedAdmin=null;adminMessages=[];await refreshAdmin();}
   catch(e){details.append(n('p','s47-error',explain(e)));}finally{arch.disabled=false;}
  });controls.append(arch);
- if(isOwnerAdmin){const permanently=btn(tr('deleteForever'),async()=>{
-  if(window.prompt(tr('deleteWarn'))!=='DELETE')return;
-  permanently.disabled=true;
-  try{const {data,error}=await client().rpc('pelak_support_delete_thread_forever',{p_thread_id:active.id});if(error)throw error;if(data!==true)throw Error(tr('actionError'));selectedAdmin=null;adminMessages=[];await refreshAdmin();}
-  catch(e){details.append(n('p','s47-error',explain(e)));}finally{permanently.disabled=false;}
- });permanently.classList.add('s47-danger');controls.append(permanently);}
- details.append(controls);
- if(active.status==='closed'){details.append(n('p','s47-muted',tr('closedHint')));return;}
- const form=n('form','s47-stack');const ta=n('textarea');ta.required=true;ta.maxLength=3000;ta.placeholder=tr('replyPh');const send=n('button','btn primary',tr('reply'));send.type='submit';const notice=n('p','s47-notice');form.append(ta,send,notice);
- form.onsubmit=async e=>{e.preventDefault();const val=ta.value.trim();if(!val||!account())return;send.disabled=true;
-  try{const {error}=await client().from('pelak_support_messages').insert({thread_id:active.id,sender_id:account().id,body:val});if(error)throw error;ta.value='';await refreshAdmin();}
-  catch(er){notice.textContent=explain(er);notice.classList.add('s47-error');}finally{send.disabled=false;}};
- details.append(form);
+ if(isOwnerAdmin){
+  const permanently=btn(tr('deleteForever'),async()=>{
+   if(window.prompt(tr('deleteWarn'))!=='DELETE')return;
+   permanently.disabled=true;
+   try{const {data,error}=await client().rpc('pelak_support_delete_thread_forever',{p_thread_id:active.id});if(error)throw error;if(data!==true)throw Error(tr('actionError'));selectedAdmin=null;adminMessages=[];await refreshAdmin();}
+   catch(e){details.append(n('p','s47-error',explain(e)));}finally{permanently.disabled=false;}
+  });
+  permanently.classList.add('s47-danger');controls.append(permanently);
+ }
+ manage.append(controls);details.append(manage);
 }
 async function selectAdmin(id){if(!client()||!account()||!isStaff)return;selectedAdmin=id;const {data,error}=await client().from('pelak_support_messages').select('id,thread_id,sender_id,body,created_at').eq('thread_id',id).order('created_at',{ascending:true}).limit(300);if(error){$('s47AdminDetails').textContent=explain(error);return;}adminMessages=data||[];renderAdmin();}
 async function refreshAdmin(){if(!client()||!account()||!isStaff)return;
