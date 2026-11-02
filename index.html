@@ -4113,6 +4113,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
  const bindingKey='pelakPushBoundUserId';
  const prefKey=id=>'pelakPushEnabled:'+id;
  let autoSyncedUser=null,autoFailedUser=null,autoInProgress=false,loggingOut=false;
+ let authSessionReady=false,authSessionUserId=null;
  const me=()=>typeof user!=='undefined'?user:null;
  const supa=()=>typeof db!=='undefined'?db:null;
  const keyBytes=s=>{const v=s.replace(/-/g,'+').replace(/_/g,'/');const b=atob(v+'='.repeat((4-v.length%4)%4));return Uint8Array.from(b,c=>c.charCodeAt(0));};
@@ -4174,13 +4175,14 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
  window.pelakPushLogoutCancelled=()=>{loggingOut=false;autoSyncedUser=null;refresh().catch(()=>{});};
 
  async function refresh(){
-  if(loggingOut||autoInProgress||busy)return;
+  // Never treat an unresolved startup session as an actual logout.
+  if(!authSessionReady||loggingOut||autoInProgress||busy)return;
   const bound=localStorage.getItem(bindingKey);
   if(bound&&supports()&&Notification.permission==='granted'){
    const prior=await existing().catch(()=>null);
    if(prior)localStorage.setItem(prefKey(bound),'1'); // migrate existing active subscription preference
   }
-  if(bound&&bound!==me()?.id){const prior=await existing().catch(()=>null);await prior?.unsubscribe().catch(()=>{});localStorage.removeItem(bindingKey);}
+  if(bound&&bound!==authSessionUserId){const prior=await existing().catch(()=>null);await prior?.unsubscribe().catch(()=>{});localStorage.removeItem(bindingKey);}
   if(!supports()){button.disabled=true;help.textContent=txt('مرورگر فعلی اعلان وب را پشتیبانی نمی‌کند.','Web Push is not supported in this browser.','المتصفح الحالي لا يدعم إشعارات الويب.','ეს ბრაუზერი არ უჭერს მხარს ვებ შეტყობინებებს.');return;}
   if(/iPad|iPhone|iPod/.test(navigator.userAgent)&&!isStandalone()){
     help.textContent=txt('برای اعلان حتی وقتی سایت بسته است، از Safari گزینه اشتراک‌گذاری ← افزودن به صفحه اصلی را بزن، سپس پلاک را از آیکون گوشی باز کن.', 'On iPhone: Safari Share → Add to Home Screen, then open PELAK from its icon.','على آيفون: المشاركة في Safari ← إضافة إلى الشاشة الرئيسية، ثم افتح بلاك.','iPhone-ზე დაამატეთ მთავარი ეკრანზე Safari-დან და გახსენით იქიდან.');
@@ -4240,7 +4242,15 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
  // Re-check immediately after sign-in, rather than waiting for the periodic status refresh.
  function watchAuth(){
   if(!supa()?.auth){setTimeout(watchAuth,300);return;}
-  supa().auth.onAuthStateChange(()=>setTimeout(()=>refresh().catch(()=>{}),0));
+  const applySession=session=>{
+   authSessionUserId=session?.user?.id||null;
+   authSessionReady=true;
+   setTimeout(()=>refresh().catch(()=>{}),0);
+  };
+  supa().auth.onAuthStateChange((_event,session)=>applySession(session));
+  supa().auth.getSession().then(({data})=>{
+   if(!authSessionReady)applySession(data?.session);
+  }).catch(()=>{});
  }
  watchAuth();
  setInterval(()=>{if(!document.hidden)refresh().catch(()=>{});},15000);
