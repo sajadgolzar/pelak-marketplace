@@ -2502,7 +2502,13 @@ window.pelakSellerReset();
  const groups=['pelakDealerGuest','pelakDealerPending','pelakDealerDashboard'];
  function reveal(id){groups.forEach(k=>$(k).classList.toggle('hidden',k!==id));}
  let inFlight=false;
- async function fetchProfile(){const {data,error}=await db.rpc('pelak_my_dealer_profile');if(error)throw error;const row=Array.isArray(data)?data[0]:data;return row?.profile||row||null;}
+ async function fetchProfile(){
+  let result=await db.rpc('pelak_free_showroom_me');
+  if(result.error && /PGRST202|42883|not.*found|schema cache/i.test(result.error.code+' '+result.error.message))result=await db.rpc('pelak_my_dealer_profile');
+  if(result.error)throw result.error;
+  const row=Array.isArray(result.data)?result.data[0]:result.data;
+  return row?.profile||row||null;
+ }
  async function refreshDashboard(){
   const {data,error}=await db.from('listings').select('id,title,listing_status,created_at,expires_at').eq('user_id',user.id).order('created_at',{ascending:false}).limit(100);
   // Gracefully support an installation where the optional expiration migration is not yet applied.
@@ -2586,7 +2592,14 @@ window.pelakSellerReset();
  function active(){return S.context?.paid===true;}
  function pack(){return S.data||{inventory:[],inquiries:[],team:[],promotions:[],metrics:{}};}
  async function refreshPro(){if(S.busy)return;S.busy=true;status.hidden=true;
-  try{const c=await rpc('pelak_pro_my_context');S.context=c;
+  try{const c=await rpc('pelak_pro_my_context');
+    if(c?.dealer_id){
+      // The context's 'paid' field is not a payment authorization.
+      // Confirm the stronger owner-verified paid access RPC before enabling premium UI.
+      const verified=await rpc('pelak_pro_access',{p_dealer:c.dealer_id});
+      c.paid=verified===true;
+    }
+    S.context=c;
     if(!c?.dealer_id){suite.hidden=true;if(approvedPanel)approvedPanel.hidden=false;return;}
     suite.hidden=!c.paid;if(approvedPanel)approvedPanel.hidden=!!c.paid;
     $('pelakProDealerName').textContent=c.profile?.business_name||'نمایشگاه';
@@ -3643,8 +3656,10 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
  async function getMyProfile(){
   if(!db||!user){profNotice('برای ساخت نمایشگاه مجازی وارد حسابت شو.');return;}
   try{
-   const {data,error}=await db.rpc('pelak_my_dealer_profile');if(error)throw error;
-   const row=Array.isArray(data)?data[0]:data;
+   let result=await db.rpc('pelak_free_showroom_me');
+   if(result.error && /PGRST202|42883|not.*found|schema cache/i.test(result.error.code+' '+result.error.message))result=await db.rpc('pelak_my_dealer_profile');
+   if(result.error)throw result.error;
+   const row=Array.isArray(result.data)?result.data[0]:result.data;
    lastProfile=row?.profile||row||null;
    if(lastProfile)profilePaint(lastProfile);
    profNotice(lastProfile?(lastProfile.free_profile_public?'پروفایل رایگان فعال است و قابل ویرایش.':'برای فعال‌کردن نمایشگاه رایگان، پروفایل موجود را ذخیره کن.'):'نام نمایشگاه و شهر را وارد کن و ذخیره بزن.');
