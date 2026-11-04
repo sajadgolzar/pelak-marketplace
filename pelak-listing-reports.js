@@ -83,7 +83,7 @@ if($('carsGrid')){
 const admin=$('adminListings');if(!admin?.parentNode)return;
 const toggle=node('button','btn outline','🚩 گزارش‌های آگهی');toggle.type='button';toggle.id='pelakOwnerReportsToggle';toggle.hidden=true;toggle.setAttribute('aria-expanded','false');
 const panel=node('section');panel.id='pelakOwnerReportsPanel';panel.hidden=true;
-panel.append(node('h3','','🚩 گزارش‌های آگهی'),node('p','pelak-report-hint','فقط مدیر اصلی گزارش‌ها را می‌بیند. تغییر وضعیت گزارش به‌تنهایی آگهی را حذف یا غیرفعال نمی‌کند.'));
+panel.append(node('h3','','🚩 گزارش‌های آگهی'),node('p','pelak-report-hint','برای آگهی دارای ایراد، به‌جای غیرفعال‌سازی از «بازگرداندن به فروشنده برای اصلاح» استفاده کن؛ دلیل و مهلت ۷روزه در «آگهی‌های من» فروشنده نشان داده می‌شود. حذف خودکار هنوز فعال نیست.'));
 const controls=node('div');controls.style.cssText='display:flex;gap:12px;align-items:center;flex-wrap:wrap';
 const chk=node('input');chk.type='checkbox';chk.checked=true;
 const label=node('label','','فقط گزارش‌های باز');label.prepend(chk);
@@ -123,6 +123,34 @@ async function load(){
       window.pelakOpenDetails(data,{admin:true,role:'super_admin'});
     }catch(err){alert('نمایش آگهی ناموفق: '+(err.message||err));}
    };actions.append(detail);
+   // A reported listing can be sent back to its seller without losing photos.
+   // Previously archived listings are supported as long as their media was not purged.
+   if(r.status!=='dismissed'&&['published','archived'].includes(r.listing_status)){
+    const sendBack=node('button','btn primary mini','↩ بازگرداندن به فروشنده برای اصلاح');
+    sendBack.type='button';
+    sendBack.onclick=async()=>{
+      const reason=prompt('دلیل دقیق اصلاح را بنویس. فروشنده این متن را در «آگهی‌های من» می‌بیند (۵ تا ۱۵۰۰ حرف):','');
+      if(reason===null)return;
+      const clean=reason.trim();
+      if(clean.length<5||clean.length>1500){
+        alert('دلیل باید بین ۵ تا ۱۵۰۰ حرف باشد.');return;
+      }
+      if(!confirm('آگهی از نمایش عمومی خارج شود و به همان پیش‌نویس فروشنده برای اصلاح برگردد؟ مهلت اصلاح ۷ روز است.'))return;
+      sendBack.disabled=true;
+      try{
+        const result=await call('pelak_owner_return_reported_listing',{
+          p_report_id:r.id,p_reason:clean
+        });
+        if(result?.success!==true)throw Error('بازگشت آگهی به فروشنده تأیید نشد.');
+        alert('آگهی به پیش‌نویس فروشنده برگشت و دلیل اصلاح ثبت شد. فروشنده در «آگهی‌های من» می‌تواند آن را اصلاح و دوباره ارسال کند. اعلان پوش و حذف خودکار هنوز فعال نیستند.');
+        $('adminRefresh')?.click();
+        await load();
+      }catch(err){
+        alert('بازگرداندن برای اصلاح انجام نشد: '+(err.message||String(err))+'\\nاگر آگهی قبلاً منقضی، لغو یا عکس‌هایش پاک شده باشد، باید جداگانه بررسی شود.');
+      }finally{sendBack.disabled=false;}
+    };
+    actions.append(sendBack);
+   }
    if(r.status==='open')for(const [decision,title] of [['reviewed','بررسی‌شده'],['dismissed','بستن گزارش']]){
     const b=node('button','btn outline mini',title);b.type='button';
     b.onclick=async()=>{
