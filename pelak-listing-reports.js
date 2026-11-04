@@ -85,7 +85,7 @@ const toggle=node('button','btn outline','🚩 گزارش‌های آگهی');to
 const panel=node('section');panel.id='pelakOwnerReportsPanel';panel.hidden=true;
 panel.append(node('h3','','🚩 گزارش‌های آگهی'),node('p','pelak-report-hint','برای آگهی دارای ایراد، به‌جای غیرفعال‌سازی از «بازگرداندن به فروشنده برای اصلاح» استفاده کن؛ دلیل و مهلت ۷روزه در «آگهی‌های من» فروشنده نشان داده می‌شود. حذف خودکار هنوز فعال نیست.'));
 const controls=node('div');controls.style.cssText='display:flex;gap:12px;align-items:center;flex-wrap:wrap';
-const chk=node('input');chk.type='checkbox';chk.checked=true;
+const chk=node('input');chk.type='checkbox';chk.checked=false;
 const label=node('label','','فقط گزارش‌های باز');label.prepend(chk);
 const refreshBtn=node('button','btn outline mini','به‌روزرسانی');refreshBtn.type='button';controls.append(label,refreshBtn);
 const msg=node('p','pelak-report-hint');msg.setAttribute('role','status');
@@ -108,6 +108,7 @@ async function load(){
   for(const r of rows){
    const box=node('article','report-row');
    box.append(node('strong','',r.title||'آگهی بدون عنوان'));
+   box.append(node('p','','وضعیت فعلی آگهی: '+({published:'منتشرشده',archived:'بایگانی‌شده',draft:'پیش‌نویس — قابل اصلاح',sold:'فروخته‌شده'}[r.listing_status]||r.listing_status||'نامشخص')));
    box.append(node('p','','دلیل: '+(categories[r.category]||r.category)));
    box.append(node('p','','توضیحات: '+(r.details||'')));
    const dt=new Date(r.created_at);const time=isNaN(dt.getTime())?'نامشخص':dt.toLocaleString('fa-IR');
