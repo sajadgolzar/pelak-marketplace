@@ -70,8 +70,8 @@
         review = reviewResult.value.data;
         if (review?.review_state === 'needs_revision') {
           section.classList.add('pelak-review-warn');
-          section.append(make('p', '', 'وضعیت: رد شده، نیازمند اصلاح'));
-          section.append(make('p', '', 'دلیل رد: ' + review.reason));
+          section.append(make('p', '', 'وضعیت: برگشت داده‌شده برای اصلاح'));
+          section.append(make('p', '', 'دلیل نیاز به اصلاح: ' + review.reason));
           section.append(make('p', '', 'آخرین مهلت اصلاح: ' + formatDate(review.delete_after)));
         } else if (review?.review_state === 'resubmitted') {
           section.append(make('p', '', 'وضعیت: اصلاح و دوباره برای بررسی ارسال شده'));
@@ -153,9 +153,9 @@
         if (!item || item.listing_status !== 'draft') continue;
         const declined = r.review_state === 'needs_revision';
         const panel = make('section', 'pelak-review-panel' + (declined ? ' pelak-review-warn' : ''));
-        panel.append(make('h3', '', declined ? 'نیازمند اصلاح — آگهی رد شده' : 'در انتظار بررسی مجدد'));
+        panel.append(make('h3', '', declined ? 'نیازمند اصلاح — آگهی برگشت داده شده' : 'در انتظار بررسی مجدد'));
         if (declined) {
-          panel.append(make('p', '', 'دلیل رد: ' + r.reason));
+          panel.append(make('p', '', 'دلیل نیاز به اصلاح: ' + r.reason));
           panel.append(make('p', '', 'مهلت اصلاح و ارسال مجدد: ' + formatDate(r.delete_after)));
           const expires = new Date(r.delete_after).getTime();
           const validDeadline = Number.isFinite(expires) && Date.now() < expires;
