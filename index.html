@@ -3331,9 +3331,9 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
   overlay=document.createElement('div');overlay.className='pelak-admin-editor-backdrop';
   overlay.innerHTML=`<section class="pelak-admin-editor" role="dialog" aria-modal="true" aria-label="اصلاح پوشش پلاک خودرو" dir="rtl">
    <div class="pelak-admin-editor-title"><strong>اصلاح پلاک پیش از انتشار</strong><button type="button" data-do="cancel" aria-label="بستن">×</button></div>
-   <p>🤖 تشخیص پلاک فقط اکنون، پس از ثبت پیش‌نویس و ورود مدیر به ابزار بررسی، اجرا می‌شود. پیشنهادها ممکن است اشتباه باشند؛ کادرها را با انگشت اصلاح کن تا <b>PELAK MARKET</b> روی تمام پلاک‌های خوانا قرار گیرد. برای جابه‌جایی روی کادر بکش، برای کوچک و بزرگ کردن گوشه‌های طلایی را بگیر.</p>
+   <p>🤖 تشخیص پلاک فقط اکنون، پس از ثبت پیش‌نویس و ورود مدیر به ابزار بررسی، اجرا می‌شود. پیشنهادها ممکن است اشتباه باشند؛ کادرها را با انگشت اصلاح کن تا <b>PELAK MARKET</b> روی تمام پلاک‌های خوانا قرار گیرد. برای حذف کادر اشتباه یک‌بار لمسش کن و دکمه حذف کادر انتخاب‌شده را بزن. برای جابه‌جایی روی کادر بکش، برای کوچک و بزرگ کردن گوشه‌های طلایی را بگیر.</p>
    <div class="pelak-admin-editor-image"><canvas aria-label="برای پوشاندن پلاک، انگشت خود را روی عکس بکش"></canvas></div>
-   <div class="pelak-admin-editor-footer"><button type="button" data-do="detect">🤖 تشخیص مجدد</button><button type="button" data-do="undo">↶ حذف آخرین کادر</button><span data-counter>۰ کادر</span><button type="button" data-do="cancel">انصراف</button></div>
+   <div class="pelak-admin-editor-footer"><button type="button" data-do="detect">🤖 تشخیص مجدد</button><button type="button" data-do="undo" aria-label="حذف کادر انتخاب‌شده">✕ حذف کادر انتخاب‌شده</button><span data-counter>۰ کادر</span><button type="button" data-do="cancel">انصراف</button></div>
    <label class="pelak-admin-review-confirm"><input type="checkbox" data-do="reviewed"/> تصویر نهایی را بررسی کردم و هیچ پلاک خوانایی باقی نمانده است.</label>
    <div class="pelak-admin-editor-footer"><button class="btn primary" type="button" data-do="save" disabled>ذخیره عکس اصلاح‌شده</button></div><p class="pelak-editor-error" role="status" aria-live="polite"></p>
   </section>`;
@@ -3351,7 +3351,7 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
   canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
   if(!canvas.width||!canvas.height)throw Error('ابعاد تصویر نامعتبر است.');
   const boxes=[];let current=null,start=null,pointer=null,ocrBusy=false,editorClosed=false;
-  let selected=-1,gesture='draw',gestureStart=null,originalBox=null;
+  let selected=-1,gesture='draw',gestureStart=null,originalBox=null,manualVersion=0;
   reviewed.addEventListener('change',()=>{save.disabled=ocrBusy||!boxes.length||!reviewed.checked;});
   const rect=(a,b)=>({x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.abs(a.x-b.x),h:Math.abs(a.y-b.y)});
   const coords=e=>{const b=canvas.getBoundingClientRect();return {x:Math.max(0,Math.min(canvas.width,(e.clientX-b.left)*canvas.width/b.width)),y:Math.max(0,Math.min(canvas.height,(e.clientY-b.top)*canvas.height/b.height))};};
@@ -3378,7 +3378,7 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
     }ctx.restore();
    }
    if(pointer!==null&&gesture==='draw'&&start&&current){const r=rect(start,current);ctx.strokeStyle='#f28b24';ctx.lineWidth=Math.max(3,canvas.width*.002);ctx.setLineDash([10,8]);ctx.strokeRect(r.x,r.y,r.w,r.h);ctx.setLineDash([]);}
-   counter.textContent=boxes.length.toLocaleString('fa-IR')+' کادر';undo.disabled=boxes.length===0;save.disabled=ocrBusy||boxes.length===0||!reviewed.checked;
+   counter.textContent=boxes.length.toLocaleString('fa-IR')+' کادر'+(selected>=0?' • انتخاب: '+(selected+1).toLocaleString('fa-IR'):' • کادر مورد نظر را لمس کن');undo.disabled=selected<0||ocrBusy;save.disabled=ocrBusy||boxes.length===0||!reviewed.checked;
   }
   const clamp=(v,lo,hi)=>Math.min(Math.max(v,lo),hi);
   const hitTest=p=>{
@@ -3393,9 +3393,9 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
   canvas.addEventListener('pointerdown',e=>{
    if(pointer!==null||(e.pointerType==='mouse'&&e.button!==0))return;
    e.preventDefault();pointer=e.pointerId;const pt=coords(e),hit=hitTest(pt);
-   if(hit){selected=hit.index;gesture=hit.mode;gestureStart=pt;originalBox={...boxes[selected]};start=current=null;}
+   if(hit){selected=hit.index;gesture=hit.mode;gestureStart=pt;originalBox={...boxes[selected]};start=current=null;note.textContent='کادر شماره '+(selected+1).toLocaleString('fa-IR')+' انتخاب شد. برای حذف روی دکمه «حذف کادر انتخاب‌شده» بزن.';}
    else{selected=-1;gesture='draw';start=current=pt;gestureStart=pt;originalBox=null;}
-   canvas.setPointerCapture?.(e.pointerId);redraw();
+   manualVersion++;canvas.setPointerCapture?.(e.pointerId);redraw();
   });
   canvas.addEventListener('pointermove',e=>{
    if(e.pointerId!==pointer)return;e.preventDefault();const pt=coords(e);
@@ -3426,12 +3426,12 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
    pointer=null;start=current=null;gestureStart=null;originalBox=null;redraw();
   }
   canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);
-  undo.onclick=()=>{boxes.pop();selected=boxes.length-1;reviewed.checked=false;note.textContent='';redraw();};redraw();
+  undo.onclick=()=>{if(selected<0||selected>=boxes.length)return;boxes.splice(selected,1);selected=-1;manualVersion++;reviewed.checked=false;note.textContent='کادر انتخاب‌شده حذف شد. تصویر را دوباره بررسی کن و کادر درست را نگه دار.';redraw();};redraw();
   // OCR is triggered only AFTER a manager opens this specific private draft photo.
   // It proposes opaque masks but NEVER uploads or publishes without explicit review.
   async function suggestAdminPlateBoxes(){
    if(ocrBusy||editorClosed)return;
-   ocrBusy=true;detect.disabled=true;detect.textContent='⏳ در حال تشخیص…';
+   ocrBusy=true;const scanManualVersion=manualVersion;detect.disabled=true;detect.textContent='⏳ در حال تشخیص…';
    note.textContent='در حال تحلیل عکس برای پیشنهاد کادر پلاک؛ در صورت خطا می‌توانی دستی کادر بکشی.';
    redraw();let worker=null;
    try{
@@ -3475,11 +3475,12 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
      else merged.push({...r});
     }
     // Limit false-positive coverage; leave the final decision to the manager.
-    if(merged.length>4){note.textContent='تشخیص چند ناحیه نامطمئن پیدا کرد؛ برای جلوگیری از پوشاندن اشتباه، دستی کادر بکش.';return;}
+    if(manualVersion!==scanManualVersion){note.textContent='کادرها به‌صورت دستی تغییر کرده‌اند؛ پیشنهاد تشخیص خودکار اعمال نشد.';return;}
+     if(merged.length>4){note.textContent='تشخیص چند ناحیه نامطمئن پیدا کرد؛ برای جلوگیری از پوشاندن اشتباه، دستی کادر بکش.';return;}
     for(const r of merged){
      if(!boxes.some(z=>r.x<=z.x+z.w&&z.x<=r.x+r.w&&r.y<=z.y+z.h&&z.y<=r.y+r.h))boxes.push(r);
     }
-    reviewed.checked=false;selected=boxes.length?0:-1;
+    reviewed.checked=false;selected=-1;
     note.textContent=merged.length?`🤖 ${merged.length} ناحیه پیشنهادی مشخص شد. کادرها را بازبینی و در صورت نیاز با انگشت اصلاح کن.`:'🤖 پلاک قابل تشخیص نبود؛ اگر پلاک خواناست، حتماً با انگشت روی آن کادر بکش.';
    }catch(e){
     if(!editorClosed)note.textContent='تشخیص خودکار در دسترس نبود. برای پوشاندن پلاک با انگشت کادر بکش؛ ثبت پیش‌نویس کاربر مستقل از این ابزار است.';
