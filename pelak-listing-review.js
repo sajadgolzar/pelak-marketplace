@@ -129,6 +129,23 @@
     const originalLoadMine = loadMine;
     loadMine = async function (...args) {
       const result = await originalLoadMine.apply(this, args);
+      // Owner sees a final moderation decision; server also blocks seller relisting.
+      const archiveHistory = byId('pelakLifeHistory');
+      if (archiveHistory && typeof myRows !== 'undefined' && Array.isArray(myRows)) {
+        for (const card of archiveHistory.querySelectorAll('.car-card[data-listing-id]')) {
+          const row = myRows.find(x => String(x.id) === card.dataset.listingId);
+          const prefix = 'moderation_rejected:';
+          if (!row || typeof row.archive_reason !== 'string' || !row.archive_reason.startsWith(prefix)) continue;
+          card.querySelectorAll('button').forEach(b => {
+            if (b.textContent.includes('ثبت مجدد از سوابق')) b.remove();
+          });
+          const notice = make('section', 'pelak-review-panel pelak-review-warn');
+          notice.append(make('h3', '', 'آگهی به دلیل نقض قوانین پلاک رد قطعی شده است'));
+          notice.append(make('p', '', 'دلیل: ' + row.archive_reason.slice(prefix.length)));
+          notice.append(make('p', '', 'این آگهی قابل انتشار مجدد نیست. اگر اعتراضی داری، از ارتباط با پشتیبانی پیام بده.'));
+          card.append(notice);
+        }
+      }
       const currentUserId = (typeof user !== 'undefined' && user?.id) || null;
       const grid = byId('myGrid');
       if (!currentUserId || !grid || !Array.isArray(myRows) || !myRows.length) return result;
