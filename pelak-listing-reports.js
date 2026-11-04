@@ -83,7 +83,7 @@ if($('carsGrid')){
 const admin=$('adminListings');if(!admin?.parentNode)return;
 const toggle=node('button','btn outline','🚩 گزارش‌های آگهی');toggle.type='button';toggle.id='pelakOwnerReportsToggle';toggle.hidden=true;toggle.setAttribute('aria-expanded','false');
 const panel=node('section');panel.id='pelakOwnerReportsPanel';panel.hidden=true;
-panel.append(node('h3','','🚩 گزارش‌های آگهی'),node('p','pelak-report-hint','برای آگهی دارای ایراد، به‌جای غیرفعال‌سازی از «بازگرداندن به فروشنده برای اصلاح» استفاده کن؛ دلیل و مهلت ۷روزه در «آگهی‌های من» فروشنده نشان داده می‌شود. حذف خودکار هنوز فعال نیست.'));
+panel.append(node('h3','','🚩 گزارش‌های آگهی'),node('p','pelak-report-hint','برای ایراد قابل اصلاح: بازگرداندن به فروشنده. برای محتوای خلاف قوانین: رد قطعی و بایگانی همراه با دلیل. برای موارد بسیار جدی: حذف دائمی با تأیید دو مرحله‌ای (عکس‌ها، پیام‌ها و گزارش‌های وابسته نیز ممکن است پاک شوند). حذف خودکار هنوز فعال نیست.'));
 const controls=node('div');controls.style.cssText='display:flex;gap:12px;align-items:center;flex-wrap:wrap';
 const chk=node('input');chk.type='checkbox';chk.checked=false;
 const label=node('label','','فقط گزارش‌های باز');label.prepend(chk);
@@ -124,6 +124,65 @@ async function load(){
       window.pelakOpenDetails(data,{admin:true,role:'super_admin'});
     }catch(err){alert('نمایش آگهی ناموفق: '+(err.message||err));}
    };actions.append(detail);
+   // Owner-only moderation choices: return for correction, final rejection, or irreversible deletion.
+   if(r.status!=='dismissed'){
+    if(['published','draft','archived'].includes(r.listing_status)){
+     const reject=node('button','btn outline mini','⛔ رد قطعی و بایگانی');
+     reject.type='button';
+     reject.onclick=async()=>{
+      const reason=prompt('دلیل رد قطعی را برای فروشنده بنویس (۵ تا ۱۲۰۰ حرف):','');
+      if(reason===null)return;
+      const clean=reason.trim();
+      if(clean.length<5||clean.length>1200){alert('دلیل باید بین ۵ تا ۱۲۰۰ حرف باشد.');return;}
+      if(!confirm('این آگهی به دلیل نقض قوانین رد قطعی شود؟ آگهی از سایت حذف می‌شود اما عکس‌ها و سابقه برای رسیدگی محفوظ می‌مانند. فروشنده اجازه انتشار مجدد همین آگهی را ندارد.'))return;
+      reject.disabled=true;
+      try{
+       const result=await call('pelak_owner_reject_reported_listing',{p_report_id:r.id,p_reason:clean});
+       if(result?.success!==true)throw Error('تأیید سرور دریافت نشد.');
+       alert('آگهی رد قطعی و از نمایش عمومی خارج شد. دلیل در سوابق آگهی فروشنده ثبت شد.');
+       $('adminRefresh')?.click();$('refreshBtn')?.click();
+       await load();
+      }catch(err){alert('رد قطعی موفق نبود: '+(err.message||String(err)));}
+      finally{reject.disabled=false;}
+     };
+     actions.append(reject);
+    }
+    const remove=node('button','btn outline mini','🗑 حذف دائمی آگهی');
+    remove.type='button';
+    remove.style.borderColor='#c54f46';remove.style.color='#a32929';
+    remove.onclick=async()=>{
+     let c;
+     try{c=await getDb();const role=await c.rpc('pelak_my_admin_role');
+      if(role.error||role.data!=='super_admin')throw Error('فقط مدیر اصلی مجاز است.');
+      const lookup=await c.from('listings').select('id,title').eq('id',r.listing_id).maybeSingle();
+      if(lookup.error)throw lookup.error;
+      if(!lookup.data)throw Error('آگهی دیگر وجود ندارد.');
+      const target=lookup.data;
+      if(!confirm('آیا می‌خواهی آگهی «'+target.title+'» را برای همیشه حذف کنی؟ عکس‌ها، پیام‌ها و گزارش‌های وابسته نیز ممکن است برای همیشه پاک شوند. این کار برگشت‌پذیر نیست.'))return;
+      if(prompt('برای تأیید حذف دائمی آگهی، واژه «حذف» را دقیق بنویس:')!=='حذف')return;
+      remove.disabled=true;
+      // Existing server-side 2-phase delete: prepare archives; finalization checks Storage.
+      const prepare=await c.rpc('pelak_super_admin_prepare_delete_listing',{p_listing_id:target.id});
+      if(prepare.error)throw prepare.error;
+      if(prepare.data?.listing_id!==target.id||!Array.isArray(prepare.data?.image_paths))
+       throw Error('آماده‌سازی حذف پاسخ معتبر نداد؛ هیچ عکسی حذف نشد.');
+      const paths=[...new Set(prepare.data.image_paths.filter(x=>typeof x==='string'&&x.trim()))];
+      if(paths.length){
+       const result=await c.storage.from('car-images').remove(paths);
+       if(result.error)throw Error('پاک‌سازی عکس‌ها کامل نشد: '+result.error.message);
+      }
+      const finish=await c.rpc('pelak_super_admin_finalize_delete_listing',{p_listing_id:target.id});
+      if(finish.error)throw finish.error;
+      if(finish.data!==true)throw Error('سرور حذف نهایی آگهی را تأیید نکرد.');
+      alert('آگهی و عکس‌های متصل به آن به‌صورت دائمی حذف شدند.');
+      $('adminRefresh')?.click();$('refreshBtn')?.click();
+      await load();
+     }catch(err){
+      alert('حذف کامل نشد: '+(err.message||String(err))+'\nاگر فرایند پس از مرحله آماده‌سازی متوقف شده باشد، آگهی موقتاً بایگانی می‌ماند. دوباره بررسی کن.');
+     }finally{remove.disabled=false;}
+    };
+    actions.append(remove);
+   }
    // A reported listing can be sent back to its seller without losing photos.
    // Previously archived listings are supported as long as their media was not purged.
    if(r.status!=='dismissed'&&['published','archived'].includes(r.listing_status)){
