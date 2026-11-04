@@ -2433,6 +2433,7 @@ window.pelakSellerReset();
   const {urls,fail}=await signedPhotos(r);
   if(seq!==openSequence)return;
   title.textContent=r.title||'آگهی خودرو';body.replaceChildren();body.append(paintImages(urls));
+   if(!opts.admin && r.listing_status==='published')window.pelakTrackListingView?.(r);
   if(fail.length)body.append(note('برخی تصاویر به علت محدودیت دسترسی Storage نمایش داده نشدند.',true));
   const specs=document.createElement('div');specs.className='pelak-detail-specs';
   [['برند',r.make],['مدل',r.model],['تیپ',r.trim||'—'],['سال مدل (میلادی-شمسی)',window.pelakModelYearText(r.year)],['کارکرد',r.mileage_km==null?'نامشخص':num(r.mileage_km)+' کیلومتر'],['قیمت',window.pelakReadablePrice?window.pelakReadablePrice(r.price,r.currency,r.price_negotiable):(r.price_negotiable?'توافقی':num(r.price)+' '+(r.currency||''))],['کشور',r.country],['شهر',r.city||'—'],['وضعیت خودرو',status[r.vehicle_status]||r.vehicle_status],['وضعیت آگهی',({draft:'پیش‌نویس',published:'منتشرشده',archived:'غیرفعال / بایگانی',sold:'فروخته‌شده'})[r.listing_status]||r.listing_status],['حجم موتور',r.engine_cc==null?'—':num(r.engine_cc)+' cc'],['قدرت موتور',r.engine_power_hp==null?'—':num(r.engine_power_hp)+' hp']].forEach(([key,value])=>{if(value!==undefined)specs.append(p(key,value));});body.append(specs);
@@ -5163,4 +5164,5 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 })();
 </script>
 <script src="./pelak-listing-review.js"></script>
+<script src="./pelak-analytics.js"></script>
 </body></html>
