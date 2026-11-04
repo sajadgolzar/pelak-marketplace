@@ -14,8 +14,8 @@
   async function record(listingId=null){
     try{
       const c=await client();if(!c||!sid)return;
-      const result=await c.auth.getUser();if(result.error)return;
-      const me=result.data?.user;
+      const result=await c.auth.getSession();if(result.error)return;
+      const me=result.data?.session?.user||null;
       if(me){const role=await c.rpc('pelak_my_admin_role');if(role.error||role.data)return;}
       await c.rpc('pelak_analytics_record',{p_visitor_key:sid,p_listing_id:listingId});
     }catch(_){/* Never block the site due to analytics. */}
