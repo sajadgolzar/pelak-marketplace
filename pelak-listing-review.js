@@ -183,10 +183,19 @@
             const buttons = make('div', 'pelak-review-actions');
             const edit = make('button', 'btn outline mini', '✎ اصلاح آگهی');
             edit.type = 'button';
-            edit.onclick = () => editListing(item.id);
+            edit.onclick = event => {
+              // The listing card has a delegated click-to-details handler.
+              // A click on its edit action must NOT also open the details modal.
+              event.preventDefault();
+              event.stopPropagation();
+              editListing(item.id);
+            };
             const resubmit = make('button', 'btn primary mini', 'ارسال مجدد برای بررسی');
             resubmit.type = 'button';
-            resubmit.addEventListener('click', async () => {
+            resubmit.addEventListener('click', async event => {
+              // Keep action clicks inside this card from opening details behind them.
+              event.preventDefault();
+              event.stopPropagation();
               if (!window.confirm('اصلاحات آگهی ذخیره شده؟ آگهی دوباره برای بررسی فرستاده شود؟')) return;
               resubmit.disabled = true;
               try {
