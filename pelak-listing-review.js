@@ -169,6 +169,10 @@
         const item = myRows.find(x => String(x.id) === String(card.dataset.listingId));
         if (!item || item.listing_status !== 'draft') continue;
         const declined = r.review_state === 'needs_revision';
+        if (!declined && r.review_state !== 'resubmitted') continue;
+        // Editable database draft; visible seller label reflects the review state.
+        const statusTag = card.querySelector('.car-photo .tag');
+        if (statusTag) statusTag.textContent = declined ? 'نیازمند اصلاح' : 'در انتظار بررسی مجدد';
         const panel = make('section', 'pelak-review-panel' + (declined ? ' pelak-review-warn' : ''));
         panel.append(make('h3', '', declined ? 'نیازمند اصلاح — آگهی برگشت داده شده' : 'در انتظار بررسی مجدد'));
         if (declined) {
