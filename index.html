@@ -1923,6 +1923,10 @@ function closeDrawer(){drawer.classList.remove('open');drawer.setAttribute('aria
 function show(view, options={}){
  if(!visible[view]||(view==='admin'&&!adminAllowed))return false;
  if(view==='mine'&&(typeof user==='undefined'||!user))view='auth';
+ // Refresh review reasons and status when opening My Listings.
+ if(view==='mine' && typeof user!=='undefined' && user && typeof loadMine==='function'){
+  setTimeout(()=>{if(!document.getElementById('pelakMineSection')?.classList.contains('hidden'))loadMine();},30);
+ }
  if(view!==viewNow&&!options.noHistory){history.push(viewNow);if(history.length>20)history.shift();}
  viewNow=view;
  ids.forEach(id=>$(id)?.classList.toggle('hidden',!visible[view].includes(id)));
