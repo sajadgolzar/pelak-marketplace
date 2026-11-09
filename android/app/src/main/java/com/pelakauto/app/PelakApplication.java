@@ -10,6 +10,7 @@ import com.google.firebase.FirebaseOptions;
 public final class PelakApplication extends Application {
     @Override public void onCreate() {
         super.onCreate();
+        PelakMessagingService.createChannel(this);
         if (BuildConfig.FIREBASE_APP_ID.isEmpty() ||
             BuildConfig.FIREBASE_API_KEY.isEmpty() ||
             BuildConfig.FIREBASE_PROJECT_ID.isEmpty() ||
