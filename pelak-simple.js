@@ -111,6 +111,7 @@
   let scheduled=false;
   const chooseVisible=()=>{
     scheduled=false;
+    if(search&&!search.classList.contains('hidden')){updateSelected('search');return;}
     for(const [key,el] of viewSections){
       if(el&&!el.classList.contains('hidden')){updateSelected(key);return;}
     }
