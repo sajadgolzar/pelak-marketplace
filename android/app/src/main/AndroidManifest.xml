@@ -4,9 +4,10 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
-    <application android:allowBackup="false"
+    <application android:name=".PelakApplication" android:allowBackup="false"
                  android:label="@string/app_name"
                  android:icon="@mipmap/ic_launcher"
                  android:roundIcon="@mipmap/ic_launcher"
@@ -19,6 +20,11 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
                        android:resource="@xml/file_paths" />
         </provider>
+        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id"
+                   android:value="pelak_updates" />
+        <service android:name=".PelakMessagingService" android:exported="false">
+            <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter>
+        </service>
         <activity android:name=".MainActivity" android:exported="true"
                   android:configChanges="orientation|screenSize|keyboardHidden"
                   android:windowSoftInputMode="adjustResize">
