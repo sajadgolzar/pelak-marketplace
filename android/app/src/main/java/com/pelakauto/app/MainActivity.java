@@ -19,7 +19,7 @@ import java.util.*;
 
 /** PELAK Android web shell v0.1; website and Supabase remain unchanged. */
 public final class MainActivity extends Activity {
-    private static final String HOME = "https://pelakauto.com/";
+    private static final String HOME = "https://pelakauto.com/?simple=1";
     private static final int FILE_REQUEST = 301;
     private static final int CAMERA_PERMISSION = 302;
     private static final int MEDIA_PERMISSION = 303;
@@ -31,6 +31,7 @@ public final class MainActivity extends Activity {
     private WebChromeClient.FileChooserParams fileParams;
     private Uri cameraUri;
     private PermissionRequest mediaRequest;
+    private PelakPushBridge pushBridge;
     private boolean failed;
 
     @Override public void onCreate(Bundle state) {
@@ -51,6 +52,8 @@ public final class MainActivity extends Activity {
         web = new WebView(this);
         root.addView(web, new FrameLayout.LayoutParams(-1,-1));
         configureBrowser();
+        pushBridge=PelakPushBridge.install(this,web);
+        PelakMessagingService.createChannel(this);
         loading = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         loading.setMax(100);
         loading.setProgressTintList(android.content.res.ColorStateList.valueOf(0xFFC9A158));
@@ -248,7 +251,9 @@ public final class MainActivity extends Activity {
     }
     @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] grants){
         super.onRequestPermissionsResult(code,permissions,grants);
-        if(code==CAMERA_PERMISSION)launchChooser(); // Gallery still works if denied.
+        if(code==PelakPushBridge.NOTIFICATION_PERMISSION_REQUEST){
+            if(pushBridge!=null)pushBridge.onPermissionResult(grants);
+        } else if(code==CAMERA_PERMISSION)launchChooser(); // Gallery still works if denied.
         else if(code==MEDIA_PERMISSION&&mediaRequest!=null){
             boolean allowed=grants.length>0;
             for(int status:grants)allowed&=status==PackageManager.PERMISSION_GRANTED;
