@@ -5171,4 +5171,21 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./pelak-listing-review.js"></script>
 <script src="./pelak-analytics.js"></script>
 <script src="./pelak-listing-reports.js"></script>
+<script id="pelak-simple-opt-in">
+(function(){
+  // Keep the known-good classic site as the default. This is strictly opt-in.
+  if(new URLSearchParams(location.search).get('simple')!=='1')return;
+  const style=document.createElement('link');
+  style.rel='stylesheet';style.href='./pelak-simple.css?v=1';
+  document.head.append(style);
+  const simple=document.createElement('script');
+  simple.src='./pelak-simple.js?v=1';
+  simple.onload=()=>{
+    const bridge=document.createElement('script');
+    bridge.src='./pelak-android-bridge.js?v=1';
+    document.body.append(bridge);
+  };
+  document.body.append(simple);
+})();
+</script>
 </body></html>
