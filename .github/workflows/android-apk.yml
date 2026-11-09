@@ -20,10 +20,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Install Android SDK tools
-        uses: android-actions/setup-android@v3
-      - name: Install Android platform 35
-        run: sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Install Android platform 35 using preinstalled SDK
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$(command -v sdkmanager)"; fi
+          "$SDKMANAGER" --install 'platforms;android-35' 'build-tools;35.0.0'
       - name: Install Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
