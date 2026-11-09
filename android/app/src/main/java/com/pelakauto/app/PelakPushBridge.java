@@ -37,6 +37,9 @@ public final class PelakPushBridge {
             (view,message,sourceOrigin,isMainFrame,reply) -> {
                 if(!isMainFrame || !isTrusted(sourceOrigin))return;
                 String request=message.getData();
+                if("disable".equals(request)){
+                    bridge.disableToken(reply);return;
+                }
                 if(!"get-token".equals(request)&&!"enable".equals(request))return;
                 bridge.requestToken("enable".equals(request),reply);
             }
@@ -70,6 +73,11 @@ public final class PelakPushBridge {
               else reply.postMessage("error:no-token");
           })
           .addOnFailureListener(e->reply.postMessage("error:firebase-unavailable"));
+    }
+    private void disableToken(JavaScriptReplyProxy reply){
+        FirebaseMessaging.getInstance().deleteToken()
+           .addOnSuccessListener(ignored->reply.postMessage("disabled"))
+           .addOnFailureListener(err->reply.postMessage("error:delete-token-failed"));
     }
     public void onPermissionResult(int[] results) {
         if(!pendingPermission)return;
