@@ -125,10 +125,16 @@ CREATE TRIGGER pelak_android_push_event_trigger
 CREATE OR REPLACE FUNCTION public.pelak_android_enqueue_revision()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO ''
 AS $$
-DECLARE recipient uuid;
+DECLARE recipient uuid; should_notify boolean := false;
 BEGIN
-  IF NEW.review_state = 'needs_revision'
-     AND (TG_OP = 'INSERT' OR OLD.review_state IS DISTINCT FROM 'needs_revision') THEN
+  IF NEW.review_state = 'needs_revision' THEN
+    IF TG_OP = 'INSERT' THEN
+      should_notify := true;
+    ELSE
+      should_notify := OLD.review_state IS DISTINCT FROM 'needs_revision';
+    END IF;
+  END IF;
+  IF should_notify THEN
     SELECT l.user_id INTO recipient
     FROM public.listings l WHERE l.id=NEW.listing_id;
     IF recipient IS NOT NULL THEN
