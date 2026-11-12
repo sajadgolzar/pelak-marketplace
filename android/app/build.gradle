@@ -20,8 +20,8 @@ android {
         buildConfigField 'String', 'FIREBASE_PROJECT_ID', '"' + (System.getenv('PELAK_FIREBASE_PROJECT_ID') ?: 'pelak-ae9f3') + '"'
         minSdk 24
         targetSdk 35
-        versionCode 2
-        versionName '0.2.0'
+        versionCode 3
+        versionName '0.3.0'
         resConfigs 'fa', 'en'
     }
     buildTypes {
