@@ -1,16 +1,11 @@
-name: Build PELAK Android APK
+name: Legacy PELAK WebView APK (manual maintenance only)
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'android/**'
-      - '.github/workflows/android-apk.yml'
   workflow_dispatch:
 concurrency:
   group: pelak-android-${{ github.ref }}
   cancel-in-progress: true
 permissions:
-  contents: write
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -56,19 +51,3 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish test APK for direct download from pelakauto.com
-        if: github.ref == 'refs/heads/main'
-        run: |
-          set -euo pipefail
-          mkdir -p downloads
-          cp android/app/build/outputs/apk/debug/app-debug.apk downloads/PELAK-Android-v0.3-debug.apk
-          test -s downloads/PELAK-Android-v0.3-debug.apk
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add downloads/PELAK-Android-v0.3-debug.apk
-          if ! git diff --cached --quiet; then
-            git commit -m 'chore(android): publish v0.3 test APK for website download'
-            git fetch origin main
-            git rebase origin/main
-            git push origin HEAD:main
-          fi
