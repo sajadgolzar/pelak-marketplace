@@ -59,7 +59,38 @@ public final class MainActivity extends Activity {
         loading.setProgressTintList(android.content.res.ColorStateList.valueOf(0xFFC9A158));
         root.addView(loading, new FrameLayout.LayoutParams(-1,dp(3),Gravity.TOP));
         createOfflineView();
-        if (state == null || web.restoreState(state) == null) web.loadUrl(HOME);
+        if (state == null || web.restoreState(state) == null) web.loadUrl(startupUrl(getIntent()));
+    }
+
+
+    /** Allow only known internal routes from notification extras, never arbitrary URLs. */
+    private static String notificationView(Intent intent) {
+        if(intent==null)return null;
+        String value=intent.getStringExtra("pelak_target");
+        if(value==null)value=intent.getStringExtra("kind"); // Firebase background payload
+        if(value==null)return null;
+        switch(value) {
+            case "listing_needs_revision":
+            case "listing_published":
+            case "mine": return "mine";
+            case "listing_report":
+            case "new_draft":
+            case "admin": return "admin";
+            case "listing_message":
+            case "messages": return "messages";
+            case "support_message":
+            case "support": return "support";
+            default: return null;
+        }
+    }
+    private static String startupUrl(Intent intent) {
+        String view=notificationView(intent);
+        return view==null?HOME:HOME+"&pelakView="+view;
+    }
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if(web!=null&&notificationView(intent)!=null)web.loadUrl(startupUrl(intent));
     }
 
     private void configureBrowser() {
@@ -263,7 +294,7 @@ public final class MainActivity extends Activity {
         }
     }
     @Override public void onBackPressed(){
-        if(offline.getVisibility()==View.VISIBLE)offline.setVisibility(View.GONE);
+        if(offline.getVisibility()==View.VISIBLE){offline.setVisibility(View.GONE);web.loadUrl(HOME);}
         else if(web.canGoBack())web.goBack();
         else new AlertDialog.Builder(this).setTitle(R.string.exit_title)
             .setMessage(R.string.exit_message)
