@@ -41,9 +41,14 @@ public final class PelakMessagingService extends FirebaseMessagingService {
         // Only the built-in app destination may be opened; ignore untrusted URL data.
         Intent open=new Intent(this,MainActivity.class);
         open.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        // An allowlisted "kind" is interpreted by MainActivity; never trust remote URLs.
+        String kind=message.getData().get("kind");
+        if(kind!=null)open.putExtra("kind",kind);
         int flags=PendingIntent.FLAG_UPDATE_CURRENT|
             (Build.VERSION.SDK_INT>=23?PendingIntent.FLAG_IMMUTABLE:0);
-        PendingIntent pending=PendingIntent.getActivity(this,0,open,flags);
+        // Unique request codes keep older notification destinations intact.
+        int notificationId=(int)(System.currentTimeMillis() & 0x7fffffff);
+        PendingIntent pending=PendingIntent.getActivity(this,notificationId,open,flags);
         NotificationCompat.Builder notification=new NotificationCompat.Builder(this,CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_pelak_foreground)
             .setContentTitle(title)
@@ -53,7 +58,7 @@ public final class PelakMessagingService extends FirebaseMessagingService {
             .setContentIntent(pending)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT);
         try {
-            NotificationManagerCompat.from(this).notify((int)System.currentTimeMillis(),notification.build());
+            NotificationManagerCompat.from(this).notify(notificationId,notification.build());
         }catch(SecurityException ignored){
             // Android 13+ user might have disabled notification permission.
         }
