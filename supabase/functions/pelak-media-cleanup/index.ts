@@ -70,6 +70,10 @@ Deno.serve(async req=>{
     for(const row of due.data||[]){
       try {
         if(!uuid.test(row.id)||!uuid.test(row.user_id)){retained++;continue}
+        // Keep evidence for any reported listing. Only a human reviewer may purge it.
+        const reports=await db.from("pelak_listing_reports")
+          .select("id",{count:"exact",head:true}).eq("listing_id",row.id);
+        if(reports.error || (reports.count||0)>0){retained++;continue}
         const prefix=row.user_id+"/"+row.id+"/";
         const referenced=Array.isArray(row.image_paths)?row.image_paths:[];
         if(referenced.some((p:unknown)=>typeof p!=="string"||!p.startsWith(prefix))){
