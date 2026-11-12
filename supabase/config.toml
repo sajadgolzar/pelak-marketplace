@@ -1,0 +1,5 @@
+# PELAK Edge Functions
+# The scheduled cleanup authenticates with a private server-side job secret.
+# No browser or anonymous caller is permitted by the worker itself.
+[functions.pelak-revision-expiry-cleanup]
+verify_jwt = false
