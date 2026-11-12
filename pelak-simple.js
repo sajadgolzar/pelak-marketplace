@@ -170,6 +170,31 @@
     enhanceEmptyListings();
   }
 
+  // In the simple web/Android UI, seller "delete draft" means a safe cancellation:
+  // archive it for the owner, then let the scheduled retention worker clean media.
+  // Permanent manual listing deletion remains reserved to the super_admin.
+  const pendingDraftCancels=new Set();
+  if(typeof window.deleteListing==='function'){
+    window.deleteListing=async function(id){
+      const row=typeof myRows!=='undefined' ? myRows.find(r=>r.id===id) : null;
+      if(!row||row.listing_status!=='draft'||pendingDraftCancels.has(id))return;
+      if(!confirm('این پیش‌نویس لغو شود؟ عکس‌ها و اطلاعات آن برای پاک‌سازی پس از ۷ روز برنامه‌ریزی می‌شوند.'))return;
+      pendingDraftCancels.add(id);
+      try{
+        const c=typeof db!=='undefined' ? db : null;
+        if(!c)throw Error('اتصال به پایگاه داده برقرار نیست');
+        const {data,error}=await c.rpc('pelak_cancel_my_listing',{p_listing_id:id});
+        if(error)throw error;
+        if(data!==true)throw Error('لغو آگهی تأیید نشد');
+        if(typeof $==='function'&&$('editingId')?.value===id&&typeof clearForm==='function')clearForm();
+        if(typeof loadMine==='function')await loadMine();
+        if(typeof msg==='function')msg('sellerMessage','پیش‌نویس لغو شد؛ پاک‌سازی طبق مهلت نگهداری انجام می‌شود.','success');
+      }catch(e){
+        if(typeof msg==='function')msg('sellerMessage','لغو پیش‌نویس ناموفق بود: '+String(e?.message||e),'error');
+      }finally{pendingDraftCancels.delete(id);}
+    };
+  }
+
   // Fallback for older shortcuts: preserve native site behavior.
   window.addEventListener('pageshow',changed);
   // Announce only opt-in mode, never modify persisted seller fields, URLs or RLS.
