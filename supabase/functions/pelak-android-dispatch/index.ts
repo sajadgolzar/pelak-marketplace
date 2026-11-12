@@ -1,6 +1,6 @@
 // PELAK — native Android FCM worker; server-side only.
-// Deploy with Supabase Edge Functions. Invoke with Authorization: Bearer <JOB_SECRET>
-// after configuring FIREBASE_SERVICE_ACCOUNT_JSON, SUPABASE_SERVICE_ROLE_KEY, etc.
+// Deploy with Supabase Edge Functions. Scheduled by pg_cron using a Vault header token.
+// Requires only PELAK_FIREBASE_SERVICE_ACCOUNT_JSON from the Firebase owner.
 // NO secrets belong in website JS, Android APK or GitHub commits.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
@@ -59,18 +59,27 @@ function json(status:number,body:unknown){
 
 Deno.serve(async request=>{
   if(request.method!=="POST")return json(405,{error:"Method not allowed"});
-  const jobSecret=Deno.env.get("PELAK_ANDROID_PUSH_JOB_SECRET");
-  if(!jobSecret||request.headers.get("authorization")!=="Bearer "+jobSecret)
+  // This secret is generated inside Supabase Vault and is never stored in source.
+  const tokenHeader=request.headers.get("x-pelak-fcm-token")||"";
+  if(!/^[a-f0-9]{64}$/.test(tokenHeader))
     return json(401,{error:"Unauthorized"});
   const apiUrl=Deno.env.get("SUPABASE_URL");
-  const serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const projectId=Deno.env.get("PELAK_FIREBASE_PROJECT_ID");
-  const rawAccount=Deno.env.get("PELAK_FIREBASE_SERVICE_ACCOUNT_JSON");
-  if(!apiUrl||!serviceKey||!projectId||!rawAccount)
-    return json(503,{error:"Native push service has not been configured"});
-  let account:{client_email:string;private_key:string};
-  try{account=JSON.parse(rawAccount)}catch(_){return json(503,{error:"Invalid Firebase service configuration"})}
+  let serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
+  if(!serviceKey){
+    try{serviceKey=String(JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS")||"{}").default||"")}
+    catch(_){serviceKey=""}
+  }
+  if(!apiUrl||!serviceKey)return json(503,{error:"Native push backend unavailable"});
   const client=createClient(apiUrl,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
+  const gate=await client.rpc("pelak_android_dispatch_authorized",{p_token:tokenHeader});
+  if(gate.error||gate.data!==true)return json(401,{error:"Unauthorized"});
+  const rawAccount=Deno.env.get("PELAK_FIREBASE_SERVICE_ACCOUNT_JSON");
+  if(!rawAccount)return json(503,{error:"Firebase service account not configured"});
+  let account:{client_email:string;private_key:string;project_id:string};
+  try{account=JSON.parse(rawAccount)}catch(_){return json(503,{error:"Invalid Firebase service configuration"})}
+  if(account.project_id!=="pelak-ae9f3"||!account.client_email||!account.private_key)
+    return json(503,{error:"Firebase project mismatch or incomplete service account"});
+  const projectId=account.project_id;
   try{
     const token=await getGoogleAccessToken(account);
     const {data:jobs,error:claimError}=await client.rpc("pelak_android_push_claim",{p_limit:25});
