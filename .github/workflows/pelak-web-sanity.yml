@@ -1,0 +1,47 @@
+name: PELAK Web Sanity
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pelak-web-sanity.yml'
+      - 'pelak-simple.js'
+      - 'pelak-android-bridge.js'
+      - 'pelak-sw.js'
+      - 'pelak-analytics.js'
+      - 'pelak-listing-reports.js'
+      - 'pelak-listing-review.js'
+      - 'index.html'
+  pull_request:
+    paths:
+      - '.github/workflows/pelak-web-sanity.yml'
+      - 'pelak-simple.js'
+      - 'pelak-android-bridge.js'
+      - 'pelak-sw.js'
+      - 'pelak-analytics.js'
+      - 'pelak-listing-reports.js'
+      - 'pelak-listing-review.js'
+      - 'index.html'
+permissions:
+  contents: read
+jobs:
+  sanity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify JS parses
+        run: |
+          set -euo pipefail
+          for f in pelak-simple.js pelak-android-bridge.js pelak-sw.js pelak-analytics.js pelak-listing-reports.js pelak-listing-review.js; do
+            node --check "$f"
+          done
+      - name: Verify website entrypoints exist
+        run: |
+          set -euo pipefail
+          test -s index.html
+          test -s pelak-simple.css
+          test -s manifest.webmanifest
+          test -s pelak-sw.js
