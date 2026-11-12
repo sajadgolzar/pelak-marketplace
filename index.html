@@ -1390,7 +1390,22 @@ async function pelakLifeNotices(){
  }catch(_){} // Optional notice rendering never blocks listing management.
 }
 
-async function deleteListing(id){const r=myRows.find(x=>x.id===id);if(!r||r.listing_status!=='draft')return;if(!confirm('این پیش‌نویس حذف شود؟'))return;const {error}=await db.from('listings').delete().eq('id',id).eq('user_id',user.id).eq('listing_status','draft');if(error){msg('sellerMessage','حذف آگهی ناموفق بود: '+errText(error),'error');return;}msg('sellerMessage','پیش‌نویس حذف شد. توجه: عکس‌های ذخیره‌شدهٔ آن هنوز ممکن است در Storage باقی بمانند.','success');if($('editingId').value===id)clearForm();await loadMine();}
+const pelakDraftCancelPending=new Set();
+async function deleteListing(id){
+ const r=myRows.find(x=>x.id===id);
+ if(!r||r.listing_status!=='draft'||pelakDraftCancelPending.has(id))return;
+ if(!confirm('این پیش‌نویس لغو شود؟ پس از ۷ روز عکس‌ها و آگهی به‌طور خودکار پاک می‌شوند.'))return;
+ pelakDraftCancelPending.add(id);
+ try{
+   const {data,error}=await db.rpc('pelak_cancel_my_listing',{p_listing_id:id});
+   if(error)throw error;
+   if(data!==true)throw Error('پیش‌نویس قابل لغو نیست یا قبلاً لغو شده است.');
+   msg('sellerMessage','پیش‌نویس لغو شد؛ پاک‌سازی خودکار آن بعد از ۷ روز انجام می‌شود.','success');
+   if($('editingId').value===id)clearForm();
+   await loadMine();
+ }catch(e){msg('sellerMessage','لغو پیش‌نویس ناموفق بود: '+errText(e),'error');}
+ finally{pelakDraftCancelPending.delete(id);}
+}
 
 // 5.48: Load the OCR library only in the administrator photo review editor.
 // OCR suggestions are best-effort and ALWAYS require manual visual verification.
