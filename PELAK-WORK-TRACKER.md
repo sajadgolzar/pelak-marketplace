@@ -19,6 +19,10 @@
 - [x] محدودسازی اجرای تابع مدیریتی `public.pelak_admin_list_listings()` برای `anon` و `PUBLIC` با migration `pelak_restrict_anonymous_admin_list_20261112`
   - راستی‌آزمایی: `anon_can_execute=false`، `authenticated_can_execute=true`، `service_can_execute=true`
   - بازگشت موردی در صورت نیاز: `GRANT EXECUTE ON FUNCTION public.pelak_admin_list_listings() TO anon;`
+- [x] محدودسازی دسترسی ناشناس به تریگر داخلی `public.pelak_support_touch_thread()` با migration `pelak_restrict_anonymous_support_touch_trigger_20261112`
+  - راستی‌آزمایی: `anon_can_execute=false`، `authenticated_can_execute=true`، `service_can_execute=true`، تریگر `pelak_support_after_message` همچنان فعال است
+  - بازگشت موردی: `GRANT EXECUTE ON FUNCTION public.pelak_support_touch_thread() TO anon;`
+- [ ] آزمون عملی ارسال پیام پشتیبانی پس از محدودسازی مجوز تریگر (فقط بررسی ACL و فعال‌بودن تریگر انجام شد)
 - [ ] تست انتها‌به‌انتها با حساب مدیر، پس از تغییر مجوز RPC (صرفاً ACL در SQL راستی‌آزمایی شد)
 
 ## مرحله ۱ — امنیت و پایداری (در حال اجرا)
