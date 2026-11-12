@@ -40,37 +40,13 @@ jobs:
           PELAK_FIREBASE_SENDER_ID: ${{ secrets.PELAK_FIREBASE_SENDER_ID }}
           PELAK_FIREBASE_PROJECT_ID: ${{ secrets.PELAK_FIREBASE_PROJECT_ID }}
         run: gradle :app:assembleDebug --no-daemon --stacktrace
-      - name: Verify output APK contains Android code
+      - name: Verify built APK before publishing
         run: |
           set -euo pipefail
           APK=android/app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
           unzip -t "$APK" >/dev/null
-          unzip -Z1 "$APK" | grep -Eq '^classes([0-9]+)?\\.dex
-        uses: actions/upload-artifact@v4
-        with:
-          name: pelak-android-v0.3-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Publish test APK for direct download from pelakauto.com
-        if: github.ref == 'refs/heads/main'
-        run: |
-          set -euo pipefail
-          mkdir -p downloads
-          cp android/app/build/outputs/apk/debug/app-debug.apk downloads/PELAK-Android-v0.3-debug.apk
-          test -s downloads/PELAK-Android-v0.3-debug.apk
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add downloads/PELAK-Android-v0.3-debug.apk
-          if ! git diff --cached --quiet; then
-            git commit -m 'chore(android): publish v0.3 test APK for website download'
-            git fetch origin main
-            git rebase origin/main
-            git push origin HEAD:main
-          fi
-
+          unzip -Z1 "$APK" | grep -Eq 'classes([0-9]+)?[.]dex'
 
       - name: Publish installation APK (testing only)
         uses: actions/upload-artifact@v4
