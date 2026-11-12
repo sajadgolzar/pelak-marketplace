@@ -77,7 +77,7 @@ BEGIN
       INSERT INTO public.pelak_revision_cleanup_jobs
         (listing_id, claimed_at, last_error)
       VALUES (v_row.listing_id, now(), 'Manual review: image path outside listing folder')
-      ON CONFLICT (listing_id) DO UPDATE
+      ON CONFLICT ON CONSTRAINT pelak_revision_cleanup_jobs_pkey DO UPDATE
         SET claimed_at = now(),
             last_error = EXCLUDED.last_error,
             updated_at = now();
@@ -96,7 +96,7 @@ BEGIN
       INSERT INTO public.pelak_revision_cleanup_jobs
         (listing_id, claimed_at, last_error)
       VALUES (v_row.listing_id, now(), 'Manual review: folder referenced by another listing')
-      ON CONFLICT (listing_id) DO UPDATE
+      ON CONFLICT ON CONSTRAINT pelak_revision_cleanup_jobs_pkey DO UPDATE
         SET claimed_at = now(),
             last_error = EXCLUDED.last_error,
             updated_at = now();
@@ -117,7 +117,7 @@ BEGIN
     INSERT INTO public.pelak_revision_cleanup_jobs AS j
       (listing_id, claim_token, claimed_at, attempt_count, last_error)
     VALUES (v_row.listing_id, v_token, now(), 1, NULL)
-    ON CONFLICT (listing_id) DO UPDATE
+    ON CONFLICT ON CONSTRAINT pelak_revision_cleanup_jobs_pkey DO UPDATE
       SET claim_token = EXCLUDED.claim_token,
           claimed_at = EXCLUDED.claimed_at,
           attempt_count = j.attempt_count + 1,
