@@ -12,11 +12,12 @@ android {
 
     defaultConfig {
         applicationId 'com.pelakauto.app'
-        // Firebase client identifiers are injected at build time; never store server credentials in APK.
-        buildConfigField 'String', 'FIREBASE_APP_ID', '"' + (System.getenv('PELAK_FIREBASE_APP_ID') ?: '') + '"'
-        buildConfigField 'String', 'FIREBASE_API_KEY', '"' + (System.getenv('PELAK_FIREBASE_API_KEY') ?: '') + '"'
-        buildConfigField 'String', 'FIREBASE_SENDER_ID', '"' + (System.getenv('PELAK_FIREBASE_SENDER_ID') ?: '') + '"'
-        buildConfigField 'String', 'FIREBASE_PROJECT_ID', '"' + (System.getenv('PELAK_FIREBASE_PROJECT_ID') ?: '') + '"'
+        // Public Firebase Android client identifiers. CI secrets can override these defaults.
+        // Never put a Firebase service-account key or Supabase secret in the APK.
+        buildConfigField 'String', 'FIREBASE_APP_ID', '"' + (System.getenv('PELAK_FIREBASE_APP_ID') ?: '1:245022577031:android:8bc31b15733dba8ce58322') + '"'
+        buildConfigField 'String', 'FIREBASE_API_KEY', '"' + (System.getenv('PELAK_FIREBASE_API_KEY') ?: 'AIzaSyBJWadEPLZdrwcnKI9sFk64IfvDfUed8Xo') + '"'
+        buildConfigField 'String', 'FIREBASE_SENDER_ID', '"' + (System.getenv('PELAK_FIREBASE_SENDER_ID') ?: '245022577031') + '"'
+        buildConfigField 'String', 'FIREBASE_PROJECT_ID', '"' + (System.getenv('PELAK_FIREBASE_PROJECT_ID') ?: 'pelak-ae9f3') + '"'
         minSdk 24
         targetSdk 35
         versionCode 2
