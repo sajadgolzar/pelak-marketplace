@@ -30,6 +30,22 @@ Deno.serve(async req=>{
   const now=new Date().toISOString();
   let archived=0,removed=0,retained=0,failed=0;
   try {
+    // Published listings expire after the recorded expiry date.
+    // Keep their media for seven additional days before removing anything.
+    const published=await db.from("listings").select("id")
+      .eq("listing_status","published").lte("expires_at",now).limit(25);
+    if(published.error)throw Error("published expiry query unavailable");
+    const publishedRetention=new Date(Date.now()+7*24*60*60*1000).toISOString();
+    for(const row of published.data||[]){
+      if(!uuid.test(row.id))continue;
+      const result=await db.from("listings").update({
+        listing_status:"archived",archive_reason:"expired",
+        archived_at:now,purge_after:publishedRetention,updated_at:now
+      }).eq("id",row.id).eq("listing_status","published").lte("expires_at",now).select("id");
+      if(result.error){failed++;continue}
+      archived+=(result.data||[]).length;
+    }
+
     // A seller only loses an uncorrected returned draft AFTER its correction deadline.
     // Do not touch published, sold, or resubmitted listings.
     const expired=await db.from("pelak_listing_rejections")
