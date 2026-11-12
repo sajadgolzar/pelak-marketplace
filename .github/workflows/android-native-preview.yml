@@ -9,7 +9,7 @@ on:
       - '.github/workflows/android-native-preview.yml'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: pelak-native-${{ github.ref }}
   cancel-in-progress: true
@@ -46,3 +46,20 @@ jobs:
           path: android-native/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
           if-no-files-found: error
+
+      - name: Publish native preview APK for direct download on PELAK site
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          mkdir -p downloads
+          cp android-native/app/build/outputs/apk/debug/app-debug.apk downloads/PELAK-Native-v0.1-preview.apk
+          test -s downloads/PELAK-Native-v0.1-preview.apk
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads/PELAK-Native-v0.1-preview.apk
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore(native): publish verified preview APK for website download'
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main
+          fi
