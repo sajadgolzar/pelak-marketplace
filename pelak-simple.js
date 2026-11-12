@@ -126,6 +126,50 @@
   if(search)observer.observe(search,{attributes:true,attributeFilter:['class']});
   chooseVisible();
 
+  // A native Android notification may deep-link to "آگهی‌های من".
+  // The legacy site handles other notification destinations itself.
+  function openMyListingsFromNotification(){
+    const url=new URL(location.href);
+    if(url.searchParams.get('pelakView')!=='mine')return;
+    let attempts=0;
+    function open(){
+      if(typeof window.pelakNavigate==='function'){
+        window.pelakNavigate('mine',{scroll:false});
+        updateSelected('mine');
+        url.searchParams.delete('pelakView');
+        history.replaceState(null,'',url.pathname+url.search+url.hash);
+      }else if(attempts++<10)setTimeout(open,200);
+    }
+    open();
+  }
+  openMyListingsFromNotification();
+
+  // A meaningful next action is more useful than an empty vehicle list.
+  const publicGrid=$('carsGrid');
+  function enhanceEmptyListings(){
+    const empty=publicGrid?.querySelector('.empty');
+    if(!empty||empty.querySelector('.pelak-simple-empty-actions'))return;
+    const actions=create('div','pelak-simple-empty-actions');
+    const filtered=empty.textContent.includes('مطابق جست‌وجو');
+    const btn=create('button','pelak-simple-empty-button',filtered?'پاک‌کردن فیلترها':'ثبت اولین آگهی خودرو');
+    btn.type='button';
+    btn.addEventListener('click',()=>{
+      if(filtered){
+        window.pelakResetPublicFilters?.();
+        chosen='';
+        refreshChips();
+      }else{
+        window.pelakNavigate?.('sell',{scroll:false});
+        updateSelected('sell');
+      }
+    });
+    actions.append(btn);empty.append(actions);
+  }
+  if(publicGrid){
+    new MutationObserver(enhanceEmptyListings).observe(publicGrid,{childList:true});
+    enhanceEmptyListings();
+  }
+
   // Fallback for older shortcuts: preserve native site behavior.
   window.addEventListener('pageshow',changed);
   // Announce only opt-in mode, never modify persisted seller fields, URLs or RLS.
