@@ -186,6 +186,20 @@ body.pelak-simple .pelak-detail-backdrop :where(.pelak-detail-modal,.pelak-detai
  body.pelak-simple .pelak-premium-header .pelak-brand-icon{width:32px!important;height:32px!important}
  body.pelak-simple .pelak-premium-header #authBtn{font-size:11px!important;padding:6px!important}
 }
+/* Helpful zero-results state, limited to the opt-in simple interface. */
+body.pelak-simple #carsGrid .empty{
+  background:#fff;border:1px solid #e3eaf1;border-radius:17px;
+  padding:24px 16px!important;line-height:1.95;text-align:center;
+  color:#53657c;min-height:130px;
+}
+body.pelak-simple .pelak-simple-empty-actions{margin-top:16px}
+body.pelak-simple .pelak-simple-empty-button{
+  background:#10233f;color:#fff;border:0;border-radius:11px;
+  padding:11px 17px;font-weight:750;font-size:14px;min-height:44px;
+}
+body.pelak-simple .pelak-simple-empty-button:focus-visible{
+  outline:3px solid #cca95d;outline-offset:2px;
+}
 @media(prefers-reduced-motion:reduce){
  body.pelak-simple *,body.pelak-simple *:before,body.pelak-simple *:after{scroll-behavior:auto!important;animation-duration:.01ms!important}
 }
