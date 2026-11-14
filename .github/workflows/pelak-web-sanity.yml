@@ -11,6 +11,7 @@ on:
       - 'pelak-listing-reports.js'
       - 'pelak-listing-review.js'
       - 'index.html'
+      - 'pelak-platform-downloads.js'
   pull_request:
     paths:
       - '.github/workflows/pelak-web-sanity.yml'
@@ -35,7 +36,7 @@ jobs:
       - name: Verify JS parses
         run: |
           set -euo pipefail
-          for f in pelak-simple.js pelak-android-bridge.js pelak-sw.js pelak-analytics.js pelak-listing-reports.js pelak-listing-review.js; do
+          for f in pelak-simple.js pelak-android-bridge.js pelak-sw.js pelak-analytics.js pelak-listing-reports.js pelak-listing-review.js pelak-platform-downloads.js; do
             node --check "$f"
           done
       - name: Verify website entrypoints exist
