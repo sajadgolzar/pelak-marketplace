@@ -8,17 +8,17 @@
     const menu = document.getElementById('pelakMenuItems');
     const menuButton = menu && menu.querySelector('button[data-target="apps"]');
     if (!apps || !actions || !footer || !menuButton || document.getElementById('pelakPlatformFooter')) return;
-    const apk = './downloads/PELAK-Native-v0.1-preview.apk';
+    const apk = './downloads/PELAK-Native-v0.2-preview.apk';
     const logo = {
       web: '<svg viewBox="0 0 24 24" role="img" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 12h12M12 6c-3 3-3 9 0 12M12 6c3 3 3 9 0 12" stroke="currentColor" fill="none" stroke-width="1.25"/></svg>',
       android: '<svg viewBox="0 0 24 24" role="img" focusable="false"><path d="M6.6 7.7 4.9 4.8M17.4 7.7l1.7-2.9" stroke="#3DDC84" stroke-width="1.3" stroke-linecap="round"/><path d="M5 11a7 7 0 0 1 14 0Z" fill="#3DDC84"/><rect x="5" y="11.7" width="14" height="7.2" rx="1.2" fill="#3DDC84"/><rect x="2.3" y="11.7" width="2" height="7" rx="1" fill="#3DDC84"/><rect x="19.7" y="11.7" width="2" height="7" rx="1" fill="#3DDC84"/><path d="M8 18v3M16 18v3" stroke="#3DDC84" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="9" r=".7" fill="#0D3247"/><circle cx="15" cy="9" r=".7" fill="#0D3247"/></svg>',
       ios: '<svg viewBox="0 0 24 24" role="img" focusable="false"><path fill="currentColor" d="M16.8 12.4c0-2 1.7-3 1.8-3.1-.9-1.4-2.2-1.6-2.7-1.7-1.2-.1-2.4.8-3 .8-.7 0-1.7-.8-2.8-.8-1.5.1-2.9.9-3.6 2.2-1.6 2.7-.4 6.6 1.1 8.8.7 1.1 1.6 2.3 2.8 2.2 1.1 0 1.5-.7 2.9-.7 1.3 0 1.6.7 2.8.7 1.3 0 2.1-1.1 2.8-2.2.9-1.3 1.3-2.5 1.3-2.6-.1 0-2.4-.9-2.4-3.8zM14.7 5.6c.6-.8 1-1.9.9-2.9-1 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.8 1.1.1 2.1-.5 2.8-1.3z"/></svg>'
     };
     const i18n = {
-      fa: {title:'دریافت پلاک برای گوشی',desc:'سه راه دسترسی به پلاک؛ نسخه اندروید فعلاً آزمایشی است و برای آیفون نسخه بومی عرضه نشده است.',web:'دریافت وب‌اپ',webNote:'نصب از طریق مرورگر',android:'اندروید',androidNote:'APK بومی ۰.۱ · آزمایشی',ios:'آی‌او‌اس',iosNote:'راهنمای نصب روی آیفون',footer:'دریافت اپلیکیشن پلاک',iosTitle:'پلاک روی آیفون',iosGuide:'در Safari همین وب‌سایت را باز کن، روی Share (اشتراک‌گذاری) بزن و Add to Home Screen (افزودن به صفحه اصلی) را انتخاب کن. اپ بومی iOS هنوز منتشر نشده است.',close:'بستن'},
-      en: {title:'Get PELAK on your phone',desc:'Choose your platform. Android APK is a preview; no native iOS app has been released.',web:'Get web app',webNote:'Install from browser',android:'Android',androidNote:'Native APK 0.1 · Preview',ios:'iOS',iosNote:'iPhone install guide',footer:'Get PELAK',iosTitle:'PELAK on iPhone',iosGuide:'Open this website in Safari, tap Share, then Add to Home Screen. A native iOS app has not been released.',close:'Close'},
-      ar: {title:'احصل على بلاك لهاتفك',desc:'اختر نسختك. تطبيق أندرويد تجريبي؛ تطبيق iOS الأصلي غير متاح بعد.',web:'تطبيق الويب',webNote:'التثبيت من المتصفح',android:'أندرويد',androidNote:'APK أصلي 0.1 · تجريبي',ios:'آي أو إس',iosNote:'دليل التثبيت على آيفون',footer:'تطبيق بلاك',iosTitle:'بلاك على آيفون',iosGuide:'افتح الموقع في Safari ثم اختر مشاركة ← إضافة إلى الشاشة الرئيسية. تطبيق iOS الأصلي غير متاح بعد.',close:'إغلاق'},
-      ka: {title:'PELAK თქვენს ტელეფონზე',desc:'აირჩიეთ პლატფორმა. Android APK სატესტოა; iOS-ის native აპი ჯერ არ გამოსულა.',web:'ვებაპი',webNote:'ბრაუზერიდან დაყენება',android:'Android',androidNote:'Native APK 0.1 · სატესტო',ios:'iOS',iosNote:'iPhone-ის ინსტრუქცია',footer:'PELAK აპლიკაცია',iosTitle:'PELAK iPhone-ზე',iosGuide:'გახსენით საიტი Safari-ში, დააჭირეთ Share-ს და აირჩიეთ Add to Home Screen. iOS-ის native აპი ჯერ არ არსებობს.',close:'დახურვა'}
+      fa: {title:'دریافت پلاک برای گوشی',desc:'سه راه دسترسی به پلاک؛ نسخه اندروید فعلاً آزمایشی است و برای آیفون نسخه بومی عرضه نشده است.',web:'دریافت وب‌اپ',webNote:'نصب از طریق مرورگر',android:'اندروید',androidNote:'APK بومی ۰.۲ · آزمایشی',ios:'آی‌او‌اس',iosNote:'راهنمای نصب روی آیفون',footer:'دریافت اپلیکیشن پلاک',iosTitle:'پلاک روی آیفون',iosGuide:'در Safari همین وب‌سایت را باز کن، روی Share (اشتراک‌گذاری) بزن و Add to Home Screen (افزودن به صفحه اصلی) را انتخاب کن. اپ بومی iOS هنوز منتشر نشده است.',close:'بستن'},
+      en: {title:'Get PELAK on your phone',desc:'Choose your platform. Android APK is a preview; no native iOS app has been released.',web:'Get web app',webNote:'Install from browser',android:'Android',androidNote:'Native APK 0.2 · Preview',ios:'iOS',iosNote:'iPhone install guide',footer:'Get PELAK',iosTitle:'PELAK on iPhone',iosGuide:'Open this website in Safari, tap Share, then Add to Home Screen. A native iOS app has not been released.',close:'Close'},
+      ar: {title:'احصل على بلاك لهاتفك',desc:'اختر نسختك. تطبيق أندرويد تجريبي؛ تطبيق iOS الأصلي غير متاح بعد.',web:'تطبيق الويب',webNote:'التثبيت من المتصفح',android:'أندرويد',androidNote:'APK أصلي 0.2 · تجريبي',ios:'آي أو إس',iosNote:'دليل التثبيت على آيفون',footer:'تطبيق بلاك',iosTitle:'بلاك على آيفون',iosGuide:'افتح الموقع في Safari ثم اختر مشاركة ← إضافة إلى الشاشة الرئيسية. تطبيق iOS الأصلي غير متاح بعد.',close:'إغلاق'},
+      ka: {title:'PELAK თქვენს ტელეფონზე',desc:'აირჩიეთ პლატფორმა. Android APK სატესტოა; iOS-ის native აპი ჯერ არ გამოსულა.',web:'ვებაპი',webNote:'ბრაუზერიდან დაყენება',android:'Android',androidNote:'Native APK 0.2 · სატესტო',ios:'iOS',iosNote:'iPhone-ის ინსტრუქცია',footer:'PELAK აპლიკაცია',iosTitle:'PELAK iPhone-ზე',iosGuide:'გახსენით საიტი Safari-ში, დააჭირეთ Share-ს და აირჩიეთ Add to Home Screen. iOS-ის native აპი ჯერ არ არსებობს.',close:'დახურვა'}
     };
     const current = () => i18n[document.documentElement.lang] || i18n.fa;
     const style = document.createElement('style');
@@ -49,7 +49,7 @@
     function icon(type) { return '<span class="pelak-platform-icon" aria-hidden="true">' + logo[type] + '</span>'; }
     function card(type, label, note) {
       const content = icon(type) + '<strong>' + label + '</strong><small>' + note + '</small>';
-      if (type === 'android') return '<a id="pelakAndroidApkLink' + (note.indexOf('Footer') >= 0 ? 'Footer' : '') + '" class="pelak-platform-choice" data-pelak-platform="android" href="' + apk + '" download="PELAK-Native-v0.1-preview.apk">' + content + '</a>';
+      if (type === 'android') return '<a id="pelakAndroidApkLink' + (note.indexOf('Footer') >= 0 ? 'Footer' : '') + '" class="pelak-platform-choice" data-pelak-platform="android" href="' + apk + '" download="PELAK-Native-v0.2-preview.apk">' + content + '</a>';
       return '<button type="button" class="pelak-platform-choice" data-pelak-platform="' + type + '">' + content + '</button>';
     }
     const footerBox = document.createElement('section');
@@ -76,7 +76,7 @@
       ].map(function (it) {
         const inner = icon(it[0]) + '<span>' + it[1] + '</span>';
         return it[0] === 'android'
-          ? '<a class="pelak-platform-mini" data-pelak-platform="android" href="' + apk + '" download="PELAK-Native-v0.1-preview.apk">' + inner + '</a>'
+          ? '<a class="pelak-platform-mini" data-pelak-platform="android" href="' + apk + '" download="PELAK-Native-v0.2-preview.apk">' + inner + '</a>'
           : '<button type="button" class="pelak-platform-mini" data-pelak-platform="' + it[0] + '">' + inner + '</button>';
       }).join('');
     }
