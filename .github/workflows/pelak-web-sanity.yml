@@ -22,6 +22,7 @@ on:
       - 'pelak-listing-reports.js'
       - 'pelak-listing-review.js'
       - 'index.html'
+      - 'pelak-platform-downloads.js'
 permissions:
   contents: read
 jobs:
