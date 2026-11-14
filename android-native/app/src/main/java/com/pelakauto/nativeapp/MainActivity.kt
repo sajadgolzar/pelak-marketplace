@@ -104,19 +104,11 @@ private fun PelakNativeApp() {
         store.save(value)
         session = value
     }
-    // Refresh the persisted session before any authenticated operation after app relaunch.
-    LaunchedEffect(Unit) {
-        val restored = session ?: return@LaunchedEffect
-        try { saveSession(api.refreshSession(restored)) }
-        catch (_: Exception) {
-            // Keep session for transient network errors; upcoming retry can recover.
-        }
-    }
     LaunchedEffect(session?.refreshToken) {
         while (session != null) {
             val current = session ?: break
             delay((current.expiresAtMs - System.currentTimeMillis() - 180000L)
-                .coerceIn(20000L, 45L * 60L * 1000L))
+                .coerceIn(0L, 45L * 60L * 1000L))
             val before = session ?: break
             try { saveSession(api.refreshSession(before)) }
             catch (_: Exception) { delay(30000L) }
