@@ -279,7 +279,17 @@ private fun PelakNativeApp() {
             onDismissRequest = { selected = null },
             title = { Text(car.title, fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (car.imagePaths.isNotEmpty()) Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        car.imagePaths.forEach { path ->
+                            CarPhoto(path, car.title, if (car.userId == session?.userId) session?.accessToken else null,
+                                Modifier.size(width = 210.dp, height = 140.dp))
+                        }
+                    }
                     Text(car.make + "  " + car.model + "  " + car.trim)
                     Text("سال ساخت: " + car.year + "  •  " + car.country + "، " + car.city)
                     car.mileageKm?.let { Text("کارکرد: " + it + " کیلومتر") }
@@ -289,19 +299,34 @@ private fun PelakNativeApp() {
                 }
             },
             confirmButton = {
-                if (car.listingStatus == "published" && car.sellerPhone.isNotBlank()) {
-                    Button(onClick = {
-                        context.startActivity(Intent(Intent.ACTION_DIAL,
-                            Uri.parse("tel:" + car.sellerPhone.filter { it.isDigit() || it == '+' })))
-                    }) { Text("تماس با فروشنده") }
-                } else {
-                    TextButton(onClick = { selected = null }) { Text("بستن") }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (car.userId == session?.userId && car.listingStatus == "draft") {
+                        Button(onClick = { editing = car; selected = null; tab = 2 }) {
+                            Text("ویرایش پیش‌نویس")
+                        }
+                    } else if (car.listingStatus == "published") {
+                        if (session != null && car.userId != session?.userId) {
+                            Button(onClick = {
+                                chatTarget = ChatTarget(car.id, car.userId, car.title)
+                                selected = null
+                            }) { Text("چت پلاک") }
+                        }
+                        if (car.sellerPhone.isNotBlank()) {
+                            TextButton(onClick = {
+                                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(
+                                    "tel:" + car.sellerPhone.filter { it.isDigit() || it == '+' })))
+                            }) { Text("تماس") }
+                        }
+                    }
                 }
             },
             dismissButton = {
                 TextButton(onClick = { selected = null }) { Text("بازگشت") }
             }
         )
+    }
+    if (chatTarget != null && session != null) {
+        ChatDialog(api, session!!, chatTarget!!, onClose = { chatTarget = null })
     }
 }
 
@@ -312,6 +337,10 @@ private fun ListingsPanel(
     error: String?,
     search: String,
     searching: Boolean,
+    session: PelakSession? = null,
+    hasMore: Boolean = false,
+    moreLoading: Boolean = false,
+    onLoadMore: () -> Unit = {},
     onSearchChange: (String) -> Unit,
     onRefresh: () -> Unit,
     onSelect: (Car) -> Unit,
@@ -356,7 +385,13 @@ private fun ListingsPanel(
                 verticalArrangement = Arrangement.spacedBy(9.dp)
             ) {
                 items(cars, key = { it.id }) { car ->
-                    CarRow(car = car, onClick = { onSelect(car) })
+                    CarRow(car = car, session = session, onClick = { onSelect(car) })
+                }
+                if (hasMore) item {
+                    Button(onClick = onLoadMore, enabled = !moreLoading,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(if (moreLoading) "در حال دریافت…" else "نمایش آگهی‌های بیشتر")
+                    }
                 }
             }
         }
@@ -364,28 +399,16 @@ private fun ListingsPanel(
 }
 
 @Composable
-private fun CarRow(car: Car, onClick: () -> Unit) {
+private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(15.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            val api = remember { PelakApi() }
-            val imageUrl by produceState<String?>(initialValue = null, key1 = car.id) {
-                value = car.imagePath?.let { api.signedPhoto(it) }
-            }
-            Box(
-                modifier = Modifier.size(110.dp).background(Pale, RoundedCornerShape(11.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                if (imageUrl == null) Text("🚘", fontSize = 30.sp)
-                else AsyncImage(
-                    model = imageUrl, contentDescription = car.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                )
-            }
+            CarPhoto(car.imagePath, car.title,
+                if (session?.userId == car.userId) session.accessToken else null,
+                Modifier.size(110.dp))
             Spacer(Modifier.width(11.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(car.title, fontWeight = FontWeight.Bold, maxLines = 2, color = Ink)
