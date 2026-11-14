@@ -3,6 +3,15 @@ package com.pelakauto.nativeapp
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.Manifest
+import android.os.Build
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -27,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.math.BigDecimal
 
 private val Navy = Color(0xFF10233F)
@@ -38,6 +48,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = android.graphics.Color.rgb(16, 35, 63)
+        runCatching { PelakPush.initialize(applicationContext) }
         setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 MaterialTheme(
@@ -55,17 +66,22 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private data class ChatTarget(val listingId: String, val peerId: String, val title: String)
+
 private val nav = listOf(
     "آگهی‌ها" to "🚘",
     "جست‌وجو" to "⌕",
     "ثبت آگهی" to "＋",
     "آگهی‌های من" to "▣",
-    "حساب من" to "♙"
+    "حساب من" to "♙",
+    "پیام‌ها" to "✉"
 )
 
 @Composable
 private fun PelakNativeApp() {
     val api = remember { PelakApi() }
+    val context = LocalContext.current
+    val store = remember { PelakSessionStore(context) }
     val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var cars by remember { mutableStateOf<List<Car>>(emptyList()) }
@@ -75,13 +91,64 @@ private fun PelakNativeApp() {
     var error by remember { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
     var selected by remember { mutableStateOf<Car?>(null) }
-    var session by remember { mutableStateOf<PelakSession?>(null) }
+    var session by remember { mutableStateOf<PelakSession?>(store.load()) }
+    var editing by remember { mutableStateOf<Car?>(null) }
+    var chatTarget by remember { mutableStateOf<ChatTarget?>(null) }
+    var searched by remember { mutableStateOf<List<Car>>(emptyList()) }
+    var searchLoading by remember { mutableStateOf(false) }
+    var searchError by remember { mutableStateOf<String?>(null) }
+    var moreLoading by remember { mutableStateOf(false) }
+    var searchHasMore by remember { mutableStateOf(true) }
+    var homeHasMore by remember { mutableStateOf(true) }
+    fun saveSession(value: PelakSession) {
+        store.save(value)
+        session = value
+    }
+    // Refresh the persisted session before any authenticated operation after app relaunch.
+    LaunchedEffect(Unit) {
+        val restored = session ?: return@LaunchedEffect
+        try { saveSession(api.refreshSession(restored)) }
+        catch (_: Exception) {
+            // Keep session for transient network errors; upcoming retry can recover.
+        }
+    }
+    LaunchedEffect(session?.refreshToken) {
+        while (session != null) {
+            val current = session ?: break
+            delay((current.expiresAtMs - System.currentTimeMillis() - 180000L)
+                .coerceIn(20000L, 45L * 60L * 1000L))
+            val before = session ?: break
+            try { saveSession(api.refreshSession(before)) }
+            catch (_: Exception) { delay(30000L) }
+        }
+    }
+    LaunchedEffect(session?.accessToken) {
+        val active = session ?: return@LaunchedEffect
+        PelakPush.token(context) { token ->
+            if (!token.isNullOrBlank()) scope.launch {
+                try { if (session?.userId == active.userId) api.registerPush(active, token) }
+                catch (_: Exception) { /* FCM delivery may not be configured server-side yet. */ }
+            }
+        }
+    }
+    LaunchedEffect(tab, search) {
+        if (tab == 1) {
+            delay(320)
+            searchLoading = true
+            searchError = null
+            try {
+                searched = api.published(search)
+                searchHasMore = searched.size == 100
+            } catch (_: Exception) { searchError = "خطای جست‌وجوی سرور؛ دوباره تلاش کن." }
+            finally { searchLoading = false }
+        }
+    }
 
     fun refresh() {
         scope.launch {
             loading = true
             error = null
-            try { cars = api.published() }
+            try { cars = api.published(); homeHasMore = cars.size == 100 }
             catch (_: Exception) { error = "دریافت آگهی‌ها ممکن نشد. اینترنت را بررسی کن." }
             finally { loading = false }
         }
@@ -133,21 +200,37 @@ private fun PelakNativeApp() {
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (tab) {
                 0, 1 -> {
-                    val filtered = remember(cars, search, tab) {
-                        if (tab == 0 || search.isBlank()) cars
-                        else cars.filter { row ->
-                            listOf(row.title, row.make, row.model, row.trim, row.city)
-                                .any { it.contains(search.trim(), ignoreCase = true) }
-                        }
-                    }
+                    val filtered = if (tab == 0) cars else searched
                     ListingsPanel(
                         cars = filtered,
-                        loading = loading,
-                        error = error,
+                        loading = if (tab == 0) loading else searchLoading,
+                        error = if (tab == 0) error else searchError,
                         search = search,
                         searching = tab == 1,
+                        session = session,
+                        hasMore = if (tab == 0) homeHasMore else searchHasMore,
+                        moreLoading = moreLoading,
+                        onLoadMore = {
+                            if (!moreLoading) scope.launch {
+                                moreLoading = true
+                                try {
+                                    val start = if (tab == 0) cars.size else searched.size
+                                    val next = api.published(if (tab == 0) "" else search, start)
+                                    if (tab == 0) { cars = cars + next; homeHasMore = next.size == 100 }
+                                    else { searched = searched + next; searchHasMore = next.size == 100 }
+                                } finally { moreLoading = false }
+                            }
+                        },
                         onSearchChange = { search = it },
-                        onRefresh = { refresh() },
+                        onRefresh = {
+                            if (tab == 0) refresh()
+                            else scope.launch {
+                                searchLoading = true
+                                try { searched = api.published(search); searchHasMore = searched.size == 100; searchError = null }
+                                catch (_: Exception) { searchError = "جست‌وجو ناموفق بود." }
+                                finally { searchLoading = false }
+                            }
+                        },
                         onSelect = { selected = it },
                         onPost = { tab = 2 }
                     )
@@ -155,7 +238,8 @@ private fun PelakNativeApp() {
                 2 -> {
                     val current = session
                     if (current == null) LoginRequired(onGoToLogin = { tab = 4 })
-                    else DraftPanel(api = api, session = current, onSaved = {
+                    else DraftPanel(api = api, session = current, editing = editing, onSaved = {
+                        editing = null
                         tab = 3
                         refreshMine(current)
                     })
@@ -164,18 +248,27 @@ private fun PelakNativeApp() {
                     if (session == null) LoginRequired(onGoToLogin = { tab = 4 })
                     else ListingsPanel(
                         cars = mine, loading = mineLoading, error = null,
-                        search = "", searching = false, onSearchChange = {},
+                        search = "", searching = false, onSearchChange = {}, session = session,
                         onRefresh = { session?.let(::refreshMine) },
                         onSelect = { selected = it }, onPost = { tab = 2 },
                         title = "آگهی‌های من"
                     )
                 }
-                else -> AccountPanel(
+                4 -> AccountPanel(
                     api = api,
                     session = session,
-                    onLogin = { session = it; tab = 3 },
-                    onLogout = { session = null; mine = emptyList(); tab = 0 }
+                    onLogin = { saveSession(it); tab = 3 },
+                    onLogout = {
+                        val current = session
+                        session = null; store.clear(); mine = emptyList(); tab = 0
+                        if (current != null) scope.launch {
+                            val token = PelakPush.lastToken(context)
+                            if (!token.isNullOrBlank()) runCatching { api.unregisterPush(current, token) }
+                        }
+                    }
                 )
+                else -> if (session == null) LoginRequired(onGoToLogin = { tab = 4 })
+                else ChatInbox(api, session!!, onThread = { chatTarget = it })
             }
         }
     }
