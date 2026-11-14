@@ -51,6 +51,11 @@ internal object PelakPush {
     }
     fun lastToken(context: Context): String? =
         context.getSharedPreferences(PREF, Context.MODE_PRIVATE).getString(TOKEN, null)
+    fun discardLocalToken(context: Context) {
+        context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            .edit().remove(TOKEN).apply()
+        runCatching { FirebaseMessaging.getInstance().deleteToken() }
+    }
 }
 
 class PelakMessagingService : FirebaseMessagingService() {
