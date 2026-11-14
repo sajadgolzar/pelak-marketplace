@@ -256,6 +256,7 @@ private fun PelakNativeApp() {
                         if (current != null) scope.launch {
                             val token = PelakPush.lastToken(context)
                             if (!token.isNullOrBlank()) runCatching { api.unregisterPush(current, token) }
+                            PelakPush.discardLocalToken(context)
                         }
                     }
                 )
