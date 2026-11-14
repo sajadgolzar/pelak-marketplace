@@ -3,6 +3,15 @@ package com.pelakauto.nativeapp
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.Manifest
+import android.os.Build
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -27,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.math.BigDecimal
 
 private val Navy = Color(0xFF10233F)
@@ -38,6 +48,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = android.graphics.Color.rgb(16, 35, 63)
+        runCatching { PelakPush.initialize(applicationContext) }
         setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 MaterialTheme(
@@ -55,17 +66,22 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private data class ChatTarget(val listingId: String, val peerId: String, val title: String)
+
 private val nav = listOf(
     "آگهی‌ها" to "🚘",
     "جست‌وجو" to "⌕",
     "ثبت آگهی" to "＋",
     "آگهی‌های من" to "▣",
-    "حساب من" to "♙"
+    "حساب من" to "♙",
+    "پیام‌ها" to "✉"
 )
 
 @Composable
 private fun PelakNativeApp() {
     val api = remember { PelakApi() }
+    val context = LocalContext.current
+    val store = remember { PelakSessionStore(context) }
     val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var cars by remember { mutableStateOf<List<Car>>(emptyList()) }
@@ -75,13 +91,56 @@ private fun PelakNativeApp() {
     var error by remember { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
     var selected by remember { mutableStateOf<Car?>(null) }
-    var session by remember { mutableStateOf<PelakSession?>(null) }
+    var session by remember { mutableStateOf<PelakSession?>(store.load()) }
+    var editing by remember { mutableStateOf<Car?>(null) }
+    var chatTarget by remember { mutableStateOf<ChatTarget?>(null) }
+    var searched by remember { mutableStateOf<List<Car>>(emptyList()) }
+    var searchLoading by remember { mutableStateOf(false) }
+    var searchError by remember { mutableStateOf<String?>(null) }
+    var moreLoading by remember { mutableStateOf(false) }
+    var searchHasMore by remember { mutableStateOf(true) }
+    var homeHasMore by remember { mutableStateOf(true) }
+    fun saveSession(value: PelakSession) {
+        store.save(value)
+        session = value
+    }
+    LaunchedEffect(session?.refreshToken) {
+        while (session != null) {
+            val current = session ?: break
+            delay((current.expiresAtMs - System.currentTimeMillis() - 180000L)
+                .coerceIn(0L, 45L * 60L * 1000L))
+            val before = session ?: break
+            try { saveSession(api.refreshSession(before)) }
+            catch (_: Exception) { delay(30000L) }
+        }
+    }
+    LaunchedEffect(session?.accessToken) {
+        val active = session ?: return@LaunchedEffect
+        PelakPush.token(context) { token ->
+            if (!token.isNullOrBlank()) scope.launch {
+                try { if (session?.userId == active.userId) api.registerPush(active, token) }
+                catch (_: Exception) { /* FCM delivery may not be configured server-side yet. */ }
+            }
+        }
+    }
+    LaunchedEffect(tab, search) {
+        if (tab == 1) {
+            delay(320)
+            searchLoading = true
+            searchError = null
+            try {
+                searched = api.published(search)
+                searchHasMore = searched.size == 100
+            } catch (_: Exception) { searchError = "خطای جست‌وجوی سرور؛ دوباره تلاش کن." }
+            finally { searchLoading = false }
+        }
+    }
 
     fun refresh() {
         scope.launch {
             loading = true
             error = null
-            try { cars = api.published() }
+            try { cars = api.published(); homeHasMore = cars.size == 100 }
             catch (_: Exception) { error = "دریافت آگهی‌ها ممکن نشد. اینترنت را بررسی کن." }
             finally { loading = false }
         }
@@ -133,21 +192,37 @@ private fun PelakNativeApp() {
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (tab) {
                 0, 1 -> {
-                    val filtered = remember(cars, search, tab) {
-                        if (tab == 0 || search.isBlank()) cars
-                        else cars.filter { row ->
-                            listOf(row.title, row.make, row.model, row.trim, row.city)
-                                .any { it.contains(search.trim(), ignoreCase = true) }
-                        }
-                    }
+                    val filtered = if (tab == 0) cars else searched
                     ListingsPanel(
                         cars = filtered,
-                        loading = loading,
-                        error = error,
+                        loading = if (tab == 0) loading else searchLoading,
+                        error = if (tab == 0) error else searchError,
                         search = search,
                         searching = tab == 1,
+                        session = session,
+                        hasMore = if (tab == 0) homeHasMore else searchHasMore,
+                        moreLoading = moreLoading,
+                        onLoadMore = {
+                            if (!moreLoading) scope.launch {
+                                moreLoading = true
+                                try {
+                                    val start = if (tab == 0) cars.size else searched.size
+                                    val next = api.published(if (tab == 0) "" else search, start)
+                                    if (tab == 0) { cars = cars + next; homeHasMore = next.size == 100 }
+                                    else { searched = searched + next; searchHasMore = next.size == 100 }
+                                } finally { moreLoading = false }
+                            }
+                        },
                         onSearchChange = { search = it },
-                        onRefresh = { refresh() },
+                        onRefresh = {
+                            if (tab == 0) refresh()
+                            else scope.launch {
+                                searchLoading = true
+                                try { searched = api.published(search); searchHasMore = searched.size == 100; searchError = null }
+                                catch (_: Exception) { searchError = "جست‌وجو ناموفق بود." }
+                                finally { searchLoading = false }
+                            }
+                        },
                         onSelect = { selected = it },
                         onPost = { tab = 2 }
                     )
@@ -155,7 +230,8 @@ private fun PelakNativeApp() {
                 2 -> {
                     val current = session
                     if (current == null) LoginRequired(onGoToLogin = { tab = 4 })
-                    else DraftPanel(api = api, session = current, onSaved = {
+                    else DraftPanel(api = api, session = current, editing = editing, onSaved = {
+                        editing = null
                         tab = 3
                         refreshMine(current)
                     })
@@ -164,18 +240,28 @@ private fun PelakNativeApp() {
                     if (session == null) LoginRequired(onGoToLogin = { tab = 4 })
                     else ListingsPanel(
                         cars = mine, loading = mineLoading, error = null,
-                        search = "", searching = false, onSearchChange = {},
+                        search = "", searching = false, onSearchChange = {}, session = session,
                         onRefresh = { session?.let(::refreshMine) },
                         onSelect = { selected = it }, onPost = { tab = 2 },
                         title = "آگهی‌های من"
                     )
                 }
-                else -> AccountPanel(
+                4 -> AccountPanel(
                     api = api,
                     session = session,
-                    onLogin = { session = it; tab = 3 },
-                    onLogout = { session = null; mine = emptyList(); tab = 0 }
+                    onLogin = { saveSession(it); tab = 3 },
+                    onLogout = {
+                        val current = session
+                        session = null; store.clear(); mine = emptyList(); tab = 0
+                        if (current != null) scope.launch {
+                            val token = PelakPush.lastToken(context)
+                            if (!token.isNullOrBlank()) runCatching { api.unregisterPush(current, token) }
+                            PelakPush.discardLocalToken(context)
+                        }
+                    }
                 )
+                else -> if (session == null) LoginRequired(onGoToLogin = { tab = 4 })
+                else ChatInbox(api, session!!, onThread = { chatTarget = it })
             }
         }
     }
@@ -186,7 +272,17 @@ private fun PelakNativeApp() {
             onDismissRequest = { selected = null },
             title = { Text(car.title, fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (car.imagePaths.isNotEmpty()) Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        car.imagePaths.forEach { path ->
+                            CarPhoto(path, car.title, if (car.userId == session?.userId) session?.accessToken else null,
+                                Modifier.size(width = 210.dp, height = 140.dp))
+                        }
+                    }
                     Text(car.make + "  " + car.model + "  " + car.trim)
                     Text("سال ساخت: " + car.year + "  •  " + car.country + "، " + car.city)
                     car.mileageKm?.let { Text("کارکرد: " + it + " کیلومتر") }
@@ -196,19 +292,34 @@ private fun PelakNativeApp() {
                 }
             },
             confirmButton = {
-                if (car.listingStatus == "published" && car.sellerPhone.isNotBlank()) {
-                    Button(onClick = {
-                        context.startActivity(Intent(Intent.ACTION_DIAL,
-                            Uri.parse("tel:" + car.sellerPhone.filter { it.isDigit() || it == '+' })))
-                    }) { Text("تماس با فروشنده") }
-                } else {
-                    TextButton(onClick = { selected = null }) { Text("بستن") }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (car.userId == session?.userId && car.listingStatus == "draft") {
+                        Button(onClick = { editing = car; selected = null; tab = 2 }) {
+                            Text("ویرایش پیش‌نویس")
+                        }
+                    } else if (car.listingStatus == "published") {
+                        if (session != null && car.userId != session?.userId) {
+                            Button(onClick = {
+                                chatTarget = ChatTarget(car.id, car.userId, car.title)
+                                selected = null
+                            }) { Text("چت پلاک") }
+                        }
+                        if (car.sellerPhone.isNotBlank()) {
+                            TextButton(onClick = {
+                                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(
+                                    "tel:" + car.sellerPhone.filter { it.isDigit() || it == '+' })))
+                            }) { Text("تماس") }
+                        }
+                    }
                 }
             },
             dismissButton = {
                 TextButton(onClick = { selected = null }) { Text("بازگشت") }
             }
         )
+    }
+    if (chatTarget != null && session != null) {
+        ChatDialog(api, session!!, chatTarget!!, onClose = { chatTarget = null })
     }
 }
 
@@ -219,6 +330,10 @@ private fun ListingsPanel(
     error: String?,
     search: String,
     searching: Boolean,
+    session: PelakSession? = null,
+    hasMore: Boolean = false,
+    moreLoading: Boolean = false,
+    onLoadMore: () -> Unit = {},
     onSearchChange: (String) -> Unit,
     onRefresh: () -> Unit,
     onSelect: (Car) -> Unit,
@@ -263,7 +378,13 @@ private fun ListingsPanel(
                 verticalArrangement = Arrangement.spacedBy(9.dp)
             ) {
                 items(cars, key = { it.id }) { car ->
-                    CarRow(car = car, onClick = { onSelect(car) })
+                    CarRow(car = car, session = session, onClick = { onSelect(car) })
+                }
+                if (hasMore) item {
+                    Button(onClick = onLoadMore, enabled = !moreLoading,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(if (moreLoading) "در حال دریافت…" else "نمایش آگهی‌های بیشتر")
+                    }
                 }
             }
         }
@@ -271,28 +392,16 @@ private fun ListingsPanel(
 }
 
 @Composable
-private fun CarRow(car: Car, onClick: () -> Unit) {
+private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(15.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            val api = remember { PelakApi() }
-            val imageUrl by produceState<String?>(initialValue = null, key1 = car.id) {
-                value = car.imagePath?.let { api.signedPhoto(it) }
-            }
-            Box(
-                modifier = Modifier.size(110.dp).background(Pale, RoundedCornerShape(11.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                if (imageUrl == null) Text("🚘", fontSize = 30.sp)
-                else AsyncImage(
-                    model = imageUrl, contentDescription = car.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                )
-            }
+            CarPhoto(car.imagePath, car.title,
+                session?.takeIf { it.userId == car.userId }?.accessToken,
+                Modifier.size(110.dp))
             Spacer(Modifier.width(11.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(car.title, fontWeight = FontWeight.Bold, maxLines = 2, color = Ink)
@@ -340,6 +449,9 @@ private fun AccountPanel(
     onLogout: () -> Unit
 ) {
     if (session != null) {
+        val context = LocalContext.current
+        val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+        var pushStatus by remember { mutableStateOf("") }
         Column(Modifier.fillMaxSize().padding(20.dp)) {
             Text("به پلاک خوش آمدی", fontWeight = FontWeight.Bold, color = Navy, fontSize = 21.sp)
             Spacer(Modifier.height(10.dp))
@@ -347,8 +459,17 @@ private fun AccountPanel(
             Spacer(Modifier.height(20.dp))
             Button(onClick = onLogout) { Text("خروج از حساب در این دستگاه") }
             Spacer(Modifier.height(10.dp))
-            Text("در این نسخه آزمایشی، نشست ورود فقط تا بسته‌شدن برنامه حفظ می‌شود.",
+            Text("ورود به‌صورت رمزگذاری‌شده روی همین گوشی حفظ می‌شود.",
                 color = Color.Gray, fontSize = 12.sp)
+            Spacer(Modifier.height(13.dp))
+            Text("اعلان پیام‌ها و وضعیت آگهی‌ها", fontWeight = FontWeight.Bold)
+            TextButton(onClick = {
+                if (Build.VERSION.SDK_INT >= 33 &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                ) permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                else pushStatus = "اعلان‌های سیستم مجازند؛ ارسال واقعی به تنظیمات Firebase وابسته است."
+            }) { Text("فعال‌سازی اعلان بومی") }
+            if (pushStatus.isNotBlank()) Text(pushStatus, color = Color.Gray, fontSize = 12.sp)
         }
         return
     }
@@ -397,17 +518,32 @@ private fun AccountPanel(
 }
 
 @Composable
-private fun DraftPanel(api: PelakApi, session: PelakSession, onSaved: () -> Unit) {
+private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSaved: () -> Unit) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var title by rememberSaveable { mutableStateOf("") }
-    var make by rememberSaveable { mutableStateOf("") }
-    var model by rememberSaveable { mutableStateOf("") }
-    var year by rememberSaveable { mutableStateOf("") }
-    var city by rememberSaveable { mutableStateOf("") }
-    var country by rememberSaveable { mutableStateOf("ایران") }
-    var phone by rememberSaveable { mutableStateOf("") }
-    var price by rememberSaveable { mutableStateOf("") }
-    var negotiable by rememberSaveable { mutableStateOf(false) }
+    var title by rememberSaveable(editing?.id) { mutableStateOf(editing?.title.orEmpty()) }
+    var make by rememberSaveable(editing?.id) { mutableStateOf(editing?.make.orEmpty()) }
+    var model by rememberSaveable(editing?.id) { mutableStateOf(editing?.model.orEmpty()) }
+    var year by rememberSaveable(editing?.id) { mutableStateOf(editing?.year?.toString().orEmpty()) }
+    var city by rememberSaveable(editing?.id) { mutableStateOf(editing?.city.orEmpty()) }
+    var country by rememberSaveable(editing?.id) { mutableStateOf(editing?.country ?: "ایران") }
+    var phone by rememberSaveable(editing?.id) { mutableStateOf(editing?.sellerPhone.orEmpty()) }
+    var price by rememberSaveable(editing?.id) {
+        mutableStateOf(
+            if (editing?.currency == "IRR" && editing.price != null)
+                runCatching { BigDecimal(editing.price).divide(BigDecimal.TEN).toPlainString() }.getOrDefault("")
+            else ""
+        )
+    }
+    var negotiable by rememberSaveable(editing?.id) { mutableStateOf(editing?.priceNegotiable ?: false) }
+    var photoUris by remember(editing?.id) { mutableStateOf<List<Uri>>(emptyList()) }
+    var savedPhotoPaths by remember(editing?.id) { mutableStateOf(editing?.imagePaths.orEmpty()) }
+    var uploadedUris by remember(editing?.id) { mutableStateOf<Set<String>>(emptySet()) }
+    var draftId by remember(editing?.id) { mutableStateOf(editing?.id) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { selected ->
+        val space = (8 - savedPhotoPaths.size).coerceAtLeast(0)
+        photoUris = (photoUris + selected).distinct().take(space)
+    }
     var working by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
     LazyColumn(
@@ -416,9 +552,9 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, onSaved: () -> Unit
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Text("ثبت پیش‌نویس آگهی", fontSize = 21.sp,
-                fontWeight = FontWeight.Bold, color = Navy)
-            Text("این فرم مستقیماً در Supabase ذخیره می‌شود، نه در وب‌سایت.",
+            Text(if (editing == null) "ثبت پیش‌نویس آگهی" else "ویرایش پیش‌نویس",
+                fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Navy)
+            Text("ثبت مستقیم در Supabase؛ انتشار عمومی پس از بررسی مدیر انجام می‌شود.",
                 fontSize = 12.sp, color = Color.Gray)
         }
         item { NativeField("عنوان آگهی", title) { title = it } }
@@ -439,6 +575,29 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, onSaved: () -> Unit
             NativeField("قیمت به تومان", price, KeyboardType.Number) { price = it }
         }
         item {
+            Text("عکس‌های خودرو: " + savedPhotoPaths.size + " ذخیره‌شده، " +
+                photoUris.count { it.toString() !in uploadedUris } + " انتخاب‌شده",
+                color = Navy, fontWeight = FontWeight.Bold)
+            TextButton(
+                onClick = { picker.launch("image/*") },
+                enabled = !working && savedPhotoPaths.size + photoUris.size < 8
+            ) { Text("＋ افزودن عکس از گالری (حداکثر ۸ عکس)") }
+        }
+        if (photoUris.isNotEmpty()) item {
+            Row(Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                photoUris.forEach { uri ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        AsyncImage(model = uri, contentDescription = "عکس خودرو",
+                            modifier = Modifier.size(100.dp))
+                        TextButton(onClick = { photoUris = photoUris - uri }, enabled = !working) {
+                            Text("حذف", fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
+        item {
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !working,
@@ -453,24 +612,41 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, onSaved: () -> Unit
                         scope.launch {
                             working = true; info = ""
                             try {
-                                api.createDraft(
-                                    session, title, make, model, y,
-                                    if (negotiable) null else p!!.multiply(BigDecimal.TEN).toPlainString(),
-                                    country, city, phone
-                                )
-                                info = "پیش‌نویس با موفقیت ذخیره شد."
+                                val rials = if (negotiable) null else
+                                    p!!.multiply(BigDecimal.TEN).toPlainString()
+                                val savedId = draftId
+                                val id = if (savedId == null) {
+                                    api.createDraft(session, title, make, model, y, rials, country, city, phone)
+                                        .also { draftId = it }
+                                } else {
+                                    api.updateDraft(session, savedId, title, make, model, y, rials,
+                                        country, city, phone)
+                                    savedId
+                                }
+                                for (uri in photoUris) {
+                                    if (uri.toString() in uploadedUris) continue
+                                    val path = api.uploadPhoto(session, context.contentResolver, uri)
+                                    val next = savedPhotoPaths + path
+                                    try { api.attachPhotos(session, id, next) }
+                                    catch (failure: Exception) {
+                                        runCatching { api.removeUnattachedPhoto(session, path) }
+                                        throw failure
+                                    }
+                                    savedPhotoPaths = next
+                                    uploadedUris = uploadedUris + uri.toString()
+                                }
                                 onSaved()
                             } catch (_: Exception) {
-                                info = "ثبت پیش‌نویس انجام نشد؛ مجوز، محدودیت آگهی و اینترنت را بررسی کن."
+                                info = "ذخیره کامل نشد. پیش‌نویس ثبت‌شده محفوظ است؛ برای عکس‌ها دوباره تلاش کن."
                             } finally { working = false }
                         }
                     }
                 }
-            ) { Text(if (working) "در حال ذخیره…" else "ذخیره پیش‌نویس") }
+            ) { Text(if (working) "در حال ذخیره و آپلود…" else "ذخیره پیش‌نویس و عکس‌ها") }
         }
         item { if (info.isNotBlank()) Text(info, color = Navy) }
         item {
-            Text("انتشار عمومی و بررسی تصاویر هنوز در این نسخه بومی فعال نیست و باید از مسیر مدیریت انجام شود.",
+            Text("انتشار و بازبینی عکس‌ها همچنان طبق قوانین مدیر انجام می‌شود.",
                 color = Color.Gray, fontSize = 12.sp)
         }
     }
@@ -489,5 +665,123 @@ private fun NativeField(
         keyboardOptions = KeyboardOptions(keyboardType = keyboard),
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp)
+    )
+}
+
+@Composable
+private fun CarPhoto(path: String?, title: String, jwt: String?, modifier: Modifier = Modifier) {
+    val api = remember { PelakApi() }
+    val url by produceState<String?>(null, path, jwt) {
+        value = path?.let { api.signedPhoto(it, jwt) }
+    }
+    Box(modifier.background(Pale, RoundedCornerShape(11.dp)),
+        contentAlignment = Alignment.Center) {
+        if (url == null) Text("🚘", fontSize = 27.sp)
+        else AsyncImage(
+            model = url, contentDescription = title,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+        )
+    }
+}
+
+@Composable
+private fun ChatInbox(api: PelakApi, session: PelakSession, onThread: (ChatTarget) -> Unit) {
+    var messages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
+    var busy by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var reload by remember { mutableIntStateOf(0) }
+    LaunchedEffect(session.userId, session.accessToken, reload) {
+        busy = true
+        try { messages = api.inbox(session); error = null }
+        catch (_: Exception) { error = "دریافت پیام‌ها ممکن نشد" }
+        finally { busy = false }
+    }
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("پیام‌های پلاک", color = Navy, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            TextButton(onClick = { reload++ }) { Text("تازه‌سازی") }
+        }
+        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (error != null) Text(error.orEmpty(), color = Color.Gray)
+        val threads = messages.distinctBy {
+            it.listingId + ":" + if (it.senderId == session.userId) it.recipientId else it.senderId
+        }
+        if (!busy && threads.isEmpty()) Text("هنوز گفت‌وگویی نداری.", color = Color.Gray)
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            items(threads, key = { it.id }) { msg ->
+                val peer = if (msg.senderId == session.userId) msg.recipientId else msg.senderId
+                Card(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        onThread(ChatTarget(msg.listingId, peer, "گفت‌وگوی آگهی"))
+                    },
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Column(Modifier.padding(15.dp)) {
+                        Text("گفت‌وگوی آگهی • " + msg.listingId.take(8),
+                            color = Navy, fontWeight = FontWeight.Bold)
+                        Text(msg.body, maxLines = 2, color = Color.Gray, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatDialog(api: PelakApi, session: PelakSession, target: ChatTarget, onClose: () -> Unit) {
+    var messages by remember(target.listingId, target.peerId) { mutableStateOf<List<ChatMessage>>(emptyList()) }
+    var body by remember(target.listingId, target.peerId) { mutableStateOf("") }
+    var working by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var reload by remember { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(target.listingId, target.peerId, session.accessToken, reload) {
+        try { messages = api.thread(session, target.listingId, target.peerId); error = null }
+        catch (_: Exception) { error = "خواندن پیام‌ها ممکن نشد." }
+    }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text(target.title, maxLines = 1, color = Navy) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.fillMaxWidth().heightIn(max = 310.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    if (messages.isEmpty()) Text("برای شروع گفت‌وگو پیام بنویس.", color = Color.Gray)
+                    messages.forEach { msg ->
+                        Text(
+                            (if (msg.senderId == session.userId) "من: " else "طرف مقابل: ") + msg.body,
+                            color = Ink,
+                            modifier = Modifier.fillMaxWidth().background(
+                                if (msg.senderId == session.userId) Pale else Color.White,
+                                RoundedCornerShape(9.dp)).padding(8.dp),
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+                OutlinedTextField(body, { body = it.take(1500) },
+                    modifier = Modifier.fillMaxWidth(), label = { Text("متن پیام") },
+                    maxLines = 4)
+                if (error != null) Text(error.orEmpty(), color = Color.Red, fontSize = 12.sp)
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                scope.launch {
+                    working = true
+                    try {
+                        api.sendMessage(session, target.listingId, target.peerId, body)
+                        body = ""; reload++
+                    } catch (_: Exception) { error = "ارسال انجام نشد؛ دسترسی یا اینترنت را بررسی کن." }
+                    finally { working = false }
+                }
+            }, enabled = !working && body.trim().isNotEmpty()) {
+                Text(if (working) "در حال ارسال…" else "ارسال پیام")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { reload++ }) { Text("↻ تازه‌سازی") }
+            TextButton(onClick = onClose) { Text("بستن") }
+        }
     )
 }

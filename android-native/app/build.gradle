@@ -13,11 +13,15 @@ android {
         applicationId 'com.pelakauto.nativepreview'
         minSdk 24
         targetSdk 35
-        versionCode 1
-        versionName '0.1-native-preview'
-        resConfigs 'fa', 'en'
+        versionCode 2
+        versionName '0.2-native-preview'
+        resConfigs 'fa', 'en', 'ar', 'ka'
+        buildConfigField 'String', 'FIREBASE_APP_ID', '\"1:245022577031:android:8bc31b15733dba8ce58322\"'
+        buildConfigField 'String', 'FIREBASE_API_KEY', '\"AIzaSyBJWadEPLZdrwcnKI9sFk64IfvDfUed8Xo\"'
+        buildConfigField 'String', 'FIREBASE_SENDER_ID', '\"245022577031\"'
+        buildConfigField 'String', 'FIREBASE_PROJECT_ID', '\"pelak-ae9f3\"'
     }
-    buildFeatures { compose true }
+    buildFeatures { compose true; buildConfig true }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -33,4 +37,7 @@ dependencies {
     implementation 'androidx.activity:activity-compose:1.10.1'
     implementation 'androidx.core:core-ktx:1.16.0'
     implementation 'io.coil-kt:coil-compose:2.7.0'
+    implementation 'androidx.core:core:1.15.0'
+    implementation platform('com.google.firebase:firebase-bom:33.7.0')
+    implementation 'com.google.firebase:firebase-messaging'
 }
