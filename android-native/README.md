@@ -1,39 +1,36 @@
-# PELAK Native Android — v0.1 Preview
+# PELAK Native Android — v0.2 Preview
 
-This is a **separate, genuinely native Android project** using Kotlin and Jetpack Compose.
-**No WebView and no dependency on pelakauto.com**. The app talks directly to the existing Supabase API.
-It does not replace the existing `android/` WebView v0.3 test app or `index.html`.
+Android project uses **Kotlin + Jetpack Compose** and is **not a WebView**.
+It communicates directly with Supabase using a publishable client key and the database's existing Row Level Security (RLS).
 
-## Native preview features
-- Public list of published car listings (server RLS), search by brand/model/title/city
-- Native listing cards, details, price in toman for IRR listings, phone dialer
-- Public car images via short-lived signed URLs where the public Storage policy allows them
-- Email one-time-code authentication, handled by Supabase Auth
-- Save text-only car **draft** directly to Supabase for review, view "my listings"
-- Handles loading, no listings, and network errors without opening a browser
-- RTL Persian design with five-tab navigation
+## What v0.2 implements
+- Public car listings and on-server searchable brand/model/trim/title/city, pagination in 100-result chunks
+- First image and a scrolling photo gallery, short-lived signed URLs, private draft photos accessible to their owner
+- Email OTP sign in and encrypted session retention using Android Keystore, automatic refresh
+- Draft creation, draft editing (only while listing_status=draft) and multiple photo picker/compressed uploads to the private bucket
+- Native buyer/seller chat and inbox, using the existing validated `pelak_send_listing_message` RPC and participant-read RLS
+- Android FCM SDK initialization, registration/unregistration RPCs and opt-in Android 13+ notification permission
 
-## Limitations — do not advertise as production-ready
-- Debug/preview package `com.pelakauto.nativepreview`, separate from `com.pelakauto.app`
-- Sign-in session is held in memory, so restarting requires logging in again
-- No photo picker/upload, listing editing, full messaging, dealer management, FCM or admin tools **yet**
-- Native listing submission saves a **draft only**; public publication still requires review
-- Current user-facing date/price formats, auth, and seller flows require real Samsung device tests
-- A working network connection to Supabase is required; offline cannot create or publish listings
-- Secrets must not be committed. The included Supabase publishable key is intentionally public, scoped by RLS.
+## Remaining production blockers / known limitations
+- The APK is **debug-signed**, **not production/release signed**; it must be tested on a real Samsung device before public recommendation.
+- FCM **delivery is not active yet**: server job `pelak-android-fcm-every-minute` is disabled pending a securely configured Firebase Service Account. Also register the preview package ID `com.pelakauto.nativepreview` in Firebase (or change to a properly registered release ID) and test device token issuance.
+- Photos require camera roll access through Android's picker; direct in-app camera, EXIF rotation handling, image deletion/reordering and robust offline upload are not finished.
+- Editing published/sold/needs-revision listings requires a server-approved moderation flow, not a bypass of draft-only RLS. Current editor deliberately limits changes to user-owned drafts.
+- Search has server-side pagination but only basic text filters; favorites, advanced filters, push deep links, complete showroom/admin functions, rich media chat, offline reading, and complete FA/EN/AR/KA localization are still unfinished.
+- Photo privacy is controlled by the existing Storage RLS; no client-side masking of licence plates. Admin review remains required before publishing.
+- Existing WebView version in `android/` remains only as a rollback, **not** the product.
+- Native preview has a different package ID from earlier WebView release. The existing `downloads/PELAK-Native-v0.1-preview.apk` is retained to allow rollback.
 
-## CI build
-GitHub Actions: `Build PELAK Native Android Preview` from `feature/pelak-native-android-mvp-2026-11-12`.
-Artifact name: `pelak-native-v0.1-debug-apk`. The debug signing key is not a release key.
+## Build
+GitHub Actions: `Build PELAK Native Android Preview`.
+On the branch `feature/native-v02-2026-11-15` and `main` it builds with JDK 17 and Gradle 8.11.1.
+After a successful merge to main, CI publishes `downloads/PELAK-Native-v0.2-preview.apk` automatically.
 
-## Roadmap
-1. Validate public listings/search and email OTP with RLS on a physical Android phone.
-2. Implement photo-picker + safe multi-photo draft uploads, seller edit/cancel and support.
-3. Add native chat/inbox, favorites, notification channels and FCM token registration.
-4. Add complete Persian/English/Arabic/Georgian localization, showroom, admin.
-5. Performance, security, release signing, Google Play testing before production swap.
-
-## Project coexistence
-`android/` = previous WebView-based APK `com.pelakauto.app`
-`android-native/` = standalone native preview `com.pelakauto.nativepreview`.
-Both share **Supabase data and RLS**. No backend migrations are required by this preview.
+## Manual regression checks before launch
+- Clean install and update on a Samsung device (Android 7+), then login with OTP and restart app
+- Search a model outside the first 100 listings, move through pagination, open signed photo gallery
+- Register a draft with 1–8 photos, revisit and edit the draft, ensure no duplicate row or orphaned file after retry
+- Chat using two real separate user accounts, verify buyer can initiate and seller can only reply to their conversation
+- Verify anonymous and authenticated Storage permissions and check draft photo privacy
+- Configure FCM Service Account securely, enable server dispatch only after testing, grant notifications on Android 13+
+- Sign out, sign in again, verify messages and FCM token ownership, test offline/slow connectivity
