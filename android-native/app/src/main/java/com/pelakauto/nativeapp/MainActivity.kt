@@ -513,17 +513,32 @@ private fun AccountPanel(
 }
 
 @Composable
-private fun DraftPanel(api: PelakApi, session: PelakSession, onSaved: () -> Unit) {
+private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSaved: () -> Unit) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var title by rememberSaveable { mutableStateOf("") }
-    var make by rememberSaveable { mutableStateOf("") }
-    var model by rememberSaveable { mutableStateOf("") }
-    var year by rememberSaveable { mutableStateOf("") }
-    var city by rememberSaveable { mutableStateOf("") }
-    var country by rememberSaveable { mutableStateOf("ایران") }
-    var phone by rememberSaveable { mutableStateOf("") }
-    var price by rememberSaveable { mutableStateOf("") }
-    var negotiable by rememberSaveable { mutableStateOf(false) }
+    var title by rememberSaveable(editing?.id) { mutableStateOf(editing?.title.orEmpty()) }
+    var make by rememberSaveable(editing?.id) { mutableStateOf(editing?.make.orEmpty()) }
+    var model by rememberSaveable(editing?.id) { mutableStateOf(editing?.model.orEmpty()) }
+    var year by rememberSaveable(editing?.id) { mutableStateOf(editing?.year?.toString().orEmpty()) }
+    var city by rememberSaveable(editing?.id) { mutableStateOf(editing?.city.orEmpty()) }
+    var country by rememberSaveable(editing?.id) { mutableStateOf(editing?.country ?: "ایران") }
+    var phone by rememberSaveable(editing?.id) { mutableStateOf(editing?.sellerPhone.orEmpty()) }
+    var price by rememberSaveable(editing?.id) {
+        mutableStateOf(
+            if (editing?.currency == "IRR" && editing.price != null)
+                runCatching { BigDecimal(editing.price).divide(BigDecimal.TEN).toPlainString() }.getOrDefault("")
+            else ""
+        )
+    }
+    var negotiable by rememberSaveable(editing?.id) { mutableStateOf(editing?.priceNegotiable ?: false) }
+    var photoUris by remember(editing?.id) { mutableStateOf<List<Uri>>(emptyList()) }
+    var savedPhotoPaths by remember(editing?.id) { mutableStateOf(editing?.imagePaths.orEmpty()) }
+    var uploadedUris by remember(editing?.id) { mutableStateOf<Set<String>>(emptySet()) }
+    var draftId by remember(editing?.id) { mutableStateOf(editing?.id) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { selected ->
+        val space = (8 - savedPhotoPaths.size).coerceAtLeast(0)
+        photoUris = (photoUris + selected).distinct().take(space)
+    }
     var working by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
     LazyColumn(
@@ -532,9 +547,9 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, onSaved: () -> Unit
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Text("ثبت پیش‌نویس آگهی", fontSize = 21.sp,
-                fontWeight = FontWeight.Bold, color = Navy)
-            Text("این فرم مستقیماً در Supabase ذخیره می‌شود، نه در وب‌سایت.",
+            Text(if (editing == null) "ثبت پیش‌نویس آگهی" else "ویرایش پیش‌نویس",
+                fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Navy)
+            Text("ثبت مستقیم در Supabase؛ انتشار عمومی پس از بررسی مدیر انجام می‌شود.",
                 fontSize = 12.sp, color = Color.Gray)
         }
         item { NativeField("عنوان آگهی", title) { title = it } }
@@ -555,6 +570,29 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, onSaved: () -> Unit
             NativeField("قیمت به تومان", price, KeyboardType.Number) { price = it }
         }
         item {
+            Text("عکس‌های خودرو: " + savedPhotoPaths.size + " ذخیره‌شده، " +
+                photoUris.count { it.toString() !in uploadedUris } + " انتخاب‌شده",
+                color = Navy, fontWeight = FontWeight.Bold)
+            TextButton(
+                onClick = { picker.launch("image/*") },
+                enabled = !working && savedPhotoPaths.size + photoUris.size < 8
+            ) { Text("＋ افزودن عکس از گالری (حداکثر ۸ عکس)") }
+        }
+        if (photoUris.isNotEmpty()) item {
+            Row(Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                photoUris.forEach { uri ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        AsyncImage(model = uri, contentDescription = "عکس خودرو",
+                            modifier = Modifier.size(100.dp))
+                        TextButton(onClick = { photoUris = photoUris - uri }, enabled = !working) {
+                            Text("حذف", fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
+        item {
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !working,
@@ -569,24 +607,37 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, onSaved: () -> Unit
                         scope.launch {
                             working = true; info = ""
                             try {
-                                api.createDraft(
-                                    session, title, make, model, y,
-                                    if (negotiable) null else p!!.multiply(BigDecimal.TEN).toPlainString(),
-                                    country, city, phone
-                                )
-                                info = "پیش‌نویس با موفقیت ذخیره شد."
+                                val rials = if (negotiable) null else
+                                    p!!.multiply(BigDecimal.TEN).toPlainString()
+                                val savedId = draftId
+                                val id = if (savedId == null) {
+                                    api.createDraft(session, title, make, model, y, rials, country, city, phone)
+                                        .also { draftId = it }
+                                } else {
+                                    api.updateDraft(session, savedId, title, make, model, y, rials,
+                                        country, city, phone)
+                                    savedId
+                                }
+                                for (uri in photoUris) {
+                                    if (uri.toString() in uploadedUris) continue
+                                    val path = api.uploadPhoto(session, context.contentResolver, uri)
+                                    val next = savedPhotoPaths + path
+                                    api.attachPhotos(session, id, next)
+                                    savedPhotoPaths = next
+                                    uploadedUris = uploadedUris + uri.toString()
+                                }
                                 onSaved()
                             } catch (_: Exception) {
-                                info = "ثبت پیش‌نویس انجام نشد؛ مجوز، محدودیت آگهی و اینترنت را بررسی کن."
+                                info = "ذخیره کامل نشد. پیش‌نویس ثبت‌شده محفوظ است؛ برای عکس‌ها دوباره تلاش کن."
                             } finally { working = false }
                         }
                     }
                 }
-            ) { Text(if (working) "در حال ذخیره…" else "ذخیره پیش‌نویس") }
+            ) { Text(if (working) "در حال ذخیره و آپلود…" else "ذخیره پیش‌نویس و عکس‌ها") }
         }
         item { if (info.isNotBlank()) Text(info, color = Navy) }
         item {
-            Text("انتشار عمومی و بررسی تصاویر هنوز در این نسخه بومی فعال نیست و باید از مسیر مدیریت انجام شود.",
+            Text("انتشار و بازبینی عکس‌ها همچنان طبق قوانین مدیر انجام می‌شود.",
                 color = Color.Gray, fontSize = 12.sp)
         }
     }
