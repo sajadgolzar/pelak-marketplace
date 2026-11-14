@@ -627,7 +627,11 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                                     if (uri.toString() in uploadedUris) continue
                                     val path = api.uploadPhoto(session, context.contentResolver, uri)
                                     val next = savedPhotoPaths + path
-                                    api.attachPhotos(session, id, next)
+                                    try { api.attachPhotos(session, id, next) }
+                                    catch (failure: Exception) {
+                                        runCatching { api.removeUnattachedPhoto(session, path) }
+                                        throw failure
+                                    }
                                     savedPhotoPaths = next
                                     uploadedUris = uploadedUris + uri.toString()
                                 }
