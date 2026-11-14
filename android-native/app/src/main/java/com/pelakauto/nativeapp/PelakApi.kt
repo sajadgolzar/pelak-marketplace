@@ -256,6 +256,20 @@ internal class PelakApi {
             path
         }
 
+    suspend fun removeUnattachedPhoto(session: PelakSession, path: String) =
+        withContext(Dispatchers.IO) {
+            val conn = URL(PelakConfig.API_ROOT + "/storage/v1/object/car-images/" +
+                Uri.encode(path, "/")).openConnection() as HttpURLConnection
+            try {
+                conn.requestMethod = "DELETE"
+                conn.connectTimeout = 10000; conn.readTimeout = 10000
+                conn.setRequestProperty("apikey", PelakConfig.PUBLIC_KEY)
+                conn.setRequestProperty("Authorization", "Bearer " + session.accessToken)
+                if (conn.responseCode !in 200..299) throw IllegalStateException("پاک‌سازی عکس ناتمام ماند")
+            } finally { conn.disconnect() }
+            Unit
+        }
+
     suspend fun inbox(session: PelakSession): List<ChatMessage> = withContext(Dispatchers.IO) {
         val resp = perform("/rest/v1/pelak_listing_messages?select=id,listing_id,sender_id,recipient_id,body,created_at" +
             "&or=(sender_id.eq." + session.userId + ",recipient_id.eq." + session.userId +
