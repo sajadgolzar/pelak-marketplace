@@ -607,3 +607,121 @@ private fun NativeField(
         shape = RoundedCornerShape(12.dp)
     )
 }
+
+@Composable
+private fun CarPhoto(path: String?, title: String, jwt: String?, modifier: Modifier = Modifier) {
+    val api = remember { PelakApi() }
+    val url by produceState<String?>(null, path, jwt) {
+        value = path?.let { api.signedPhoto(it, jwt) }
+    }
+    Box(modifier.background(Pale, RoundedCornerShape(11.dp)),
+        contentAlignment = Alignment.Center) {
+        if (url == null) Text("🚘", fontSize = 27.sp)
+        else AsyncImage(
+            model = url, contentDescription = title,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+        )
+    }
+}
+
+@Composable
+private fun ChatInbox(api: PelakApi, session: PelakSession, onThread: (ChatTarget) -> Unit) {
+    var messages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
+    var busy by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var reload by remember { mutableIntStateOf(0) }
+    LaunchedEffect(session.userId, session.accessToken, reload) {
+        busy = true
+        try { messages = api.inbox(session); error = null }
+        catch (_: Exception) { error = "دریافت پیام‌ها ممکن نشد" }
+        finally { busy = false }
+    }
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("پیام‌های پلاک", color = Navy, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            TextButton(onClick = { reload++ }) { Text("تازه‌سازی") }
+        }
+        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (error != null) Text(error.orEmpty(), color = Color.Gray)
+        val threads = messages.distinctBy {
+            it.listingId + ":" + if (it.senderId == session.userId) it.recipientId else it.senderId
+        }
+        if (!busy && threads.isEmpty()) Text("هنوز گفت‌وگویی نداری.", color = Color.Gray)
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            items(threads, key = { it.id }) { msg ->
+                val peer = if (msg.senderId == session.userId) msg.recipientId else msg.senderId
+                Card(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        onThread(ChatTarget(msg.listingId, peer, "گفت‌وگوی آگهی"))
+                    },
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Column(Modifier.padding(15.dp)) {
+                        Text("گفت‌وگوی آگهی • " + msg.listingId.take(8),
+                            color = Navy, fontWeight = FontWeight.Bold)
+                        Text(msg.body, maxLines = 2, color = Color.Gray, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatDialog(api: PelakApi, session: PelakSession, target: ChatTarget, onClose: () -> Unit) {
+    var messages by remember(target.listingId, target.peerId) { mutableStateOf<List<ChatMessage>>(emptyList()) }
+    var body by remember(target.listingId, target.peerId) { mutableStateOf("") }
+    var working by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var reload by remember { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(target.listingId, target.peerId, session.accessToken, reload) {
+        try { messages = api.thread(session, target.listingId, target.peerId); error = null }
+        catch (_: Exception) { error = "خواندن پیام‌ها ممکن نشد." }
+    }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text(target.title, maxLines = 1, color = Navy) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.fillMaxWidth().heightIn(max = 310.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    if (messages.isEmpty()) Text("برای شروع گفت‌وگو پیام بنویس.", color = Color.Gray)
+                    messages.forEach { msg ->
+                        Text(
+                            (if (msg.senderId == session.userId) "من: " else "طرف مقابل: ") + msg.body,
+                            color = Ink,
+                            modifier = Modifier.fillMaxWidth().background(
+                                if (msg.senderId == session.userId) Pale else Color.White,
+                                RoundedCornerShape(9.dp)).padding(8.dp),
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+                OutlinedTextField(body, { body = it.take(1500) },
+                    modifier = Modifier.fillMaxWidth(), label = { Text("متن پیام") },
+                    maxLines = 4)
+                if (error != null) Text(error.orEmpty(), color = Color.Red, fontSize = 12.sp)
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                scope.launch {
+                    working = true
+                    try {
+                        api.sendMessage(session, target.listingId, target.peerId, body)
+                        body = ""; reload++
+                    } catch (_: Exception) { error = "ارسال انجام نشد؛ دسترسی یا اینترنت را بررسی کن." }
+                    finally { working = false }
+                }
+            }, enabled = !working && body.trim().isNotEmpty()) {
+                Text(if (working) "در حال ارسال…" else "ارسال پیام")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { reload++ }) { Text("↻ تازه‌سازی") }
+            TextButton(onClick = onClose) { Text("بستن") }
+        }
+    )
+}
