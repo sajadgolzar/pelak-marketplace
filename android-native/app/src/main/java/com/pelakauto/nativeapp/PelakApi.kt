@@ -224,8 +224,10 @@ internal class PelakApi {
     suspend fun uploadPhoto(session: PelakSession, resolver: ContentResolver, image: Uri): String =
         withContext(Dispatchers.IO) {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            resolver.openInputStream(image)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            val boundsStream = resolver.openInputStream(image)
                 ?: throw IllegalStateException("عکس قابل خواندن نیست")
+            boundsStream.use { BitmapFactory.decodeStream(it, null, bounds) }
+            // decodeStream returns null deliberately when inJustDecodeBounds is true.
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IllegalStateException("تصویر نامعتبر")
             var sample = 1
             while (bounds.outWidth / sample > 1700 || bounds.outHeight / sample > 1700) sample *= 2
