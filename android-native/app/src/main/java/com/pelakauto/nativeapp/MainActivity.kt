@@ -90,6 +90,7 @@ private fun PelakNativeApp() {
     var mine by remember { mutableStateOf<List<Car>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var mineLoading by remember { mutableStateOf(false) }
+    var mineError by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
     var selected by remember { mutableStateOf<Car?>(null) }
@@ -150,8 +151,8 @@ private fun PelakNativeApp() {
     fun refreshMine(current: PelakSession) {
         scope.launch {
             mineLoading = true
-            try { mine = api.mine(current) }
-            catch (_: Exception) { mine = emptyList() }
+            try { mine = api.mine(current); mineError = null }
+            catch (_: Exception) { mineError = "دریافت آگهی‌های من ناموفق بود. دوباره تلاش کن." }
             finally { mineLoading = false }
         }
     }
@@ -244,7 +245,7 @@ private fun PelakNativeApp() {
                 3 -> {
                     if (session == null) LoginRequired(onGoToLogin = { tab = 4 })
                     else ListingsPanel(
-                        cars = mine, loading = mineLoading, error = null,
+                        cars = mine, loading = mineLoading, error = mineError,
                         search = "", searching = false, onSearchChange = {}, session = session,
                         onRefresh = { session?.let(::refreshMine) },
                         onSelect = { selected = it }, onPost = { tab = 2 },
@@ -257,7 +258,7 @@ private fun PelakNativeApp() {
                     onLogin = { saveSession(it); tab = 3 },
                     onLogout = {
                         val current = session
-                        session = null; store.clear(); mine = emptyList(); tab = 0
+                        session = null; store.clear(); mine = emptyList(); mineError = null; tab = 0
                         if (current != null) scope.launch {
                             val token = PelakPush.lastToken(context)
                             if (!token.isNullOrBlank()) runCatching { api.unregisterPush(current, token) }
