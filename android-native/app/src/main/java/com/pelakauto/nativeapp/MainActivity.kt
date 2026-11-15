@@ -1371,7 +1371,8 @@ private fun CarPhoto(path: String?, title: String, jwt: String?, modifier: Modif
 
 @Composable
 private fun ChatInbox(api: PelakApi, session: PelakSession, onThread: (ChatTarget) -> Unit) {
-    var messages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
+    var messages by remember(session.userId) { mutableStateOf<List<ChatMessage>>(emptyList()) }
+    var inboxSearch by rememberSaveable(session.userId) { mutableStateOf("") }
     var busy by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
@@ -1395,12 +1396,30 @@ private fun ChatInbox(api: PelakApi, session: PelakSession, onThread: (ChatTarge
         }
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (error != null) Text(error.orEmpty(), color = Color.Gray)
+        OutlinedTextField(
+            value = inboxSearch,
+            onValueChange = { inboxSearch = it.take(100) },
+            label = { Text("جست‌وجو در پیام‌ها یا شناسه آگهی") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+        )
         val threads = messages.distinctBy {
             it.listingId + ":" + if (it.senderId == session.userId) it.recipientId else it.senderId
         }
+        val visibleThreads = if (inboxSearch.isBlank()) threads else threads.filter { msg ->
+            val peer = if (msg.senderId == session.userId) msg.recipientId else msg.senderId
+            val conversationKey = msg.listingId + ":" + peer
+            msg.listingId.contains(inboxSearch.trim(), ignoreCase = true) ||
+                messages.any { item ->
+                    val itemPeer = if (item.senderId == session.userId) item.recipientId else item.senderId
+                    item.listingId + ":" + itemPeer == conversationKey &&
+                        item.body.contains(inboxSearch.trim(), ignoreCase = true)
+                }
+        }
         if (!busy && threads.isEmpty()) Text("هنوز گفت‌وگویی نداری.", color = Color.Gray)
+        else if (!busy && visibleThreads.isEmpty()) Text("گفت‌وگوی مطابق جست‌وجو پیدا نشد.", color = Color.Gray)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            items(threads, key = { it.id }) { msg ->
+            items(visibleThreads, key = { it.id }) { msg ->
                 val peer = if (msg.senderId == session.userId) msg.recipientId else msg.senderId
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable {
