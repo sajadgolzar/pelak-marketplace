@@ -1,0 +1,47 @@
+name: Publish PELAK Android test APK
+on:
+  pull_request:
+    paths:
+      - 'android-native/**'
+      - '.github/workflows/android-beta-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish-test-apk:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build APK
+        working-directory: android-native
+        run: gradle :app:assembleDebug --no-daemon
+      - name: Validate and prepare APK
+        run: |
+          set -euo pipefail
+          test -s android-native/app/build/outputs/apk/debug/app-debug.apk
+          unzip -t android-native/app/build/outputs/apk/debug/app-debug.apk >/dev/null
+          cp android-native/app/build/outputs/apk/debug/app-debug.apk PELAK-Android-Test.apk
+          sha256sum PELAK-Android-Test.apk > PELAK-Android-Test.apk.sha256
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="pelak-android-test-20261115"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" PELAK-Android-Test.apk PELAK-Android-Test.apk.sha256 --clobber
+          else
+            gh release create "$tag" PELAK-Android-Test.apk PELAK-Android-Test.apk.sha256 \
+              --target "${{ github.event.pull_request.head.sha || github.sha }}" \
+              --title "PELAK Android - Test APK" --notes "Experimental Android debug APK. Not production tested. Install only for testing." \
+              --prerelease --latest=false
+          fi
