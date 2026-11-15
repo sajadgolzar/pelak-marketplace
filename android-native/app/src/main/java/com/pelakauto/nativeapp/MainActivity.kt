@@ -1383,7 +1383,7 @@ private fun ChatInbox(api: PelakApi, session: PelakSession, onThread: (ChatTarge
         }
     }
     LaunchedEffect(session.userId, session.accessToken, reload) {
-        busy = true
+        if (messages.isEmpty()) busy = true
         try { messages = api.inbox(session); error = null }
         catch (_: Exception) { error = "دریافت پیام‌ها ممکن نشد" }
         finally { busy = false }
@@ -1427,6 +1427,10 @@ private fun ChatDialog(api: PelakApi, session: PelakSession, target: ChatTarget,
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
+    val messageScroll = rememberScrollState()
+    LaunchedEffect(messages.lastOrNull()?.id) {
+        messageScroll.animateScrollTo(messageScroll.maxValue)
+    }
     // Lightweight polling until native realtime subscriptions are available.
     LaunchedEffect(target.listingId, target.peerId) {
         while (true) {
@@ -1443,7 +1447,7 @@ private fun ChatDialog(api: PelakApi, session: PelakSession, target: ChatTarget,
         title = { Text(target.title, maxLines = 1, color = Navy) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column(Modifier.fillMaxWidth().heightIn(max = 310.dp).verticalScroll(rememberScrollState()),
+                Column(Modifier.fillMaxWidth().heightIn(max = 310.dp).verticalScroll(messageScroll),
                     verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     if (messages.isEmpty()) Text("برای شروع گفت‌وگو پیام بنویس.", color = Color.Gray)
                     messages.forEach { msg ->
