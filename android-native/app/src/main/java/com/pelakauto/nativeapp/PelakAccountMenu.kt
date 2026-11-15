@@ -1,5 +1,11 @@
 package com.pelakauto.nativeapp
 
+import android.Manifest
+import android.os.Build
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -27,6 +33,13 @@ internal fun PelakAccountMenu(
 ) {
     val context = LocalContext.current
     var dialog by remember { mutableStateOf<String?>(null) }
+    var notificationAllowed by remember {
+        mutableStateOf(Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
+    }
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> notificationAllowed = granted }
     val entries = listOf(
         AccountEntry("آگهی‌های من", Icons.Outlined.ListAlt, "mine"),
         AccountEntry("نمایشگاه مجازی", Icons.Outlined.Storefront, "dealer"),
@@ -51,6 +64,25 @@ internal fun PelakAccountMenu(
                 fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
             Text(email, style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
+            HorizontalDivider()
+        }
+        if (Build.VERSION.SDK_INT >= 33) item {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("اعلان‌های پلاک", style = MaterialTheme.typography.titleMedium)
+                Text(if (notificationAllowed) "مجوز نمایش اعلان‌ها فعال است."
+                    else "برای دیدن پیام‌ها و اطلاعیه‌ها، مجوز اعلان را فعال کن.",
+                    style = MaterialTheme.typography.bodySmall)
+                if (!notificationAllowed) {
+                    OutlinedButton(onClick = {
+                        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }) { Text("فعال‌کردن اعلان‌ها") }
+                    TextButton(onClick = {
+                        context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + context.packageName)))
+                    }) { Text("تنظیمات اعلان در گوشی") }
+                }
+            }
             HorizontalDivider()
         }
         items(entries.size) { index ->
