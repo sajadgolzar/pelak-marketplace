@@ -1,0 +1,48 @@
+name: PELAK Visual UI Regression
+on:
+  push:
+    branches:
+      - feature/visual-polish-2026-11-15
+    paths:
+      - 'index.html'
+      - 'pelak-visual-polish.js'
+      - 'pelak-visual-polish.css'
+      - 'pelak-platform-downloads.js'
+      - 'tests/visual-polish.e2e.mjs'
+      - '.github/workflows/pelak-visual-ui.yml'
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'pelak-visual-polish.js'
+      - 'pelak-visual-polish.css'
+      - 'pelak-platform-downloads.js'
+      - 'tests/visual-polish.e2e.mjs'
+      - '.github/workflows/pelak-visual-ui.yml'
+permissions:
+  contents: read
+jobs:
+  visual-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser test runner
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Run real Chromium responsive checks
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/pelak-visual-server.log 2>&1 &
+          sleep 2
+          node tests/visual-polish.e2e.mjs
+      - name: Upload mobile and desktop previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pelak-visual-polish-screenshots
+          path: ui-screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
