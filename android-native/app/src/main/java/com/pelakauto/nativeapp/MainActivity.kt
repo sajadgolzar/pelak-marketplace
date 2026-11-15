@@ -1373,9 +1373,9 @@ private fun CarPhoto(path: String?, title: String, jwt: String?, modifier: Modif
 private fun ChatInbox(api: PelakApi, session: PelakSession, onThread: (ChatTarget) -> Unit) {
     var messages by remember(session.userId) { mutableStateOf<List<ChatMessage>>(emptyList()) }
     var inboxSearch by rememberSaveable(session.userId) { mutableStateOf("") }
-    var busy by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var reload by remember { mutableIntStateOf(0) }
+    var busy by remember(session.userId) { mutableStateOf(true) }
+    var error by remember(session.userId) { mutableStateOf<String?>(null) }
+    var reload by remember(session.userId) { mutableIntStateOf(0) }
     // Refresh inbox while this screen is visible; cancelled when the user navigates away.
     LaunchedEffect(session.userId) {
         while (true) {
@@ -1403,18 +1403,18 @@ private fun ChatInbox(api: PelakApi, session: PelakSession, onThread: (ChatTarge
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
         )
-        val threads = messages.distinctBy {
-            it.listingId + ":" + if (it.senderId == session.userId) it.recipientId else it.senderId
+        // The API returns newest messages first. Group once to avoid scanning all messages
+        // for every conversation during each recomposition.
+        val conversations = messages.groupBy { msg ->
+            msg.listingId + ":" + if (msg.senderId == session.userId) msg.recipientId else msg.senderId
         }
-        val visibleThreads = if (inboxSearch.isBlank()) threads else threads.filter { msg ->
+        val threads = conversations.values.mapNotNull { it.firstOrNull() }
+        val term = inboxSearch.trim()
+        val visibleThreads = if (term.isEmpty()) threads else threads.filter { msg ->
             val peer = if (msg.senderId == session.userId) msg.recipientId else msg.senderId
-            val conversationKey = msg.listingId + ":" + peer
-            msg.listingId.contains(inboxSearch.trim(), ignoreCase = true) ||
-                messages.any { item ->
-                    val itemPeer = if (item.senderId == session.userId) item.recipientId else item.senderId
-                    item.listingId + ":" + itemPeer == conversationKey &&
-                        item.body.contains(inboxSearch.trim(), ignoreCase = true)
-                }
+            val key = msg.listingId + ":" + peer
+            msg.listingId.contains(term, ignoreCase = true) ||
+                conversations[key].orEmpty().any { it.body.contains(term, ignoreCase = true) }
         }
         if (!busy && threads.isEmpty()) Text("هنوز گفت‌وگویی نداری.", color = Color.Gray)
         else if (!busy && visibleThreads.isEmpty()) Text("گفت‌وگوی مطابق جست‌وجو پیدا نشد.", color = Color.Gray)
