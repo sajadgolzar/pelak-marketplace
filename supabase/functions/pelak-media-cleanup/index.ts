@@ -127,17 +127,8 @@ Deno.serve(async req=>{
           .select("id");
         if(marked.error||(marked.data||[]).length!==1){failed++;continue}
 
-        // Foreign-key RESTRICT protects conversations: keep the record if messages exist.
-        const messages=await db.from("pelak_listing_messages")
-          .select("id",{count:"exact",head:true}).eq("listing_id",row.id);
-        if(messages.error || (messages.count||0)>0){retained++;continue}
-        const deleted=await db.from("listings").delete()
-          .eq("id",row.id).eq("listing_status","archived")
-          .in("archive_reason",["expired","cancelled","revision_timeout"])
-          .not("media_purged_at","is",null)
-          .eq("image_paths","{}").select("id");
-        if(deleted.error||(deleted.data||[]).length!==1){retained++;continue}
-        removed++;
+        // Final deletion happens in the dedicated pass below, where both
+        // reports and conversations are checked after media is confirmed gone.
       }catch(_){failed++}
     }
     // Retry records whose media was already purged but whose conversations/reports
