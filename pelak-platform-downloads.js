@@ -117,7 +117,7 @@
     window.setInterval(function () { if (!document.hidden) checkWebUpdate(false); }, 15 * 60 * 1000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) checkWebUpdate(false); });
     const language = document.getElementById('pelakSiteLang');
-    if (language) language.addEventListener('change', function () { setTimeout(render, 0); });
+    if (language) language.addEventListener('change', function () { setTimeout(function () { render(); footerBox.appendChild(updateButton); }, 0); });
     menu.addEventListener('click', function (event) {
       if (event.target.closest('button[data-target="apps"]') !== menuButton) return;
       event.preventDefault();
