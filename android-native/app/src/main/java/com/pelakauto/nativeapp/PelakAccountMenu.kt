@@ -58,12 +58,13 @@ internal fun PelakAccountMenu(
                 Modifier.fillMaxWidth().clickable {
                     when (entry.action) {
                         "mine" -> onNavigate(3)
+                        "favorites" -> onNavigate(6)
                         "settings" -> {
                             context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                                 Uri.parse("package:" + context.packageName)))
                         }
                         "help", "news", "safety", "dealer" -> dialog = entry.action
-                        "about", "favorites", "recent" -> dialog = entry.action
+                        "about", "recent" -> dialog = entry.action
                     }
                 }.padding(horizontal = 18.dp, vertical = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
