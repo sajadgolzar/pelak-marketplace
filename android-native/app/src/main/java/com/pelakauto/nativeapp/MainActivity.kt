@@ -531,33 +531,38 @@ private fun AccountPanel(
     var email by rememberSaveable { mutableStateOf("") }
     var otp by rememberSaveable { mutableStateOf("") }
     var sent by rememberSaveable { mutableStateOf(false) }
+    var sentToEmail by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("ورود / ثبت‌نام پلاک", fontWeight = FontWeight.Bold, color = Navy, fontSize = 21.sp)
         Text("با ایمیل خود کد ورود یک‌بارمصرف دریافت کن.", color = Color.Gray)
-        OutlinedTextField(value = email, onValueChange = { email = it },
+        OutlinedTextField(value = email, onValueChange = {
+            email = it
+            if (sent && it.trim() != sentToEmail) { sent = false; otp = ""; sentToEmail = "" }
+        },
             label = { Text("ایمیل") }, singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             modifier = Modifier.fillMaxWidth())
         if (sent) {
-            OutlinedTextField(value = otp, onValueChange = { otp = it },
+            OutlinedTextField(value = otp, onValueChange = { otp = it.filter(Char::isDigit).take(6) },
                 label = { Text("کد ۶ رقمی دریافتی") }, singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth())
         }
         Button(
-            enabled = !busy && email.contains("@") && (!sent || otp.length >= 6),
+            enabled = !busy && email.trim().contains("@") && (!sent || (otp.length == 6 && email.trim() == sentToEmail)),
             onClick = {
                 scope.launch {
                     busy = true; info = ""
                     try {
                         if (!sent) {
                             api.sendOtp(email)
+                            sentToEmail = email.trim()
                             sent = true
                             info = "کد به ایمیلت ارسال شد."
                         } else {
-                            onLogin(api.verifyOtp(email, otp))
+                            onLogin(api.verifyOtp(sentToEmail, otp))
                             otp = ""
                         }
                     } catch (_: Exception) {
@@ -566,7 +571,18 @@ private fun AccountPanel(
                 }
             }
         ) { Text(if (busy) "در حال بررسی…" else if (sent) "تأیید و ورود" else "دریافت کد") }
-        if (sent) TextButton(onClick = { sent = false; otp = "" }) { Text("ارسال مجدد کد") }
+        if (sent) TextButton(enabled = !busy, onClick = {
+            scope.launch {
+                busy = true; info = ""
+                try {
+                    api.sendOtp(sentToEmail)
+                    otp = ""
+                    info = "درخواست ارسال مجدد ثبت شد؛ ایمیل را بررسی کن."
+                } catch (_: Exception) {
+                    info = "ارسال مجدد ناموفق بود؛ کمی بعد دوباره تلاش کن."
+                } finally { busy = false }
+            }
+        }) { Text("ارسال مجدد کد") }
         if (info.isNotBlank()) Text(info, color = Navy)
     }
 }
