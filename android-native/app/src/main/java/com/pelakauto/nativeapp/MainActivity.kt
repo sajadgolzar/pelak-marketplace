@@ -1,5 +1,7 @@
 package com.pelakauto.nativeapp
 
+import android.content.ActivityNotFoundException
+import android.widget.Toast
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -306,27 +308,39 @@ private fun PelakNativeApp() {
                         }
                         if (car.sellerPhone.isNotBlank()) {
                             TextButton(onClick = {
-                                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(
-                                    "tel:" + car.sellerPhone.filter { it.isDigit() || it == '+' })))
+                                try {
+                                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(
+                                        "tel:" + car.sellerPhone.filter { it.isDigit() || it == '+' })))
+                                } catch (_: ActivityNotFoundException) {
+                                    Toast.makeText(context, "برنامه تماس روی دستگاه موجود نیست.", Toast.LENGTH_SHORT).show()
+                                }
                             }) { Text("تماس") }
                         }
                         if (car.sellerPhone.isNotBlank()) {
                             TextButton(onClick = {
                                 val phone = car.sellerPhone.filter { it.isDigit() || it == '+' }
-                                context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$phone")).apply {
-                                    putExtra("sms_body", "سلام، درباره آگهی " + car.title + " در پلاک پیام می‌دهم.")
-                                })
+                                try {
+                                    context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$phone")).apply {
+                                        putExtra("sms_body", "سلام، درباره آگهی " + car.title + " در پلاک پیام می‌دهم.")
+                                    })
+                                } catch (_: ActivityNotFoundException) {
+                                    Toast.makeText(context, "برنامه پیامک روی دستگاه موجود نیست.", Toast.LENGTH_SHORT).show()
+                                }
                             }) { Text("پیامک") }
                         }
                         TextButton(onClick = {
                             val url = "https://pelakauto.com/" // Deep-link route requires website support before enabling
                             val message = car.title + "\n" + car.priceLabel() + "\n" + url
-                            context.startActivity(Intent.createChooser(
-                                Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, message)
-                                }, "اشتراک‌گذاری آگهی"
-                            ))
+                            try {
+                                context.startActivity(Intent.createChooser(
+                                    Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, message)
+                                    }, "اشتراک‌گذاری آگهی"
+                                ))
+                            } catch (_: ActivityNotFoundException) {
+                                Toast.makeText(context, "برنامه‌ای برای اشتراک‌گذاری موجود نیست.", Toast.LENGTH_SHORT).show()
+                            }
                         }) { Text("اشتراک‌گذاری") }
                     }
                 }
