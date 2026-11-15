@@ -1,0 +1,17 @@
+name: PELAK Auth Email Template Tests
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/pelak-auth-email-i18n/**'
+      - '.github/workflows/pelak-auth-email-tests.yml'
+  workflow_dispatch:
+jobs:
+  templates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check four-language email templates
+        run: deno test --allow-none supabase/functions/pelak-auth-email-i18n/templates_test.ts
