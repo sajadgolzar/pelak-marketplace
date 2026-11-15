@@ -1115,6 +1115,8 @@ private fun AccountPanel(
     var busy by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
     var resendCooldown by rememberSaveable { mutableIntStateOf(0) }
+    val normalizedEmail = email.trim().lowercase(java.util.Locale.ROOT)
+    val emailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(normalizedEmail).matches()
     LaunchedEffect(resendCooldown > 0) {
         while (resendCooldown > 0) {
             delay(1000)
@@ -1126,26 +1128,33 @@ private fun AccountPanel(
         Text("با ایمیل خود کد ورود یک‌بارمصرف دریافت کن.", color = Color.Gray)
         OutlinedTextField(value = email, onValueChange = {
             email = it
-            if (sent && it.trim() != sentToEmail) { sent = false; otp = ""; sentToEmail = ""; resendCooldown = 0 }
+            if (sent && it.trim().lowercase(java.util.Locale.ROOT) != sentToEmail) {
+                sent = false; otp = ""; sentToEmail = ""
+            }
         },
             label = { Text("ایمیل") }, singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             modifier = Modifier.fillMaxWidth())
         if (sent) {
-            OutlinedTextField(value = otp, onValueChange = { otp = it.filter(Char::isDigit).take(6) },
+            OutlinedTextField(value = otp, onValueChange = { input ->
+                otp = input.mapNotNull { ch ->
+                    val digit = Character.digit(ch, 10)
+                    if (digit in 0..9) ('0' + digit) else null
+                }.take(6).joinToString("")
+            },
                 label = { Text("کد ۶ رقمی دریافتی") }, singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth())
         }
         Button(
-            enabled = !busy && email.trim().contains("@") && (!sent || (otp.length == 6 && email.trim() == sentToEmail)),
+            enabled = !busy && emailValid && (!sent || (otp.length == 6 && normalizedEmail == sentToEmail)) && (sent || resendCooldown == 0),
             onClick = {
                 scope.launch {
                     busy = true; info = ""
                     try {
                         if (!sent) {
-                            api.sendOtp(email)
-                            sentToEmail = email.trim()
+                            api.sendOtp(normalizedEmail)
+                            sentToEmail = normalizedEmail
                             sent = true
                             resendCooldown = 60
                             info = "درخواست ارسال کد ثبت شد. صندوق ورودی و هرزنامه را بررسی کن."
