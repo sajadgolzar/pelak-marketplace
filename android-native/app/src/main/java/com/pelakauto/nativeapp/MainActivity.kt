@@ -107,6 +107,28 @@ private fun PelakNativeApp() {
     var moreLoading by remember { mutableStateOf(false) }
     var searchHasMore by remember { mutableStateOf(true) }
     var homeHasMore by remember { mutableStateOf(true) }
+    var favorites by remember { mutableStateOf<List<Car>>(emptyList()) }
+    var favoriteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var favoritesLoading by remember { mutableStateOf(false) }
+    var favoritesError by remember { mutableStateOf<String?>(null) }
+    var favoriteBusy by remember { mutableStateOf(false) }
+    fun refreshFavorites(current: PelakSession) {
+        scope.launch {
+            favoritesLoading = true
+            favoritesError = null
+            try {
+                val ids = api.favoriteIds(current)
+                val rows = api.favoriteCars(current)
+                if (session?.userId == current.userId) {
+                    favoriteIds = ids
+                    favorites = rows
+                }
+            } catch (_: Exception) {
+                favoritesError = "دریافت نشان‌ها ناموفق بود؛ دوباره تلاش کن."
+            } finally { favoritesLoading = false }
+        }
+    }
+
     fun saveSession(value: PelakSession) {
         store.save(value)
         session = value
@@ -184,7 +206,17 @@ private fun PelakNativeApp() {
         }
     }
 
+    LaunchedEffect(session?.userId) {
+        favoriteIds = emptySet()
+        favorites = emptyList()
+        session?.let { current ->
+            try { favoriteIds = api.favoriteIds(current) } catch (_: Exception) {}
+        }
+    }
     LaunchedEffect(Unit) { refresh() }
+    LaunchedEffect(tab, session?.userId) {
+        if (tab == 6) session?.let { refreshFavorites(it) }
+    }
     LaunchedEffect(tab, session) {
         val current = session
         if (tab == 3 && current != null) refreshMine(current)
@@ -313,6 +345,23 @@ private fun PelakNativeApp() {
                         title = "آگهی‌های من"
                     )
                 }
+                6 -> {
+                    val current = session
+                    if (current == null) LoginRequired(onGoToLogin = { tab = 4 })
+                    else ListingsPanel(
+                        cars = favorites,
+                        loading = favoritesLoading,
+                        error = favoritesError,
+                        search = "",
+                        searching = false,
+                        session = current,
+                        onSearchChange = {},
+                        onRefresh = { refreshFavorites(current) },
+                        onSelect = { selected = it },
+                        onPost = { tab = 0 },
+                        title = "نشان‌های من"
+                    )
+                }
                 4 -> AccountPanel(
                     api = api,
                     session = session,
@@ -354,6 +403,27 @@ private fun PelakNativeApp() {
                     Text(car.make + "  " + car.model + "  " + car.trim)
                     Text("سال ساخت: " + car.year + "  •  " + car.country + "، " + car.city)
                     car.mileageKm?.let { Text("کارکرد: " + it + " کیلومتر") }
+                    if (session != null && car.listingStatus == "published") {
+                        TextButton(
+                            enabled = !favoriteBusy,
+                            onClick = {
+                                val active = session ?: return@TextButton
+                                val saved = car.id in favoriteIds
+                                scope.launch {
+                                    favoriteBusy = true
+                                    try {
+                                        api.setFavorite(active, car.id, !saved)
+                                        if (session?.userId == active.userId) {
+                                            favoriteIds = if (saved) favoriteIds - car.id else favoriteIds + car.id
+                                            if (tab == 6) refreshFavorites(active)
+                                        }
+                                    } catch (_: Exception) {
+                                        Toast.makeText(context, "ذخیره نشان ناموفق بود؛ دوباره تلاش کن.", Toast.LENGTH_SHORT).show()
+                                    } finally { favoriteBusy = false }
+                                }
+                            }
+                        ) { Text(if (car.id in favoriteIds) "★ حذف از نشان‌ها" else "☆ افزودن به نشان‌ها") }
+                    }
                     Text(car.priceLabel(), color = Navy, fontWeight = FontWeight.Bold)
                     if (car.listingStatus != "published") Text("وضعیت: " + car.listingStatus)
                     if (car.description.isNotBlank()) Text(car.description)
