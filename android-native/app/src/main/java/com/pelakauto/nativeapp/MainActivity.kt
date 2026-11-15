@@ -68,6 +68,13 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private fun revisionDeadlineMillis(raw: String?): Long? {
+    if (raw.isNullOrBlank()) return null
+    return runCatching { java.time.OffsetDateTime.parse(raw).toInstant().toEpochMilli() }
+        .recoverCatching { java.time.Instant.parse(raw).toEpochMilli() }
+        .getOrNull()
+}
+
 private data class ChatTarget(val listingId: String, val peerId: String, val title: String)
 
 // Visible navigation is five tabs; internal routes 1, 3 and 7 remain accessible.
@@ -497,9 +504,7 @@ private fun PelakNativeApp() {
                             val notice = revisionReasons[car.id]!!
                             Text("علت بازگشت: " + notice.reason, color = Gold)
                             notice.deleteAfter?.let { deadline ->
-                                val deadlineMs = runCatching {
-                                    java.time.Instant.parse(deadline).toEpochMilli()
-                                }.getOrNull()
+                                val deadlineMs = revisionDeadlineMillis(deadline)
                                 if (deadlineMs != null) {
                                     val days = kotlin.math.ceil(
                                         (deadlineMs - System.currentTimeMillis()) / 86400000.0
@@ -515,8 +520,17 @@ private fun PelakNativeApp() {
                             TextButton(onClick = { editing = car; selected = null; tab = 2 }) {
                                 Text("اصلاح آگهی")
                             }
-                            TextButton(onClick = { ownerActionConfirm = car to "resubmit"; selected = null }) {
+                            val deadlinePassed = revisionDeadlineMillis(notice.deleteAfter)
+                                ?.let { it <= System.currentTimeMillis() } ?: false
+                            TextButton(
+                                enabled = !deadlinePassed,
+                                onClick = { ownerActionConfirm = car to "resubmit"; selected = null }
+                            ) {
                                 Text("ارسال مجدد برای بررسی")
+                            }
+                            if (car.imagePaths.isEmpty()) {
+                                Text("برای ارسال مجدد، دست‌کم یک عکس خودرو لازم است.",
+                                    fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
                             }
                         }
                         if (car.listingStatus == "published" || car.listingStatus == "archived") {
