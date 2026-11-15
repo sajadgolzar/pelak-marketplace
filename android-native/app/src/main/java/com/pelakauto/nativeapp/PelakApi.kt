@@ -352,6 +352,32 @@ internal class PelakApi {
                     .put("p_details", details.trim()), session.accessToken)
             Unit
         }
+    suspend fun cancelMyListing(session: PelakSession, listingId: String) =
+        withContext(Dispatchers.IO) {
+            val result = perform("/rest/v1/rpc/pelak_cancel_my_listing", "POST",
+                JSONObject().put("p_listing_id", listingId), session.accessToken)
+            if (result.trim() != "true") throw IllegalStateException("لغو آگهی تأیید نشد")
+            Unit
+        }
+
+    suspend fun renewMyListing(session: PelakSession, listingId: String) =
+        withContext(Dispatchers.IO) {
+            val result = perform("/rest/v1/rpc/pelak_renew_my_listing", "POST",
+                JSONObject().put("p_listing_id", listingId), session.accessToken)
+            if (result.isBlank() || result.trim() == "null")
+                throw IllegalStateException("تمدید آگهی تأیید نشد")
+            Unit
+        }
+
+    suspend fun resubmitMyListing(session: PelakSession, listingId: String) =
+        withContext(Dispatchers.IO) {
+            val result = perform("/rest/v1/rpc/pelak_resubmit_rejected_listing", "POST",
+                JSONObject().put("p_listing_id", listingId), session.accessToken)
+            if (result.isBlank() || result.trim() == "null")
+                throw IllegalStateException("ارسال مجدد آگهی تأیید نشد")
+            Unit
+        }
+
     suspend fun registerPush(session: PelakSession, token: String) = withContext(Dispatchers.IO) {
         perform("/rest/v1/rpc/pelak_register_android_push", "POST",
             JSONObject().put("p_token", token), session.accessToken)
