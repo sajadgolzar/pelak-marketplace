@@ -147,7 +147,7 @@ Deno.serve(async req=>{
       .in("archive_reason",["expired","cancelled","revision_timeout"])
       .lte("purge_after",now)
       .not("media_purged_at","is",null)
-      .eq("image_paths","{}").limit(20);
+      .eq("image_paths","{}").order("purge_after",{ascending:true}).limit(20);
     if(pending.error)throw Error("final deletion queue unavailable");
     for(const row of pending.data||[]){
       if(!uuid.test(row.id))continue;
