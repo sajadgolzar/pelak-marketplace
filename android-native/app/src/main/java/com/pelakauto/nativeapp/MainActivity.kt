@@ -201,6 +201,13 @@ private fun PelakNativeApp() {
             }
         }
     }
+    // Save only settled searches, not every intermediate character while typing.
+    LaunchedEffect(tab, search) {
+        if (tab == 1 && search.trim().length >= 2) {
+            delay(1500)
+            if (tab == 1) saveSearchQuery(search)
+        }
+    }
     LaunchedEffect(tab, search) {
         if (tab == 1) {
             searchLoading = true
@@ -210,7 +217,6 @@ private fun PelakNativeApp() {
             try {
                 val results = api.published(requestedSearch)
                 if (tab == 1 && search == requestedSearch) {
-                    saveSearchQuery(requestedSearch)
                     searched = results
                     searchHasMore = results.size == 100
                 }
