@@ -264,6 +264,9 @@ internal class PelakApi {
     }
     suspend fun attachPhotos(session: PelakSession, id: String, paths: List<String>) =
         withContext(Dispatchers.IO) {
+            require(paths.size <= 8 && paths.distinct().size == paths.size) {
+                "حداکثر ۸ عکس غیرتکراری برای هر آگهی مجاز است"
+            }
             val arr = JSONArray()
             paths.forEach { arr.put(it) }
             val result = JSONArray(perform("/rest/v1/listings?id=eq." + Uri.encode(id) +
@@ -286,8 +289,9 @@ internal class PelakApi {
             val bitmap = resolver.openInputStream(image)?.use { BitmapFactory.decodeStream(it, null, opts) }
                 ?: throw IllegalStateException("بازکردن عکس ممکن نیست")
             val buffer = ByteArrayOutputStream()
-            try { bitmap.compress(Bitmap.CompressFormat.JPEG, 82, buffer) }
+            val compressed = try { bitmap.compress(Bitmap.CompressFormat.JPEG, 82, buffer) }
             finally { bitmap.recycle() }
+            if (!compressed) throw IllegalStateException("فشرده‌سازی عکس ناموفق بود")
             val bytes = buffer.toByteArray()
             if (bytes.isEmpty() || bytes.size > 6 * 1024 * 1024) throw IllegalStateException("اندازه عکس مجاز نیست")
             val path = session.userId + "/" + UUID.randomUUID().toString() + ".jpg"
