@@ -760,7 +760,11 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
         item { NativeField("سال ساخت میلادی", year, KeyboardType.Number) { year = it } }
         item { NativeField("کشور", country) { country = it } }
         item { NativeField("شهر", city) { city = it } }
-        item { NativeField("شماره تماس فروشنده", phone, KeyboardType.Phone) { phone = it } }
+        item {
+            NativeField("شماره تماس فروشنده", phone, KeyboardType.Phone) { phone = it }
+            Text("برای انتشار، شماره را با کد کشور وارد کن (مثلاً ‎+989121234567). شماره تماس در آگهی منتشرشده عمومی است.",
+                fontSize = 12.sp, color = Color.Gray)
+        }
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(checked = negotiable, onCheckedChange = { negotiable = it })
