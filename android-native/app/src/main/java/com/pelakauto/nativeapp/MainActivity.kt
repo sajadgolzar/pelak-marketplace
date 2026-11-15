@@ -162,7 +162,9 @@ private fun PelakNativeApp() {
                     mineError = null; mineMoreError = null
                 }
             }
-            catch (_: Exception) { mineError = "دریافت آگهی‌های من ناموفق بود. دوباره تلاش کن." }
+            catch (_: Exception) {
+                if (session?.userId == current.userId) mineError = "دریافت آگهی‌های من ناموفق بود. دوباره تلاش کن."
+            }
             finally { mineLoading = false }
         }
     }
@@ -224,8 +226,10 @@ private fun PelakNativeApp() {
                                 try {
                                     val start = if (tab == 0) cars.size else searched.size
                                     val next = api.published(if (tab == 0) "" else search, start)
-                                    if (tab == 0) { cars = cars + next; homeHasMore = next.size == 100 }
-                                    else { searched = searched + next; searchHasMore = next.size == 100 }
+                                    if (tab == 0) { cars = (cars + next).distinctBy { it.id }; homeHasMore = next.size == 100 }
+                                    else { searched = (searched + next).distinctBy { it.id }; searchHasMore = next.size == 100 }
+                                } catch (_: Exception) {
+                                    android.widget.Toast.makeText(context, "دریافت آگهی‌های بیشتر ناموفق بود؛ دوباره تلاش کن.", android.widget.Toast.LENGTH_SHORT).show()
                                 } finally { moreLoading = false }
                             }
                         },
