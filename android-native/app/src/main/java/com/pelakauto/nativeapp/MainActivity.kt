@@ -117,8 +117,15 @@ private fun PelakNativeApp() {
             delay((current.expiresAtMs - System.currentTimeMillis() - 180000L)
                 .coerceIn(0L, 45L * 60L * 1000L))
             val before = session ?: break
-            try { saveSession(api.refreshSession(before)) }
-            catch (_: Exception) { delay(30000L) }
+            try {
+                val renewed = api.refreshSession(before)
+                // Never restore a session after logout or an account switch.
+                if (session?.userId == before.userId && session?.refreshToken == before.refreshToken) {
+                    saveSession(renewed)
+                }
+            } catch (_: Exception) {
+                delay(30000L)
+            }
         }
     }
     LaunchedEffect(session?.accessToken) {
@@ -135,7 +142,6 @@ private fun PelakNativeApp() {
             searchLoading = true
             val requestedSearch = search
             delay(320)
-            searchLoading = true
             searchError = null
             try {
                 val results = api.published(requestedSearch)
