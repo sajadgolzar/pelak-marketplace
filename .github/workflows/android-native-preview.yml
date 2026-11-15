@@ -48,8 +48,10 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+      # Do not silently replace the public download when source code changes.
+      # Publishing is a separate, manually approved release step after device QA.
       - name: Publish native preview APK for direct download on PELAK site
-        if: github.ref == 'refs/heads/main'
+        if: ${{ false }}
         run: |
           set -euo pipefail
           mkdir -p downloads
