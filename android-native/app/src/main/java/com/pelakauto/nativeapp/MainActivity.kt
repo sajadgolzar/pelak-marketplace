@@ -684,27 +684,56 @@ private fun ListingsPanel(
 
 @Composable
 private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
+    var photoIndex by remember(car.id) { mutableIntStateOf(0) }
+    val photoCount = car.imagePaths.size
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(15.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            CarPhoto(car.imagePath, car.title,
-                session?.takeIf { it.userId == car.userId }?.accessToken,
-                Modifier.size(110.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CarPhoto(car.imagePaths.getOrNull(photoIndex), car.title,
+                    session?.takeIf { it.userId == car.userId }?.accessToken,
+                    Modifier.size(110.dp))
+                if (photoCount > 1) {
+                    Row(verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center) {
+                        TextButton(
+                            onClick = { photoIndex = (photoIndex - 1 + photoCount) % photoCount },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                        ) { Text("‹", fontSize = 20.sp) }
+                        Text("${photoIndex + 1}/$photoCount", color = Color.Gray, fontSize = 11.sp)
+                        TextButton(
+                            onClick = { photoIndex = (photoIndex + 1) % photoCount },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                        ) { Text("›", fontSize = 20.sp) }
+                    }
+                }
+            }
             Spacer(Modifier.width(11.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(car.title, fontWeight = FontWeight.Bold, maxLines = 2, color = Ink)
-                Text(
-                    "مدل " + car.year + " • " + car.country + " " + car.city,
-                    color = Color.Gray, fontSize = 12.sp, maxLines = 1
-                )
+                val details = listOf(car.make, car.model, car.trim).filter { it.isNotBlank() }
+                    .joinToString(" · ")
+                if (details.isNotBlank()) Text(details, color = Ink, fontSize = 12.sp, maxLines = 2)
+                Text("سال ${car.year} • ${car.country}، ${car.city}",
+                    color = Color.Gray, fontSize = 12.sp, maxLines = 2)
                 Text(car.priceLabel(), color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                car.mileageKm?.let { Text("کارکرد " + java.text.NumberFormat.getNumberInstance().format(it) + " کیلومتر", color = Color.Gray, fontSize = 12.sp) }
-                if (car.imagePaths.size > 1) Text(car.imagePaths.size.toString() + " عکس", color = Color.Gray, fontSize = 11.sp)
-                if (car.listingStatus != "published") Text("وضعیت: " + car.listingStatus, color = Gold, fontSize = 11.sp)
-
+                car.mileageKm?.let {
+                    Text("کارکرد " + java.text.NumberFormat.getNumberInstance().format(it) +
+                        " کیلومتر", color = Color.Gray, fontSize = 12.sp)
+                }
+                val status = when (car.vehicleStatus) {
+                    "abroad" -> "خارج از کشور"
+                    "in_transit" -> "در مسیر"
+                    "customs" -> "گمرک"
+                    "ready" -> "آماده تحویل"
+                    else -> ""
+                }
+                if (status.isNotBlank()) Text(status, color = Color.Gray, fontSize = 11.sp)
+                if (car.listingStatus != "published")
+                    Text("وضعیت: " + car.listingStatus, color = Gold, fontSize = 11.sp)
             }
         }
     }
