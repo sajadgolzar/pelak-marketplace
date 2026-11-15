@@ -37,13 +37,10 @@
       });
       if (!firstText) return;
       var original = firstText.textContent.trim();
-      var cleaned = original.replace(/^[\s\uFE0F]*(?:🚘|🔎|👤|💬|❤️|♡|\＋|\+)[\s\uFE0F]*/u, '').trim();
+      var cleaned = original.replace(/^[\s\uFE0F]*(?:🚘|🔎|👤|💬|❤️|♡|＋|\+)[\s\uFE0F]*/u, '').trim();
       if (cleaned) firstText.textContent = cleaned + ' ';
       button.insertBefore(icon(type), button.firstChild);
       button.classList.add('pv-shortcut');
-      if (!button.hasAttribute('aria-label')) {
-        button.setAttribute('aria-label', cleaned || original);
-      }
     });
   }
 
@@ -63,7 +60,6 @@
       title.dataset.pvCollapsible = '1';
       title.setAttribute('role', 'button');
       title.setAttribute('tabindex', '0');
-      title.setAttribute('aria-label', title.textContent.trim());
       var expanded = index === 0;
       function setExpanded(next) {
         expanded = next;
