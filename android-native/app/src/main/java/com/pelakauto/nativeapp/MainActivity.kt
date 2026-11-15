@@ -582,8 +582,17 @@ private fun PelakNativeApp() {
                             TextButton(onClick = { reporting = car; selected = null }) { Text("گزارش آگهی") }
                         }
                         TextButton(onClick = {
-                            val url = "https://pelakauto.com/" // Deep-link route requires website support before enabling
-                            val message = car.title + "\n" + car.priceLabel() + "\n" + url
+                            // Share the exact listing ID until the website supports a verified deep-link route.
+                            val message = listOf(
+                                car.title,
+                                listOf(car.make, car.model, car.trim).filter { it.isNotBlank() }.joinToString(" "),
+                                "سال ساخت: ${car.year}",
+                                car.mileageKm?.let { "کارکرد: $it کیلومتر" }.orEmpty(),
+                                "قیمت: ${car.priceLabel()}",
+                                "موقعیت: ${car.city}، ${car.country}",
+                                "شناسه آگهی: ${car.id}",
+                                "پلاک: https://pelakauto.com/"
+                            ).filter { it.isNotBlank() }.joinToString("\n")
                             try {
                                 context.startActivity(Intent.createChooser(
                                     Intent(Intent.ACTION_SEND).apply {
@@ -778,6 +787,7 @@ private fun ListingsPanel(
                     it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO
                 }) else filteredCars
             "کم‌کارکردترین" -> filteredCars.sortedWith(compareBy<Car> { it.mileageKm ?: Int.MAX_VALUE })
+            "جدیدترین مدل" -> filteredCars.sortedWith(compareByDescending<Car> { it.year })
             else -> filteredCars
         }
     }
@@ -811,7 +821,7 @@ private fun ListingsPanel(
                 modifier = Modifier.padding(horizontal = 14.dp), fontSize = 12.sp, color = Color.Gray)
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("جدیدترین", "ارزان‌ترین", "گران‌ترین", "کم‌کارکردترین").forEach { option ->
+            listOf("جدیدترین", "ارزان‌ترین", "گران‌ترین", "کم‌کارکردترین", "جدیدترین مدل").forEach { option ->
                 FilterChip(selected = sortMode == option, onClick = { sortMode = option }, label = { Text(option, fontSize = 12.sp) })
             }
         }
