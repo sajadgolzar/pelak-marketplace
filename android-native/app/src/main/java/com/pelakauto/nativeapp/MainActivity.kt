@@ -317,6 +317,7 @@ private fun PelakNativeApp() {
                     api = api,
                     session = session,
                     onLogin = { saveSession(it); tab = 3 },
+                    onNavigate = { tab = it },
                     onLogout = {
                         val current = session
                         session = null; store.clear(); mine = emptyList(); mineHasMore = false; mineError = null; mineMoreError = null; tab = 0
@@ -627,31 +628,15 @@ private fun AccountPanel(
     api: PelakApi,
     session: PelakSession?,
     onLogin: (PelakSession) -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onNavigate: (Int) -> Unit
 ) {
     if (session != null) {
-        val context = LocalContext.current
-        val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-        var pushStatus by remember { mutableStateOf("") }
-        Column(Modifier.fillMaxSize().padding(20.dp)) {
-            Text("به پلاک خوش آمدی", fontWeight = FontWeight.Bold, color = Navy, fontSize = 21.sp)
-            Spacer(Modifier.height(10.dp))
-            Text(session.email)
-            Spacer(Modifier.height(20.dp))
-            Button(onClick = onLogout) { Text("خروج از حساب در این دستگاه") }
-            Spacer(Modifier.height(10.dp))
-            Text("ورود به‌صورت رمزگذاری‌شده روی همین گوشی حفظ می‌شود.",
-                color = Color.Gray, fontSize = 12.sp)
-            Spacer(Modifier.height(13.dp))
-            Text("اعلان پیام‌ها و وضعیت آگهی‌ها", fontWeight = FontWeight.Bold)
-            TextButton(onClick = {
-                if (Build.VERSION.SDK_INT >= 33 &&
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-                ) permission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                else pushStatus = "اعلان‌های سیستم مجازند؛ ارسال واقعی به تنظیمات Firebase وابسته است."
-            }) { Text("فعال‌سازی اعلان بومی") }
-            if (pushStatus.isNotBlank()) Text(pushStatus, color = Color.Gray, fontSize = 12.sp)
-        }
+        PelakAccountMenu(
+            email = session.email,
+            onNavigate = onNavigate,
+            onLogout = onLogout
+        )
         return
     }
     val scope = rememberCoroutineScope()
