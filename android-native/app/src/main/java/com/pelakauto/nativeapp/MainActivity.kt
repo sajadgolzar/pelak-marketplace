@@ -1331,9 +1331,9 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                         step == 0 && (title.isBlank() || make.isBlank() || model.isBlank() ||
                             y == null || y !in 1950..2100 || (mileage.isNotBlank() && mileage.toIntOrNull() == null)) ->
                             "عنوان، برند، مدل و سال ساخت معتبر را وارد کن."
-                        step == 1 && (country.isBlank() || !validSellerPhone ||
+                        step == 1 && (country.isBlank() || city.isBlank() || !validSellerPhone ||
                             (!negotiable && (p == null || p <= BigDecimal.ZERO))) ->
-                            "کشور، شماره تماس بین‌المللی معتبر و قیمت را وارد کن."
+                            "کشور، شهر، شماره تماس بین‌المللی معتبر و قیمت را وارد کن."
                         else -> ""
                     }
                     if (info.isBlank()) step++
@@ -1348,9 +1348,9 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                     val y = year.toIntOrNull()
                     val p = price.replace(",", "").trim().toBigDecimalOrNull()
                     if (title.isBlank() || make.isBlank() || model.isBlank() ||
-                        y == null || y !in 1950..2100 || country.isBlank() ||
-                        !validSellerPhone || (!negotiable && (p == null || p <= BigDecimal.ZERO))) {
-                        info = "عنوان، برند، مدل، سال، کشور، شماره بین‌المللی و قیمت را درست وارد کن."
+                        y == null || y !in 1950..2100 || country.isBlank() || city.isBlank() ||
+                        (mileage.isNotBlank() && mileage.toIntOrNull() == null) || !validSellerPhone || (!negotiable && (p == null || p <= BigDecimal.ZERO))) {
+                        info = "عنوان، برند، مدل، سال، کارکرد، کشور، شهر، شماره بین‌المللی و قیمت را درست وارد کن."
                     } else {
                         scope.launch {
                             working = true; info = ""
