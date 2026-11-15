@@ -1,5 +1,9 @@
 name: Build signed PELAK APK from encrypted backup (manual QA)
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/android-native-signed-from-backup.yml'
   workflow_dispatch:
     inputs:
       backup_run_id:
@@ -7,7 +11,7 @@ on:
         required: true
         default: '43733615602'
 permissions:
-  contents: read
+  contents: write
   actions: read
 jobs:
   signed-qa:
@@ -23,7 +27,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+          BACKUP_RUN_ID: ${{ inputs.backup_run_id || '43733615602' }}
         run: |
           set -euo pipefail
           [[ "$BACKUP_RUN_ID" =~ ^[0-9]+$ ]] || { echo "::error::Invalid run ID"; exit 1; }
@@ -86,3 +90,20 @@ jobs:
           path: ${{ runner.temp }}/PELAK-Native-signed-QA.apk
           retention-days: 7
           if-no-files-found: error
+
+      - name: Publish verified signed APK to existing website download path
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
+          set -euo pipefail
+          test -s "$RUNNER_TEMP/PELAK-Native-signed-QA.apk"
+          mkdir -p downloads
+          cp "$RUNNER_TEMP/PELAK-Native-signed-QA.apk" downloads/PELAK-Native-v0.2-preview.apk
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads/PELAK-Native-v0.2-preview.apk
+          if ! git diff --cached --quiet; then
+            git commit -m 'release(android): replace website APK with signed native QA build'
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main
+          fi
