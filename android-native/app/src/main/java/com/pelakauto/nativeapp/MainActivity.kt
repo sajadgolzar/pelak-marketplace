@@ -480,7 +480,8 @@ private fun PelakNativeApp() {
             },
             confirmButton = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.End) {
-                    if (car.userId == session?.userId && car.listingStatus == "draft") {
+                    if (car.userId == session?.userId && car.listingStatus == "draft" &&
+                        car.id !in revisionReasons) {
                         Button(onClick = { editing = car; selected = null; tab = 2 }) {
                             Text("ویرایش پیش‌نویس")
                         }
