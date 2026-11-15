@@ -455,7 +455,8 @@ private fun PelakNativeApp() {
                 Text(photoCar.title, fontWeight = FontWeight.Bold, color = Navy)
                 CarPhoto(photoCar.imagePaths.getOrNull(photoIndex), photoCar.title,
                     if (photoCar.userId == session?.userId) session?.accessToken else null,
-                    Modifier.fillMaxWidth().height(350.dp))
+                    Modifier.fillMaxWidth().height(350.dp),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit)
                 Text("عکس ${photoIndex + 1} از ${photoCar.imagePaths.size}")
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(enabled = photoIndex > 0,
@@ -1353,7 +1354,10 @@ private fun NativeField(
 }
 
 @Composable
-private fun CarPhoto(path: String?, title: String, jwt: String?, modifier: Modifier = Modifier) {
+private fun CarPhoto(
+    path: String?, title: String, jwt: String?, modifier: Modifier = Modifier,
+    contentScale: androidx.compose.ui.layout.ContentScale = androidx.compose.ui.layout.ContentScale.Crop
+) {
     val api = remember { PelakApi() }
     val url by produceState<String?>(null, path, jwt) {
         value = path?.let { api.signedPhoto(it, jwt) }
@@ -1364,7 +1368,7 @@ private fun CarPhoto(path: String?, title: String, jwt: String?, modifier: Modif
         else AsyncImage(
             model = url, contentDescription = title,
             modifier = Modifier.fillMaxSize(),
-            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+            contentScale = contentScale
         )
     }
 }
