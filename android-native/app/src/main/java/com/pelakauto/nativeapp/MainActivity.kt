@@ -993,6 +993,10 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
     var title by rememberSaveable(editing?.id) { mutableStateOf(editing?.title.orEmpty()) }
     var make by rememberSaveable(editing?.id) { mutableStateOf(editing?.make.orEmpty()) }
     var model by rememberSaveable(editing?.id) { mutableStateOf(editing?.model.orEmpty()) }
+    var trim by rememberSaveable(editing?.id) { mutableStateOf(editing?.trim.orEmpty()) }
+    var mileage by rememberSaveable(editing?.id) { mutableStateOf(editing?.mileageKm?.toString().orEmpty()) }
+    var vehicleStatus by rememberSaveable(editing?.id) { mutableStateOf(editing?.vehicleStatus ?: "ready") }
+    var description by rememberSaveable(editing?.id) { mutableStateOf(editing?.description.orEmpty()) }
     var year by rememberSaveable(editing?.id) { mutableStateOf(editing?.year?.toString().orEmpty()) }
     var city by rememberSaveable(editing?.id) { mutableStateOf(editing?.city.orEmpty()) }
     var country by rememberSaveable(editing?.id) { mutableStateOf(editing?.country ?: "ایران") }
@@ -1041,11 +1045,23 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
         item { NativeField("عنوان آگهی", title) { title = it } }
         item { NativeField("برند خودرو", make) { make = it } }
         item { NativeField("مدل خودرو", model) { model = it } }
+        item { NativeField("تیپ خودرو", trim) { trim = it } }
+        item { NativeField("کارکرد (کیلومتر)", mileage, KeyboardType.Number) { mileage = it.filter(Char::isDigit) } }
         item { NativeField("سال ساخت میلادی", year, KeyboardType.Number) { year = it } }
         }
         if (step == 1) {
         item { NativeField("کشور", country) { country = it } }
         item { NativeField("شهر", city) { city = it } }
+        item {
+            Text("وضعیت خودرو", color = Navy)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                listOf("آماده تحویل" to "ready", "خارج از کشور" to "abroad",
+                    "در مسیر" to "in_transit", "گمرک" to "customs").forEach { (label, code) ->
+                    FilterChip(selected = vehicleStatus == code, onClick = { vehicleStatus = code },
+                        label = { Text(label) })
+                }
+            }
+        }
         item {
             NativeField("شماره تماس فروشنده", phone, KeyboardType.Phone) { phone = it }
             Text("برای انتشار، شماره را با کد کشور وارد کن (مثلاً ‎+989121234567). شماره تماس در آگهی منتشرشده عمومی است.",
@@ -1063,6 +1079,11 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
         }
         }
         if (step == 2) {
+        item {
+            OutlinedTextField(value = description, onValueChange = { description = it.take(4000) },
+                label = { Text("توضیحات خودرو") }, modifier = Modifier.fillMaxWidth(),
+                minLines = 3, maxLines = 6)
+        }
         item {
             Text("عکس‌های خودرو: " + savedPhotoPaths.size + " ذخیره‌شده، " +
                 photoUris.count { it.toString() !in uploadedUris } + " انتخاب‌شده",
@@ -1097,7 +1118,7 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                     val p = price.replace(",", "").trim().toBigDecimalOrNull()
                     info = when {
                         step == 0 && (title.isBlank() || make.isBlank() || model.isBlank() ||
-                            y == null || y !in 1950..2100) ->
+                            y == null || y !in 1950..2100 || (mileage.isNotBlank() && mileage.toIntOrNull() == null)) ->
                             "عنوان، برند، مدل و سال ساخت معتبر را وارد کن."
                         step == 1 && (country.isBlank() || phone.isBlank() ||
                             (!negotiable && (p == null || p <= BigDecimal.ZERO))) ->
@@ -1127,11 +1148,11 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                                     p!!.multiply(BigDecimal.TEN).toPlainString()
                                 val savedId = draftId
                                 val id = if (savedId == null) {
-                                    api.createDraft(session, title, make, model, y, rials, country, city, phone)
+                                    api.createDraft(session, title, make, model, y, rials, country, city, phone, trim, mileage.toIntOrNull(), description, vehicleStatus)
                                         .also { draftId = it }
                                 } else {
                                     api.updateDraft(session, savedId, title, make, model, y, rials,
-                                        country, city, phone)
+                                        country, city, phone, trim, mileage.toIntOrNull(), description, vehicleStatus)
                                     savedId
                                 }
                                 for (uri in photoUris) {
