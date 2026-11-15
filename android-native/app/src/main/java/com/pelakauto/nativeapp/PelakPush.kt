@@ -13,6 +13,9 @@ import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /** The public Firebase client identifiers are not a service-account key. */
 internal object PelakPush {
@@ -63,7 +66,14 @@ class PelakMessagingService : FirebaseMessagingService() {
         super.onNewToken(token)
         getSharedPreferences("pelak_native_push", Context.MODE_PRIVATE)
             .edit().putString("last_token", token).apply()
-        // Registration happens only in an authenticated foreground session.
+        // FCM may rotate tokens while the app is backgrounded. Register the new
+        // token for the currently signed-in account instead of waiting for a login.
+        val session = PelakSessionStore(this).load() ?: return
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching { PelakApi().registerPush(session, token) }
+            // If the session has expired or the network is down, foreground login
+            // registration will retry when the access token changes.
+        }
     }
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
