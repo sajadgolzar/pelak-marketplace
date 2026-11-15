@@ -183,7 +183,10 @@ private fun PelakNativeApp() {
                 nav.forEachIndexed { index, item ->
                     NavigationBarItem(
                         selected = tab == index,
-                        onClick = { tab = index },
+                        onClick = {
+                            if (index == 2 && tab != 2) editing = null
+                            tab = index
+                        },
                         icon = { Text(item.second, fontSize = 21.sp) },
                         label = { Text(item.first, fontSize = 9.sp, maxLines = 1) }
                     )
@@ -226,7 +229,7 @@ private fun PelakNativeApp() {
                             }
                         },
                         onSelect = { selected = it },
-                        onPost = { tab = 2 }
+                        onPost = { editing = null; tab = 2 }
                     )
                 }
                 2 -> {
