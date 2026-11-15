@@ -64,7 +64,9 @@ Deno.serve(async req=>{
 
     const due=await db.from("listings")
       .select("id,user_id,image_paths,purge_after,listing_status")
-      .eq("listing_status","archived").lte("purge_after",now)
+      .eq("listing_status","archived")
+      .in("archive_reason",["expired","cancelled","revision_timeout"])
+      .lte("purge_after",now)
       .is("media_purged_at",null).order("purge_after",{ascending:true}).limit(20);
     if(due.error)throw Error("retention queue unavailable");
     for(const row of due.data||[]){
