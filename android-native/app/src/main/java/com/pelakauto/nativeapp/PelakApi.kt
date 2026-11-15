@@ -134,9 +134,10 @@ internal class PelakApi {
                 "&order=created_at.desc&limit=" + pageSize.coerceIn(1,100) +
                 "&offset=" + offset.coerceAtLeast(0)))
         }
-    suspend fun mine(session: PelakSession): List<Car> = withContext(Dispatchers.IO) {
+    suspend fun mine(session: PelakSession, offset: Int = 0, pageSize: Int = 100): List<Car> = withContext(Dispatchers.IO) {
         parseCars(perform("/rest/v1/listings?select=" + carFields +
-            "&user_id=eq." + session.userId + "&order=created_at.desc&limit=100",
+            "&user_id=eq." + session.userId + "&order=created_at.desc" +
+            "&limit=" + pageSize.coerceIn(1, 100) + "&offset=" + offset.coerceAtLeast(0),
             jwt = session.accessToken))
     }
     // The Storage API returns /object/sign/... on some versions and /storage/v1/object/sign/... on others.
