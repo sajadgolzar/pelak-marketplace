@@ -15,7 +15,7 @@ async function testViewport(width, height, label) {
   });
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('pageerror', (error) => errors.push(error.stack || error.message));
   // Preserve the local page and static assets, but don't trigger live Supabase reads.
   await page.route('**/*', async (route) => {
     const url = new URL(route.request().url());
@@ -77,7 +77,7 @@ async function testViewport(width, height, label) {
     path: 'ui-screenshots/' + label + '-home.png',
     fullPage: true, animations: 'disabled'
   });
-  if (errors.length) console.log(label + ': pre-existing or blocked-external page errors: ' + errors.slice(0, 8).join(' | '));
+  if (errors.length) console.log(label + ': pre-existing or blocked-external page errors: ' + errors.slice(0, 4).join(' | ').slice(0, 6000));
   await context.close();
 }
 
