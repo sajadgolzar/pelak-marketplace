@@ -680,13 +680,42 @@ private fun ListingsPanel(
     onPost: () -> Unit,
     title: String = "جدیدترین آگهی‌های خودرو"
 ) {
+    var filterOpen by rememberSaveable { mutableStateOf(false) }
+    var brandFilter by rememberSaveable { mutableStateOf("") }
+    var cityFilter by rememberSaveable { mutableStateOf("") }
+    var minYear by rememberSaveable { mutableStateOf("") }
+    var maxYear by rememberSaveable { mutableStateOf("") }
+    var minMileage by rememberSaveable { mutableStateOf("") }
+    var maxMileage by rememberSaveable { mutableStateOf("") }
+    var minPrice by rememberSaveable { mutableStateOf("") }
+    var maxPrice by rememberSaveable { mutableStateOf("") }
+    var statusFilter by rememberSaveable { mutableStateOf("همه") }
+    var negotiableOnly by rememberSaveable { mutableStateOf(false) }
     var sortMode by rememberSaveable { mutableStateOf("جدیدترین") }
-    val sortedCars = remember(cars, sortMode) {
+    val filteredCars = remember(cars, brandFilter, cityFilter, minYear, maxYear,
+        minMileage, maxMileage, minPrice, maxPrice, statusFilter, negotiableOnly) {
+        cars.filter { car ->
+            val searchFields = listOf(car.make, car.model, car.trim, car.title).joinToString(" ")
+            val amount = car.price?.toBigDecimalOrNull()
+            (brandFilter.isBlank() || searchFields.contains(brandFilter.trim(), ignoreCase = true)) &&
+                (cityFilter.isBlank() || listOf(car.city, car.country).joinToString(" ")
+                    .contains(cityFilter.trim(), ignoreCase = true)) &&
+                (minYear.toIntOrNull()?.let { car.year >= it } ?: true) &&
+                (maxYear.toIntOrNull()?.let { car.year <= it } ?: true) &&
+                (minMileage.toIntOrNull()?.let { (car.mileageKm ?: Int.MAX_VALUE) >= it } ?: true) &&
+                (maxMileage.toIntOrNull()?.let { (car.mileageKm ?: Int.MAX_VALUE) <= it } ?: true) &&
+                (minPrice.toBigDecimalOrNull()?.let { amount != null && amount >= it } ?: true) &&
+                (maxPrice.toBigDecimalOrNull()?.let { amount != null && amount <= it } ?: true) &&
+                (statusFilter == "همه" || car.vehicleStatus == statusFilter) &&
+                (!negotiableOnly || car.priceNegotiable)
+        }
+    }
+    val sortedCars = remember(filteredCars, sortMode) {
         when (sortMode) {
-            "ارزان‌ترین" -> cars.sortedWith(compareBy<Car> { it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal("999999999999999999999") })
+            "ارزان‌ترین" -> filteredCars.sortedWith(compareBy<Car> { it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal("999999999999999999999") })
             "گران‌ترین" -> cars.sortedWith(compareByDescending<Car> { it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO })
             "کم‌کارکردترین" -> cars.sortedWith(compareBy<Car> { it.mileageKm ?: Int.MAX_VALUE })
-            else -> cars
+            else -> filteredCars
         }
     }
     Column(Modifier.fillMaxSize()) {
@@ -712,13 +741,64 @@ private fun ListingsPanel(
                 FilterChip(selected = sortMode == option, onClick = { sortMode = option }, label = { Text(option, fontSize = 12.sp) })
             }
         }
+        TextButton(onClick = { filterOpen = !filterOpen }, modifier = Modifier.padding(horizontal = 12.dp)) {
+            Text(if (filterOpen) "بستن فیلترها" else "⚙ فیلترهای پیشرفته")
+        }
+        if (filterOpen) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(brandFilter, { brandFilter = it }, label = { Text("برند، مدل یا تیپ") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+                OutlinedTextField(cityFilter, { cityFilter = it }, label = { Text("شهر یا کشور") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(minYear, { minYear = it.filter(Char::isDigit).take(4) },
+                        label = { Text("سال از") }, modifier = Modifier.weight(1f), singleLine = true)
+                    OutlinedTextField(maxYear, { maxYear = it.filter(Char::isDigit).take(4) },
+                        label = { Text("سال تا") }, modifier = Modifier.weight(1f), singleLine = true)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(minMileage, { minMileage = it.filter(Char::isDigit) },
+                        label = { Text("کارکرد از (km)") }, modifier = Modifier.weight(1f), singleLine = true)
+                    OutlinedTextField(maxMileage, { maxMileage = it.filter(Char::isDigit) },
+                        label = { Text("کارکرد تا (km)") }, modifier = Modifier.weight(1f), singleLine = true)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(minPrice, { minPrice = it.filter(Char::isDigit) },
+                        label = { Text("قیمت از (واحد ذخیره)") }, modifier = Modifier.weight(1f), singleLine = true)
+                    OutlinedTextField(maxPrice, { maxPrice = it.filter(Char::isDigit) },
+                        label = { Text("قیمت تا (واحد ذخیره)") }, modifier = Modifier.weight(1f), singleLine = true)
+                }
+                Text("وضعیت خودرو", fontSize = 12.sp)
+                Row(Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf("همه" to "همه", "آماده تحویل" to "ready",
+                        "خارج از کشور" to "abroad", "در مسیر" to "in_transit",
+                        "گمرک" to "customs").forEach { (label, value) ->
+                        FilterChip(selected = statusFilter == value,
+                            onClick = { statusFilter = value }, label = { Text(label) })
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = negotiableOnly, onCheckedChange = { negotiableOnly = it })
+                    Text("فقط قیمت توافقی")
+                }
+                TextButton(onClick = {
+                    brandFilter = ""; cityFilter = ""; minYear = ""; maxYear = ""
+                    minMileage = ""; maxMileage = ""; minPrice = ""; maxPrice = ""
+                    statusFilter = "همه"; negotiableOnly = false
+                }) { Text("پاک‌کردن فیلترها") }
+                Text("فیلترها فعلاً روی آگهی‌های بارگذاری‌شده اعمال می‌شوند؛ قیمت‌ها در ارزهای مختلف قابل مقایسه مستقیم نیستند.",
+                    color = Color.Gray, fontSize = 11.sp)
+            }
+        }
         if (hasMore && sortMode != "جدیدترین") Text("مرتب‌سازی روی آگهی‌های بارگذاری‌شده انجام می‌شود.", modifier = Modifier.padding(horizontal = 16.dp), color = Color.Gray, fontSize = 11.sp)
         if (loading) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
         }
         if (error != null) {
             EmptyPanel(error, "تلاش مجدد", onRefresh)
-        } else if (!loading && cars.isEmpty()) {
+        } else if (!loading && sortedCars.isEmpty()) {
             EmptyPanel(
                 if (searching && search.isNotBlank())
                     "آگهی مطابق جست‌وجو پیدا نشد."
