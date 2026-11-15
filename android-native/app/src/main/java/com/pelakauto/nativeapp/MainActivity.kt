@@ -310,6 +310,24 @@ private fun PelakNativeApp() {
                                     "tel:" + car.sellerPhone.filter { it.isDigit() || it == '+' })))
                             }) { Text("تماس") }
                         }
+                        if (car.sellerPhone.isNotBlank()) {
+                            TextButton(onClick = {
+                                val phone = car.sellerPhone.filter { it.isDigit() || it == '+' }
+                                context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$phone")).apply {
+                                    putExtra("sms_body", "سلام، درباره آگهی " + car.title + " در پلاک پیام می‌دهم.")
+                                })
+                            }) { Text("پیامک") }
+                        }
+                        TextButton(onClick = {
+                            val url = "https://pelakauto.com/?listing=" + Uri.encode(car.id)
+                            val message = car.title + "\n" + car.priceLabel() + "\n" + url
+                            context.startActivity(Intent.createChooser(
+                                Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, message)
+                                }, "اشتراک‌گذاری آگهی"
+                            ))
+                        }) { Text("اشتراک‌گذاری") }
                     }
                 }
             },
