@@ -155,8 +155,15 @@ internal class PelakApi {
         } catch (_: Exception) { null }
     }
 
-    suspend fun sendOtp(email: String) = withContext(Dispatchers.IO) {
-        perform("/auth/v1/otp", "POST", JSONObject().put("email", email.trim()).put("create_user", true))
+    suspend fun sendOtp(email: String, locale: String = "en") = withContext(Dispatchers.IO) {
+        // Supabase persists data for new users. Existing accounts may retain their prior
+        // locale; do not claim per-request localization is guaranteed until verified.
+        val selected = if (locale in setOf("fa", "en", "ar", "ka")) locale else "en"
+        val payload = JSONObject()
+            .put("email", email.trim())
+            .put("create_user", true)
+            .put("data", JSONObject().put("pelak_locale", selected))
+        perform("/auth/v1/otp", "POST", payload)
         Unit
     }
     private fun newSession(raw: JSONObject, fallbackEmail: String): PelakSession {
