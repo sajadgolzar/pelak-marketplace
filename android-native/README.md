@@ -41,3 +41,19 @@ After a successful merge to main, CI publishes `downloads/PELAK-Native-v0.2-prev
 - Android's button opens the fixed PELAK HTTPS APK download URL. It does not silently install an APK or claim Play Store in-app updates.
 - **Production blocker:** CI debug APKs may be signed with different temporary keys. Configure one secure persistent release-signing key, validate matching `applicationId`, and test upgrade-in-place with data retained on a physical Samsung before promising seamless updates. Do not commit a signing keystore or passwords.
 - If version metadata is unreachable, the app/site retains normal functionality; manual checks show a retry message.
+
+## Secure Android release signing and update push
+
+The normal GitHub Actions debug build remains available for compilation checks, but **must not be automatically published as an upgrade**. Debug APK signatures can differ between CI runners. The manual workflow `Build signed PELAK Android release (manual)` uses a stable private keystore stored **only in GitHub Actions Secrets** and verifies the resulting APK signature.
+
+**One-time owner setup on a trusted computer:** create and safely back up a dedicated release keystore with `keytool -genkeypair -v -keystore pelak-release.jks -alias pelak-release -keyalg RSA -keysize 3072 -validity 10000`. Keep the keystore and passwords offline and in a secure backup; losing the key means existing installations cannot be upgraded in place. Never commit the keystore, base64 representation, or passwords to Git.
+
+Add four repository Actions secrets:
+- `PELAK_ANDROID_KEYSTORE_B64`: single-line base64 of the complete keystore file
+- `PELAK_ANDROID_STORE_PASSWORD`: keystore password
+- `PELAK_ANDROID_KEY_ALIAS`: key alias (e.g. `pelak-release`)
+- `PELAK_ANDROID_KEY_PASSWORD`: private-key password
+
+Then manually run the signed-release workflow from the default branch. It produces a signed APK artifact for device QA, **not a public download**. Before publishing: increment `versionCode` and update `pelak-release.json`; verify APK certificate fingerprints and install/upgrade on a Samsung; confirm user data persists. The first stable signed release may **not** upgrade a previously debug-signed preview APK, even with the same application ID; test this and give users migration guidance rather than promising a seamless update.
+
+FCM `data` payload for an update notification: `{"kind":"app_update","version_code":"3"}`. The native receiver ignores notices for installed/newer versions and never trusts a URL from the push payload. **Server delivery remains disabled until Firebase service-account credentials are configured securely and a controlled end-to-end device test succeeds.** Do not store Firebase private keys in the client app or public repository. Android 13+ requires user permission to display notifications.
