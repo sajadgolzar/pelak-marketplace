@@ -84,6 +84,7 @@ private fun PelakNativeApp() {
     val api = remember { PelakApi() }
     val context = LocalContext.current
     val store = remember { PelakSessionStore(context) }
+    val recentStore = remember { PelakRecentViews(context) }
     val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var cars by remember { mutableStateOf<List<Car>>(emptyList()) }
@@ -109,9 +110,25 @@ private fun PelakNativeApp() {
     var homeHasMore by remember { mutableStateOf(true) }
     var favorites by remember { mutableStateOf<List<Car>>(emptyList()) }
     var favoriteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var recentCars by remember { mutableStateOf<List<Car>>(emptyList()) }
+    var recentLoading by remember { mutableStateOf(false) }
+    var recentError by remember { mutableStateOf<String?>(null) }
+    var recentRevision by remember { mutableIntStateOf(0) }
     var favoritesLoading by remember { mutableStateOf(false) }
     var favoritesError by remember { mutableStateOf<String?>(null) }
     var favoriteBusy by remember { mutableStateOf(false) }
+    fun refreshRecent() {
+        scope.launch {
+            recentLoading = true
+            recentError = null
+            try {
+                val rows = api.publishedByIds(recentStore.ids(session?.userId))
+                recentCars = rows
+            } catch (_: Exception) {
+                recentError = "دریافت بازدیدهای اخیر ناموفق بود؛ دوباره تلاش کن."
+            } finally { recentLoading = false }
+        }
+    }
     fun refreshFavorites(current: PelakSession) {
         scope.launch {
             favoritesLoading = true
@@ -206,6 +223,17 @@ private fun PelakNativeApp() {
         }
     }
 
+    LaunchedEffect(selected?.id, session?.userId) {
+        selected?.let {
+            if (it.listingStatus == "published") {
+                recentStore.record(session?.userId, it.id)
+                recentRevision++
+            }
+        }
+    }
+    LaunchedEffect(tab, session?.userId, recentRevision) {
+        if (tab == 7) refreshRecent()
+    }
     LaunchedEffect(session?.userId) {
         favoriteIds = emptySet()
         favorites = emptyList()
@@ -343,6 +371,21 @@ private fun PelakNativeApp() {
                         },
                         onSelect = { selected = it }, onPost = { editing = null; tab = 2 },
                         title = "آگهی‌های من"
+                    )
+                }
+                7 -> {
+                    ListingsPanel(
+                        cars = recentCars,
+                        loading = recentLoading,
+                        error = recentError,
+                        search = "",
+                        searching = false,
+                        session = session,
+                        onSearchChange = {},
+                        onRefresh = { refreshRecent() },
+                        onSelect = { selected = it },
+                        onPost = { tab = 0 },
+                        title = "بازدیدهای اخیر"
                     )
                 }
                 6 -> {
