@@ -418,11 +418,13 @@ private fun PelakNativeApp() {
                 4 -> AccountPanel(
                     api = api,
                     session = session,
-                    onLogin = { saveSession(it); tab = 3 },
+                    onLogin = { saveSession(it); tab = 4; refreshMine(it) },
                     onNavigate = { tab = it },
                     onLogout = {
                         val current = session
-                        session = null; store.clear(); mine = emptyList(); mineHasMore = false; mineError = null; mineMoreError = null; tab = 0
+                        session = null; store.clear(); mine = emptyList(); revisionReasons = emptyMap();
+                        favoriteIds = emptySet(); favorites = emptyList();
+                        mineHasMore = false; mineError = null; mineMoreError = null; tab = 0
                         if (current != null) scope.launch {
                             val token = PelakPush.lastToken(context)
                             if (!token.isNullOrBlank()) runCatching { api.unregisterPush(current, token) }
@@ -723,8 +725,8 @@ private fun ListingsPanel(
     val sortedCars = remember(filteredCars, sortMode) {
         when (sortMode) {
             "ارزان‌ترین" -> filteredCars.sortedWith(compareBy<Car> { it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal("999999999999999999999") })
-            "گران‌ترین" -> cars.sortedWith(compareByDescending<Car> { it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO })
-            "کم‌کارکردترین" -> cars.sortedWith(compareBy<Car> { it.mileageKm ?: Int.MAX_VALUE })
+            "گران‌ترین" -> filteredCars.sortedWith(compareByDescending<Car> { it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO })
+            "کم‌کارکردترین" -> filteredCars.sortedWith(compareBy<Car> { it.mileageKm ?: Int.MAX_VALUE })
             else -> filteredCars
         }
     }
