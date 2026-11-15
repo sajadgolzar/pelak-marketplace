@@ -1,5 +1,6 @@
 name: Check PELAK Native Android PR
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'android-native/**'
@@ -30,4 +31,4 @@ jobs:
         with:
           name: pelak-native-pr-debug
           path: android-native/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 7
+          retention-days: 30
