@@ -1222,12 +1222,15 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
     var draftId by remember(editing?.id) { mutableStateOf(editing?.id) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { selected ->
         val space = (8 - savedPhotoPaths.size).coerceAtLeast(0)
-        photoUris = (photoUris + selected).distinct().take(space)
+        val merged = (photoUris + selected).distinct()
+        photoUris = merged.take(space)
+        pickerNotice = if (merged.size > space) "حداکثر ۸ عکس مجاز است؛ ${merged.size - space} عکس اضافی انتخاب نشد." else ""
     }
     var step by rememberSaveable(editing?.id) { mutableIntStateOf(0) }
     var working by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
     var uploadProgress by remember { mutableStateOf("") }
+    var pickerNotice by remember { mutableStateOf("") }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -1304,6 +1307,7 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                 onClick = { picker.launch("image/*") },
                 enabled = !working && savedPhotoPaths.size + photoUris.size < 8
             ) { Text("＋ افزودن عکس از گالری (حداکثر ۸ عکس)") }
+            if (pickerNotice.isNotBlank()) Text(pickerNotice, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
         }
         if (photoUris.isNotEmpty()) item {
             Row(Modifier.horizontalScroll(rememberScrollState()),
