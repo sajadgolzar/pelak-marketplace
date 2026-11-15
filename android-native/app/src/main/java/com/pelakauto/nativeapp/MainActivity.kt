@@ -522,11 +522,15 @@ private fun PelakNativeApp() {
                             }
                             val deadlinePassed = revisionDeadlineMillis(notice.deleteAfter)
                                 ?.let { it <= System.currentTimeMillis() } ?: false
-                            TextButton(
-                                enabled = !deadlinePassed,
-                                onClick = { ownerActionConfirm = car to "resubmit"; selected = null }
-                            ) {
-                                Text("ارسال مجدد برای بررسی")
+                            if (!deadlinePassed) {
+                                TextButton(onClick = {
+                                    ownerActionConfirm = car to "resubmit"; selected = null
+                                }) {
+                                    Text("ارسال مجدد برای بررسی")
+                                }
+                            } else {
+                                Text("مهلت تمام شده؛ آگهی و تصاویر آن در صف حذف خودکار هستند.",
+                                    fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
                             }
                             if (car.imagePaths.isEmpty()) {
                                 Text("برای ارسال مجدد، دست‌کم یک عکس خودرو لازم است.",
