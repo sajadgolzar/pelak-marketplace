@@ -106,6 +106,18 @@ private fun PelakNativeApp() {
     var mineError by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
+    val searchPrefs = remember { context.getSharedPreferences("pelak_native_search_history", android.content.Context.MODE_PRIVATE) }
+    var searchHistory by remember {
+        mutableStateOf(searchPrefs.getString("recent_queries", "").orEmpty().split("\n")
+            .filter { it.isNotBlank() }.take(8))
+    }
+    fun saveSearchQuery(query: String) {
+        val clean = query.trim().replace("\n", " ").take(80)
+        if (clean.length < 2) return
+        val updated = (listOf(clean) + searchHistory.filterNot { it.equals(clean, ignoreCase = true) }).take(8)
+        searchHistory = updated
+        searchPrefs.edit().putString("recent_queries", updated.joinToString("\n")).apply()
+    }
     var selected by remember { mutableStateOf<Car?>(null) }
     var expandedPhoto by remember { mutableStateOf<Pair<Car, Int>?>(null) }
     var reporting by remember { mutableStateOf<Car?>(null) }
@@ -198,6 +210,7 @@ private fun PelakNativeApp() {
             try {
                 val results = api.published(requestedSearch)
                 if (tab == 1 && search == requestedSearch) {
+                    saveSearchQuery(requestedSearch)
                     searched = results
                     searchHasMore = results.size == 100
                 }
@@ -310,6 +323,12 @@ private fun PelakNativeApp() {
                         error = if (tab == 0) error else searchError,
                         search = search,
                         searching = tab == 1,
+                        searchHistory = if (tab == 1) searchHistory else emptyList(),
+                        onHistorySelect = { search = it },
+                        onHistoryClear = {
+                            searchHistory = emptyList()
+                            searchPrefs.edit().remove("recent_queries").apply()
+                        },
                         session = session,
                         hasMore = if (tab == 0) homeHasMore else searchHasMore,
                         moreLoading = moreLoading,
@@ -759,7 +778,10 @@ private fun ListingsPanel(
     onRefresh: () -> Unit,
     onSelect: (Car) -> Unit,
     onPost: () -> Unit,
-    title: String = "جدیدترین آگهی‌های خودرو"
+    title: String = "جدیدترین آگهی‌های خودرو",
+    searchHistory: List<String> = emptyList(),
+    onHistorySelect: (String) -> Unit = {},
+    onHistoryClear: () -> Unit = {}
 ) {
     var filterOpen by rememberSaveable { mutableStateOf(false) }
     var brandFilter by rememberSaveable { mutableStateOf("") }
@@ -823,6 +845,20 @@ private fun ListingsPanel(
             }
         }
         if (searching) {
+            if (searchHistory.isNotEmpty()) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text("جست‌وجوهای اخیر", color = Color.Gray, fontSize = 12.sp)
+                    TextButton(onClick = onHistoryClear) { Text("پاک‌کردن", fontSize = 12.sp) }
+                }
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    searchHistory.forEach { query ->
+                        AssistChip(onClick = { onHistorySelect(query) }, label = { Text(query, maxLines = 1) })
+                    }
+                }
+            }
             OutlinedTextField(
                 value = search, onValueChange = onSearchChange,
                 label = { Text("نام برند، مدل، تیپ یا شهر") },
