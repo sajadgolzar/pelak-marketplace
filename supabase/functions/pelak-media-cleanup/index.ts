@@ -112,8 +112,35 @@ Deno.serve(async req=>{
           .select("id",{count:"exact",head:true}).eq("listing_id",row.id);
         if(messages.error || (messages.count||0)>0){retained++;continue}
         const deleted=await db.from("listings").delete()
-          .eq("id",row.id).eq("listing_status","archived").select("id");
+          .eq("id",row.id).eq("listing_status","archived")
+          .in("archive_reason",["expired","cancelled","revision_timeout"])
+          .not("media_purged_at","is",null).select("id");
         if(deleted.error||(deleted.data||[]).length!==1){retained++;continue}
+        removed++;
+      }catch(_){failed++}
+    }
+    // Retry records whose media was already purged but whose conversations/reports
+    // previously blocked final deletion. Never erase evidence or message history.
+    const pending=await db.from("listings").select("id")
+      .eq("listing_status","archived")
+      .in("archive_reason",["expired","cancelled","revision_timeout"])
+      .lte("purge_after",now)
+      .not("media_purged_at","is",null).limit(20);
+    if(pending.error)throw Error("final deletion queue unavailable");
+    for(const row of pending.data||[]){
+      if(!uuid.test(row.id))continue;
+      try {
+        const reports=await db.from("pelak_listing_reports")
+          .select("id",{count:"exact",head:true}).eq("listing_id",row.id);
+        const messages=await db.from("pelak_listing_messages")
+          .select("id",{count:"exact",head:true}).eq("listing_id",row.id);
+        if(reports.error||messages.error){failed++;continue}
+        if((reports.count||0)>0||(messages.count||0)>0){retained++;continue}
+        const deleted=await db.from("listings").delete()
+          .eq("id",row.id).eq("listing_status","archived")
+          .in("archive_reason",["expired","cancelled","revision_timeout"])
+          .not("media_purged_at","is",null).select("id");
+        if(deleted.error||(deleted.data||[]).length!==1){failed++;continue}
         removed++;
       }catch(_){failed++}
     }
