@@ -361,17 +361,22 @@ internal class PelakApi {
                     .put("p_details", details.trim()), session.accessToken)
             Unit
         }
-    suspend fun myRevisionReasons(session: PelakSession): Map<String, String> =
+    data class RevisionNotice(val reason: String, val deleteAfter: String?)
+
+    suspend fun myRevisionReasons(session: PelakSession): Map<String, RevisionNotice> =
         withContext(Dispatchers.IO) {
             val rows = JSONArray(perform(
-                "/rest/v1/pelak_listing_rejections?select=listing_id,reason,review_state" +
+                "/rest/v1/pelak_listing_rejections?select=listing_id,reason,review_state,delete_after" +
                     "&owner_id=eq." + Uri.encode(session.userId) +
                     "&review_state=eq.needs_revision",
                 jwt = session.accessToken
             ))
             (0 until rows.length()).associate { index ->
                 val item = rows.getJSONObject(index)
-                item.getString("listing_id") to item.optString("reason", "نیازمند اصلاح")
+                item.getString("listing_id") to RevisionNotice(
+                    item.optString("reason", "نیازمند اصلاح"),
+                    item.optString("delete_after").takeUnless { it.isBlank() || it == "null" }
+                )
             }
         }
 
