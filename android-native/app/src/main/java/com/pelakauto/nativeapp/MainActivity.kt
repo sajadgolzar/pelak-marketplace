@@ -667,7 +667,7 @@ private fun AccountPanel(
         Text("ورود / ثبت‌نام پلاک", fontWeight = FontWeight.Bold, color = Navy, fontSize = 21.sp)
         Text("با ایمیل خود کد ورود یک‌بارمصرف دریافت کن.", color = Color.Gray)
         Text("زبان ایمیل ورود", color = Navy)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
             emailLanguages.forEach { (code, label) ->
                 FilterChip(
                     selected = emailLocale == code,
