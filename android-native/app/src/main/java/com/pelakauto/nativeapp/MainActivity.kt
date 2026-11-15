@@ -1162,8 +1162,15 @@ private fun AccountPanel(
                             onLogin(api.verifyOtp(sentToEmail, otp))
                             otp = ""
                         }
-                    } catch (_: Exception) {
-                        info = "عملیات ورود ناموفق بود؛ ایمیل، کد یا اتصال را بررسی کن."
+                    } catch (e: Exception) {
+                        info = when {
+                            e.message?.contains("(429)") == true ->
+                                "تعداد درخواست‌ها زیاد شده؛ کمی صبر کن و دوباره تلاش کن."
+                            e.message?.contains("(400)") == true || e.message?.contains("(422)") == true ->
+                                if (sent) "کد معتبر نیست یا منقضی شده؛ کد جدید درخواست کن."
+                                else "درخواست ارسال کد پذیرفته نشد؛ نشانی ایمیل را بررسی کن."
+                            else -> "عملیات ورود ناموفق بود؛ اتصال اینترنت را بررسی کن و دوباره تلاش کن."
+                        }
                     } finally { busy = false }
                 }
             }
