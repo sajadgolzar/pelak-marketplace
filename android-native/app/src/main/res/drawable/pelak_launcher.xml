@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF" android:pathData="M0,0h108v108h-108z"/>
+    <!-- Vector tracing of the approved PELAK logo: navy lettering and red swooshes. -->
+    <path android:fillColor="#09244C" android:fillType="evenOdd" android:pathData="M71,48 72,49 72,55 71,56 67,56 66,55Z M19,47 22,47 23,48 23,51 21,53 17,53 16,52 17,49Z M83,44 78,63 83,63 83,60 85,55 90,63 96,63 91,53 100,44 95,44 87,52 86,50 88,44Z M49,45 46,54 46,57 45,58 45,62 46,63 55,63 56,62 57,63 62,63 65,59 71,59 72,60 72,63 76,63 76,46 75,44 69,44 66,47 63,54 57,63 56,62 57,59 51,59 50,58 54,44 50,44Z M47,44 35,44 33,45 30,50 28,56 28,62 29,63 41,63 42,59 34,59 33,56 35,54 42,54 43,51 36,51 35,50 37,47 45,47Z M28,46 26,44 14,44 9,59 9,62 8,63 13,63 16,57 24,56 28,51Z"/>
+    <path android:fillColor="#E60016" android:pathData="M15,71 17,75 22,78 29,79 30,80 36,80 37,79 49,78 50,77 53,77 70,70 74,67 67,71 58,74 48,75 47,76 35,76 34,75 27,74 22,71 20,69 18,63 16,66Z M94,34 91,30 85,27 81,27 80,26 70,26 69,27 64,27 63,28 60,28 59,29 56,29 47,32 32,40 49,33 57,32 58,31 63,31 64,30 76,30 77,31 81,31 87,34 91,38 92,41 94,39Z"/>
+</vector>
