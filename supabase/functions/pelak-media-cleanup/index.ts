@@ -96,6 +96,18 @@ Deno.serve(async req=>{
           if((check.data||[]).length){shared=true;break}
         }
         if(shared){retained++;continue}
+        // Re-read the lifecycle immediately before irreversible Storage removal.
+        // A concurrent renewal or moderation action must stop this worker.
+        const current=await db.from("listings")
+          .select("id,image_paths").eq("id",row.id)
+          .eq("listing_status","archived")
+          .in("archive_reason",["expired","cancelled","revision_timeout"])
+          .lte("purge_after",now).is("media_purged_at",null).maybeSingle();
+        if(current.error){failed++;continue}
+        if(!current.data ||
+           JSON.stringify(current.data.image_paths||[])!==JSON.stringify(referenced)){
+          retained++;continue
+        }
         if(paths.length){
           const deletion=await db.storage.from("car-images").remove(paths);
           if(deletion.error){failed++;continue}
