@@ -1013,12 +1013,19 @@ private fun AccountPanel(
     var sentToEmail by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
+    var resendCooldown by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(resendCooldown > 0) {
+        while (resendCooldown > 0) {
+            delay(1000)
+            resendCooldown--
+        }
+    }
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("ورود / ثبت‌نام پلاک", fontWeight = FontWeight.Bold, color = Navy, fontSize = 21.sp)
         Text("با ایمیل خود کد ورود یک‌بارمصرف دریافت کن.", color = Color.Gray)
         OutlinedTextField(value = email, onValueChange = {
             email = it
-            if (sent && it.trim() != sentToEmail) { sent = false; otp = ""; sentToEmail = "" }
+            if (sent && it.trim() != sentToEmail) { sent = false; otp = ""; sentToEmail = ""; resendCooldown = 0 }
         },
             label = { Text("ایمیل") }, singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -1039,7 +1046,8 @@ private fun AccountPanel(
                             api.sendOtp(email)
                             sentToEmail = email.trim()
                             sent = true
-                            info = "کد به ایمیلت ارسال شد."
+                            resendCooldown = 60
+                            info = "درخواست ارسال کد ثبت شد. صندوق ورودی و هرزنامه را بررسی کن."
                         } else {
                             onLogin(api.verifyOtp(sentToEmail, otp))
                             otp = ""
@@ -1050,18 +1058,19 @@ private fun AccountPanel(
                 }
             }
         ) { Text(if (busy) "در حال بررسی…" else if (sent) "تأیید و ورود" else "دریافت کد") }
-        if (sent) TextButton(enabled = !busy, onClick = {
+        if (sent) TextButton(enabled = !busy && resendCooldown == 0, onClick = {
             scope.launch {
                 busy = true; info = ""
                 try {
                     api.sendOtp(sentToEmail)
                     otp = ""
-                    info = "درخواست ارسال مجدد ثبت شد؛ ایمیل را بررسی کن."
+                    resendCooldown = 60
+                    info = "درخواست ارسال مجدد ثبت شد؛ صندوق ورودی و هرزنامه را بررسی کن."
                 } catch (_: Exception) {
                     info = "ارسال مجدد ناموفق بود؛ کمی بعد دوباره تلاش کن."
                 } finally { busy = false }
             }
-        }) { Text("ارسال مجدد کد") }
+        }) { Text(if (resendCooldown > 0) "ارسال مجدد تا ${resendCooldown} ثانیه دیگر" else "ارسال مجدد کد") }
         if (info.isNotBlank()) Text(info, color = Navy)
     }
 }
