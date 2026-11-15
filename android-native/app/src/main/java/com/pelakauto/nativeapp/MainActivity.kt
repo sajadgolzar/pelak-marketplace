@@ -70,8 +70,8 @@ class MainActivity : ComponentActivity() {
 
 private data class ChatTarget(val listingId: String, val peerId: String, val title: String)
 
-private // Visible navigation is five tabs; internal routes 1, 3 and 7 remain accessible.
-val nav = listOf(
+// Visible navigation is five tabs; internal routes 1, 3 and 7 remain accessible.
+private val nav = listOf(
     Triple("آگهی‌ها", "🚘", 0),
     Triple("نشان‌ها", "☆", 6),
     Triple("ثبت آگهی", "＋", 2),
@@ -727,10 +727,18 @@ private fun ListingsPanel(
                 (!negotiableOnly || car.priceNegotiable)
         }
     }
-    val sortedCars = remember(filteredCars, sortMode) {
+    // Compare prices only within one currency; mixed-currency feeds must not imply an FX rate.
+    val sortedCars = remember(filteredCars, sortMode, priceCurrency) {
+        val sameCurrency = filteredCars.all { it.currency == priceCurrency }
         when (sortMode) {
-            "ارزان‌ترین" -> filteredCars.sortedWith(compareBy<Car> { it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal("999999999999999999999") })
-            "گران‌ترین" -> filteredCars.sortedWith(compareByDescending<Car> { it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO })
+            "ارزان‌ترین" -> if (sameCurrency)
+                filteredCars.sortedWith(compareBy<Car> {
+                    it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal("999999999999999999999")
+                }) else filteredCars
+            "گران‌ترین" -> if (sameCurrency)
+                filteredCars.sortedWith(compareByDescending<Car> {
+                    it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO
+                }) else filteredCars
             "کم‌کارکردترین" -> filteredCars.sortedWith(compareBy<Car> { it.mileageKm ?: Int.MAX_VALUE })
             else -> filteredCars
         }
@@ -758,6 +766,11 @@ private fun ListingsPanel(
         ) {
             Text(title, color = Navy, fontWeight = FontWeight.Bold)
             TextButton(onClick = onRefresh, enabled = !loading) { Text("↻ تازه‌سازی") }
+        }
+        if (sortMode in listOf("ارزان‌ترین", "گران‌ترین") &&
+            filteredCars.any { it.currency != priceCurrency }) {
+            Text("برای مرتب‌سازی قیمت، ارز آگهی‌ها باید یکسان باشد. از فیلتر ارز و محدوده قیمت استفاده کن.",
+                modifier = Modifier.padding(horizontal = 14.dp), fontSize = 12.sp, color = Color.Gray)
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("جدیدترین", "ارزان‌ترین", "گران‌ترین", "کم‌کارکردترین").forEach { option ->
