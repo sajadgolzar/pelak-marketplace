@@ -14,4 +14,4 @@ jobs:
         with:
           deno-version: v2.x
       - name: Check four-language email templates
-        run: deno test --allow-none supabase/functions/pelak-auth-email-i18n/templates_test.ts
+        run: deno test --allow-net=deno.land supabase/functions/pelak-auth-email-i18n/templates_test.ts
