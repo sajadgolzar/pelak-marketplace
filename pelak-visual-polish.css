@@ -1,0 +1,230 @@
+/* PELAK visual polish v1. Keep approved navy/gold identity; NO hero/banner. */
+:root{
+  --pv-navy:#10233f;
+  --pv-ink:#172940;
+  --pv-muted:#596b81;
+  --pv-line:#dee6ef;
+  --pv-gold:#c9a158;
+  --pv-surface:#ffffff;
+}
+/* 1. Header remains the approved compact layout. Improve only rhythm and focus. */
+.pelak-control-row{column-gap:12px!important}
+.pelak-control-menu,.pelak-control-auth{min-width:0}
+#pelakMenuTrigger,#authBtn{min-height:43px!important}
+#pelakMenuTrigger:focus-visible,#authBtn:focus-visible,
+.pelak-shortcuts button:focus-visible,.pv-search-expand-button:focus-visible,
+.pv-footer-links button:focus-visible,
+#pelakMenuItems .pelak-menu-group-title:focus-visible{
+  outline:3px solid var(--pv-gold)!important;outline-offset:3px!important;
+}
+/* 2. Main search stands alone, without reinstating a decorative car banner. */
+main#home .pelak-new-intro{padding-top:10px!important;padding-bottom:3px!important}
+main#home .pelak-quick-search{
+  border:1px solid #d7e0eb!important;border-radius:16px!important;
+  box-shadow:0 7px 24px #10233f0a!important;min-height:59px!important;
+  padding:6px 8px!important;margin:12px auto 5px!important;
+}
+.pelak-quick-search input{min-height:42px!important;font-size:14px!important}
+.pelak-quick-search input::placeholder{color:#657589;opacity:1}
+.pelak-quick-search button{min-height:44px!important;border-radius:11px!important;font-weight:800!important}
+.pelak-quick-search .pelak-search-symbol{font-size:24px!important;color:#6c8299!important}
+
+/* 3. Exactly the six existing shortcuts, without changing their actions. */
+.pelak-shortcuts{gap:11px!important;margin:12px auto 15px!important}
+.pelak-shortcuts > button.pv-shortcut{
+  box-sizing:border-box!important;position:relative!important;
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  flex-direction:column!important;gap:6px!important;
+  min-height:94px!important;padding:13px 7px!important;
+  border:1px solid #e0e7ef!important;border-radius:16px!important;
+  background:#fff!important;color:var(--pv-navy)!important;
+  box-shadow:0 3px 14px #10233f0b!important;
+  font-family:inherit!important;font-size:13px!important;font-weight:800!important;
+  line-height:1.5!important;text-align:center!important;
+}
+.pelak-shortcuts > button.pv-shortcut.active,
+.pelak-shortcuts > button.pv-shortcut[aria-pressed="true"]{
+  background:var(--pv-navy)!important;color:#fff!important;
+  border-color:var(--pv-navy)!important;
+}
+.pelak-shortcuts > button.pv-shortcut .pv-shortcut-icon{
+  width:25px;height:25px;display:flex;flex:none;align-items:center;justify-content:center;
+  color:inherit;line-height:0;
+}
+.pelak-shortcuts .pv-shortcut-icon svg{width:100%;height:100%}
+.pelak-shortcuts > button.pv-shortcut .pelak-fav-total{
+  position:absolute!important;top:5px!important;left:7px!important;
+  margin:0!important;min-width:20px!important;height:20px!important;
+  display:grid!important;place-items:center!important;padding:0 4px!important;
+  font-size:11px!important;line-height:1!important;
+  border:1px solid #d6e0ed!important;background:#f5f7fa!important;color:#12304c!important;
+  border-radius:999px!important;
+}
+@media(hover:hover){
+ .pelak-shortcuts > button.pv-shortcut:hover{
+   border-color:#b8c8d8!important;box-shadow:0 6px 19px #10233f16!important;
+   transform:translateY(-1px);
+ }
+}
+
+/* 4. Listings: photos remain the visual focus, not heavy gold card borders. */
+#carsGrid,#myGrid{gap:16px!important;align-items:stretch!important}
+#carsGrid .car-card,#myGrid .car-card{
+  border:1px solid var(--pv-line)!important;border-top:1px solid var(--pv-line)!important;
+  border-radius:17px!important;
+  box-shadow:0 4px 17px #10233f0b!important;
+  background:var(--pv-surface)!important;overflow:hidden!important;
+}
+#carsGrid .car-card:hover,#myGrid .car-card:hover{
+  border-color:#cbd8e5!important;box-shadow:0 9px 23px #10233f16!important;
+}
+#carsGrid .car-photo,#myGrid .car-photo{
+  aspect-ratio:16/10!important;max-height:265px!important;
+  background:#edf2f7!important;
+}
+#carsGrid .card-body,#myGrid .card-body{padding:14px 15px!important}
+#carsGrid .card-body h3,#myGrid .card-body h3{
+  color:var(--pv-navy)!important;line-height:1.65!important;
+  font-size:16px!important;font-weight:850!important;
+}
+#carsGrid .meta,#myGrid .meta{color:var(--pv-muted)!important;font-size:12px!important}
+#carsGrid .specs,#myGrid .specs{
+  color:#51647b!important;font-size:12px!important;
+  padding:9px 0!important;gap:8px!important;
+}
+#carsGrid .price,#myGrid .price{font-size:18px!important;font-weight:900!important}
+#carsGrid .card-actions button,#carsGrid .card-actions a,
+#myGrid .card-actions button,#myGrid .card-actions a{
+  min-height:40px!important;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:10px!important;
+}
+#cars .pelak-listing-heading{margin-bottom:13px!important;gap:10px!important}
+#cars .pelak-listing-heading h2{line-height:1.4!important}
+#cars .pelak-listing-heading p{font-size:12px;color:var(--pv-muted)}
+
+/* 5. The optional specialist filters remain functional; only their visibility changes. */
+.searchbox{border:1px solid var(--pv-line)!important;box-shadow:0 8px 22px #10233f0b!important}
+.searchbox .pv-search-expand-row{display:flex;justify-content:flex-start;margin:8px 0 13px}
+.searchbox .pv-search-expand-button{
+  background:#f5f8fb;border:1px solid #ccd9e6;border-radius:11px;
+  color:var(--pv-navy);font:inherit;font-size:13px;font-weight:800;
+  min-height:42px;padding:8px 14px;cursor:pointer;
+}
+.searchbox .pv-search-expand-button[aria-expanded="true"]{background:#eaf0f7}
+.searchbox:not(.pv-search-expanded) .pv-specialist-field{display:none!important}
+.searchbox .field label{font-size:12px!important;font-weight:650!important;color:#52677e!important}
+.searchbox .field input,.searchbox .field select,.searchbox .field textarea{
+  min-height:43px;border-radius:11px!important;
+}
+.searchbox .search-grid{gap:12px!important}
+.searchbox #searchBtn{min-height:44px!important}
+#pelakBrandInlineSearch,#pelakQuickQuery{font-size:16px!important}
+
+/* 6. Drawer group headers become accessible collapsible sections. */
+.pelak-drawer-inner{
+  max-width:360px!important;padding:15px 13px 22px!important;
+  background:#fff!important;
+}
+#pelakCloseMenu{min-height:43px!important;border-radius:11px!important;
+  background:#f3f6fa!important;border:1px solid #e0e7ef!important;
+  margin-bottom:9px!important;font-weight:800!important;
+}
+#pelakMenuItems > .pelak-menu-group-title[data-pv-collapsible="1"]{
+  display:flex!important;align-items:center;justify-content:space-between!important;
+  margin:8px 0 4px!important;padding:11px 13px!important;
+  min-height:45px;border:1px solid #e3eaf2!important;border-radius:12px!important;
+  background:#f4f7fb!important;color:var(--pv-navy)!important;
+  font-size:13px!important;font-weight:850!important;
+  cursor:pointer!important;
+}
+#pelakMenuItems > .pelak-menu-group-title[data-pv-collapsible="1"]::after{
+  content:"⌄";color:#63768d;font-size:19px;font-weight:500;line-height:1;
+  transform:rotate(0deg);transition:transform .18s ease;
+}
+#pelakMenuItems > .pelak-menu-group-title[aria-expanded="true"]::after{transform:rotate(180deg)}
+#pelakMenuItems > [data-pv-group-collapsed="true"]{display:none!important}
+#pelakMenuItems > button:not([hidden]),
+#pelakMenuItems > a:not([hidden]){
+  min-height:43px!important;padding:10px 12px!important;font-size:13px!important;
+  border-radius:9px!important;line-height:1.6!important;
+}
+#pelakMenuItems > button[data-target="apps"]{font-weight:800!important}
+.pelak-push-settings{margin-top:15px!important;border-radius:13px!important}
+
+/* 7. Form wizard and supporting panels: typography and tappable controls. */
+#listingForm .pelak-step-tab{font-size:12px!important;line-height:1.45!important;min-height:46px!important}
+#listingForm .pelak-step-tab b{flex:none}
+#sell .panel,#pelakMineSection .panel,#pelakSupport .panel,
+#pelakMessagesSection .pelak-inbox-panel,#adminPanel .panel{
+  border:1px solid var(--pv-line)!important;border-radius:17px!important;
+  box-shadow:0 5px 20px #10233f0a!important;
+}
+#sell .panel .hint{font-size:13px!important;line-height:1.95!important}
+#sell .field label{font-size:13px!important}
+#sell .field input,#sell .field select,#sell .field textarea{
+  border-radius:10px!important;min-height:43px;
+}
+#sell .btn,#pelakMineSection .btn,#pelakMessagesSection .btn,
+#pelakSupport .btn,#adminPanel .btn{min-height:42px}
+.pelak-section-close,.pelak-close{min-width:42px;min-height:42px}
+
+/* 8. Footer: useful links, restrained branding and clearly grouped app downloads. */
+footer.foot{margin-top:24px!important;padding:31px 0 max(26px,env(safe-area-inset-bottom))!important;
+  background:#0b192d!important;color:#c1cede!important;
+}
+footer.foot>.wrap{
+  display:grid!important;grid-template-columns:1fr 1fr;gap:16px 30px!important;
+  align-items:start;
+}
+footer.foot .pv-footer-about{min-width:0}
+footer.foot .pv-footer-about>strong{display:block;font-size:19px;font-weight:900;color:#fff}
+footer.foot .pv-footer-about>p{margin:6px 0;font-size:13px;line-height:1.9;max-width:480px}
+footer.foot .pv-footer-about>small{display:block;margin-top:12px;color:#a4b6c9;font-size:11px}
+footer.foot .pv-footer-navigation{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+footer.foot .pv-footer-navigation .pv-footer-links-heading{font-size:15px;color:#fff}
+footer.foot .pv-footer-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 9px;width:100%}
+footer.foot .pv-footer-links button{
+  display:block;width:100%;text-align:start;color:#d7e1ec;line-height:1.65;
+  background:transparent;border:1px solid transparent;border-radius:9px;
+  padding:8px 9px;min-height:42px;cursor:pointer;font:inherit;font-size:13px;
+}
+footer.foot .pv-footer-links button:hover{border-color:#415672;background:#ffffff0d}
+footer.foot #pelakPlatformFooter{
+  grid-column:1/-1;margin:7px 0 0!important;padding-top:17px!important;
+  border-top:1px solid #364a60!important;
+}
+footer.foot #pelakPlatformFooter h3{color:#fff;font-size:16px}
+footer.foot #pelakPlatformFooter .pelak-platform-choice{
+  background:#152a44!important;color:#f7fafc!important;border:1px solid #435973!important;
+  border-radius:13px!important;box-shadow:none!important;
+}
+footer.foot #pelakPlatformFooter .pelak-platform-choice small{color:#c5d1df!important}
+footer.foot #pelakPlatformFooter .pelak-platform-choice:hover{border-color:#c9a158!important}
+
+/* 9. Mobile composition and accessibility. */
+@media(max-width:720px){
+  .pelak-shortcuts{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important}
+  .pelak-shortcuts > button.pv-shortcut{
+    min-height:86px!important;padding:9px 3px!important;border-radius:13px!important;
+    font-size:12px!important;gap:5px!important;
+  }
+  .pelak-shortcuts > button.pv-shortcut .pv-shortcut-icon{width:23px;height:23px}
+  main#home .pelak-quick-search{margin:8px 0 4px!important;min-height:55px!important}
+  .pelak-quick-search .pelak-search-symbol{font-size:21px!important;padding-inline:4px!important}
+  .pelak-quick-search button{padding:9px 11px!important;font-size:12px!important}
+  #carsGrid,#myGrid{gap:12px!important}
+  #carsGrid .car-card,#myGrid .car-card{border-radius:15px!important}
+  #listingForm .pelak-step-tabs{gap:5px!important}
+  #listingForm .pelak-step-tab{font-size:11px!important;padding:7px 3px!important;min-height:48px!important}
+  footer.foot>.wrap{grid-template-columns:1fr!important;gap:20px!important}
+  footer.foot .pv-footer-links{max-width:460px}
+}
+@media(max-width:390px){
+  .pelak-shortcuts > button.pv-shortcut{font-size:11px!important;min-height:83px!important}
+  #listingForm .pelak-step-tab{font-size:10.5px!important;padding:5px 2px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .pelak-shortcuts > button.pv-shortcut,
+  #carsGrid .car-card,#myGrid .car-card{transition:none!important;transform:none!important}
+  #pelakMenuItems > .pelak-menu-group-title::after{transition:none!important}
+}
