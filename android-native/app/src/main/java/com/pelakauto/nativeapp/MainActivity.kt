@@ -1356,6 +1356,13 @@ private fun ChatInbox(api: PelakApi, session: PelakSession, onThread: (ChatTarge
     var busy by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
+    // Refresh inbox while this screen is visible; cancelled when the user navigates away.
+    LaunchedEffect(session.userId) {
+        while (true) {
+            delay(20000)
+            reload++
+        }
+    }
     LaunchedEffect(session.userId, session.accessToken, reload) {
         busy = true
         try { messages = api.inbox(session); error = null }
@@ -1401,6 +1408,13 @@ private fun ChatDialog(api: PelakApi, session: PelakSession, target: ChatTarget,
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
+    // Lightweight polling until native realtime subscriptions are available.
+    LaunchedEffect(target.listingId, target.peerId) {
+        while (true) {
+            delay(12000)
+            reload++
+        }
+    }
     LaunchedEffect(target.listingId, target.peerId, session.accessToken, reload) {
         try { messages = api.thread(session, target.listingId, target.peerId); error = null }
         catch (_: Exception) { error = "خواندن پیام‌ها ممکن نشد." }
