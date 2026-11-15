@@ -228,3 +228,28 @@ footer.foot #pelakPlatformFooter .pelak-platform-choice:hover{border-color:#c9a1
   #carsGrid .car-card,#myGrid .car-card{transition:none!important;transform:none!important}
   #pelakMenuItems > .pelak-menu-group-title::after{transition:none!important}
 }
+
+/* Responsive finishing pass after inspecting actual Chromium screenshots. */
+@media(min-width:981px){
+  .pelak-shortcuts{grid-template-columns:repeat(6,minmax(0,1fr))!important}
+  .pelak-shortcuts > button.pv-shortcut{min-height:88px!important;padding:10px 4px!important;font-size:12px!important}
+}
+@media(min-width:721px) and (max-width:980px){
+  .pelak-shortcuts{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+}
+footer.foot #pelakPlatformFooter .pelak-platform-icon{color:#f8fafc!important}
+@media(max-width:620px){
+  /* Keep the showroom teaser, but do not let its sample car become a second giant hero. */
+  #pelakV526ShowroomHome{min-height:0!important;margin:18px auto 23px!important;border-radius:18px!important}
+  #pelakV526ShowroomHome .p526-home-pic{min-height:122px!important}
+  #pelakV526ShowroomHome .p526-home-pic img{height:122px!important}
+  #pelakV526ShowroomHome .p526-home-copy{padding:15px 16px!important;gap:7px!important}
+  #pelakV526ShowroomHome .p526-kicker{font-size:10px!important}
+  #pelakV526ShowroomHome h2{font-size:19px!important;line-height:1.48!important}
+  #pelakV526ShowroomHome p{font-size:12px!important;line-height:1.7!important}
+  #pelakV526ShowroomHome .p526-home-actions{gap:7px!important;margin-top:5px!important}
+  #pelakV526ShowroomHome .p526-home-actions button,
+  #pelakV526ShowroomHome .p526-home-actions a{
+    min-height:41px!important;padding:8px 12px!important;font-size:12px!important
+  }
+}
