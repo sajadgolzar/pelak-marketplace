@@ -948,6 +948,7 @@ private fun ListingsPanel(
 
 @Composable
 private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
+    val context = LocalContext.current
     var photoIndex by remember(car.id) { mutableIntStateOf(0) }
     val photoCount = car.imagePaths.size
     Card(
@@ -998,6 +999,24 @@ private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
                 if (status.isNotBlank()) Text(status, color = Color.Gray, fontSize = 11.sp)
                 if (car.listingStatus != "published")
                     Text("وضعیت: " + car.listingStatus, color = Gold, fontSize = 11.sp)
+                if (car.listingStatus == "published") {
+                    TextButton(onClick = {
+                        val details = listOf(car.make, car.model, car.trim).filter { it.isNotBlank() }.joinToString(" ")
+                        val message = listOf(car.title, details, "سال ساخت: ${car.year}",
+                            car.mileageKm?.let { "کارکرد: $it کیلومتر" }.orEmpty(),
+                            "قیمت: ${car.priceLabel()}", "موقعیت: ${car.city}، ${car.country}",
+                            "شناسه آگهی: ${car.id}", "https://pelakauto.com/")
+                            .filter { it.isNotBlank() }.joinToString("\n")
+                        try {
+                            context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, message)
+                            }, "اشتراک‌گذاری آگهی"))
+                        } catch (_: ActivityNotFoundException) {
+                            Toast.makeText(context, "برنامه اشتراک‌گذاری پیدا نشد.", Toast.LENGTH_SHORT).show()
+                        }
+                    }, contentPadding = PaddingValues(0.dp)) { Text("↗ اشتراک‌گذاری", fontSize = 12.sp) }
+                }
             }
         }
     }
