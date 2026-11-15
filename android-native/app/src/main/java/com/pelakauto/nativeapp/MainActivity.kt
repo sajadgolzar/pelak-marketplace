@@ -740,9 +740,10 @@ private fun ListingsPanel(
     var maxPrice by rememberSaveable { mutableStateOf("") }
     var statusFilter by rememberSaveable { mutableStateOf("همه") }
     var negotiableOnly by rememberSaveable { mutableStateOf(false) }
+    var photosOnly by rememberSaveable { mutableStateOf(false) }
     var sortMode by rememberSaveable { mutableStateOf("جدیدترین") }
     val filteredCars = remember(cars, brandFilter, cityFilter, minYear, maxYear,
-        minMileage, maxMileage, minPrice, maxPrice, priceCurrency, statusFilter, negotiableOnly) {
+        minMileage, maxMileage, minPrice, maxPrice, priceCurrency, statusFilter, negotiableOnly, photosOnly) {
         cars.filter { car ->
             val searchFields = listOf(car.make, car.model, car.trim, car.title).joinToString(" ")
             val amount = car.price?.toBigDecimalOrNull()
@@ -760,7 +761,8 @@ private fun ListingsPanel(
                 (minPrice.toBigDecimalOrNull()?.let { priceInSelectedUnit != null && priceInSelectedUnit >= it } ?: true) &&
                 (maxPrice.toBigDecimalOrNull()?.let { priceInSelectedUnit != null && priceInSelectedUnit <= it } ?: true) &&
                 (statusFilter == "همه" || car.vehicleStatus == statusFilter) &&
-                (!negotiableOnly || car.priceNegotiable)
+                (!negotiableOnly || car.priceNegotiable) &&
+                (!photosOnly || car.imagePaths.isNotEmpty())
         }
     }
     // Compare prices only within one currency; mixed-currency feeds must not imply an FX rate.
@@ -863,10 +865,14 @@ private fun ListingsPanel(
                     Checkbox(checked = negotiableOnly, onCheckedChange = { negotiableOnly = it })
                     Text("فقط قیمت توافقی")
                 }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = photosOnly, onCheckedChange = { photosOnly = it })
+                    Text("فقط آگهی‌های عکس‌دار")
+                }
                 TextButton(onClick = {
                     brandFilter = ""; cityFilter = ""; minYear = ""; maxYear = ""
                     minMileage = ""; maxMileage = ""; minPrice = ""; maxPrice = ""
-                    statusFilter = "همه"; priceCurrency = "IRR"; negotiableOnly = false
+                    statusFilter = "همه"; priceCurrency = "IRR"; negotiableOnly = false; photosOnly = false
                 }) { Text("پاک‌کردن فیلترها") }
                 Text("فیلترها روی آگهی‌های بارگذاری‌شده اعمال می‌شوند. محدوده قیمت فقط آگهی‌های هم‌ارز را نشان می‌دهد و ریال به تومان تبدیل می‌شود.",
                     color = Color.Gray, fontSize = 11.sp)
