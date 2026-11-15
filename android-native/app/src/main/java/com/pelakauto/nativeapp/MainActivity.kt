@@ -1,5 +1,7 @@
 package com.pelakauto.nativeapp
 
+import android.content.ActivityNotFoundException
+import android.widget.Toast
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -88,9 +90,14 @@ private fun PelakNativeApp() {
     var mine by remember { mutableStateOf<List<Car>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var mineLoading by remember { mutableStateOf(false) }
+    var mineHasMore by remember { mutableStateOf(false) }
+    var mineMoreLoading by remember { mutableStateOf(false) }
+    var mineMoreError by remember { mutableStateOf<String?>(null) }
+    var mineError by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
     var selected by remember { mutableStateOf<Car?>(null) }
+    var reporting by remember { mutableStateOf<Car?>(null) }
     var session by remember { mutableStateOf<PelakSession?>(store.load()) }
     var editing by remember { mutableStateOf<Car?>(null) }
     var chatTarget by remember { mutableStateOf<ChatTarget?>(null) }
@@ -110,8 +117,15 @@ private fun PelakNativeApp() {
             delay((current.expiresAtMs - System.currentTimeMillis() - 180000L)
                 .coerceIn(0L, 45L * 60L * 1000L))
             val before = session ?: break
-            try { saveSession(api.refreshSession(before)) }
-            catch (_: Exception) { delay(30000L) }
+            try {
+                val renewed = api.refreshSession(before)
+                // Never restore a session after logout or an account switch.
+                if (session?.userId == before.userId && session?.refreshToken == before.refreshToken) {
+                    saveSession(renewed)
+                }
+            } catch (_: Exception) {
+                delay(30000L)
+            }
         }
     }
     LaunchedEffect(session?.accessToken) {
@@ -125,14 +139,22 @@ private fun PelakNativeApp() {
     }
     LaunchedEffect(tab, search) {
         if (tab == 1) {
-            delay(320)
             searchLoading = true
+            val requestedSearch = search
+            delay(320)
             searchError = null
             try {
-                searched = api.published(search)
-                searchHasMore = searched.size == 100
-            } catch (_: Exception) { searchError = "خطای جست‌وجوی سرور؛ دوباره تلاش کن." }
-            finally { searchLoading = false }
+                val results = api.published(requestedSearch)
+                if (tab == 1 && search == requestedSearch) {
+                    searched = results
+                    searchHasMore = results.size == 100
+                }
+            } catch (_: Exception) {
+                if (tab == 1 && search == requestedSearch)
+                    searchError = "خطای جست‌وجوی سرور؛ دوباره تلاش کن."
+            } finally {
+                if (tab == 1 && search == requestedSearch) searchLoading = false
+            }
         }
     }
 
@@ -148,8 +170,16 @@ private fun PelakNativeApp() {
     fun refreshMine(current: PelakSession) {
         scope.launch {
             mineLoading = true
-            try { mine = api.mine(current) }
-            catch (_: Exception) { mine = emptyList() }
+            try {
+                val result = api.mine(current)
+                if (session?.userId == current.userId) {
+                    mine = result; mineHasMore = result.size == 100
+                    mineError = null; mineMoreError = null
+                }
+            }
+            catch (_: Exception) {
+                if (session?.userId == current.userId) mineError = "دریافت آگهی‌های من ناموفق بود. دوباره تلاش کن."
+            }
             finally { mineLoading = false }
         }
     }
@@ -181,7 +211,10 @@ private fun PelakNativeApp() {
                 nav.forEachIndexed { index, item ->
                     NavigationBarItem(
                         selected = tab == index,
-                        onClick = { tab = index },
+                        onClick = {
+                            if (index == 2 && tab != 2) editing = null
+                            tab = index
+                        },
                         icon = { Text(item.second, fontSize = 21.sp) },
                         label = { Text(item.first, fontSize = 9.sp, maxLines = 1) }
                     )
@@ -203,14 +236,29 @@ private fun PelakNativeApp() {
                         hasMore = if (tab == 0) homeHasMore else searchHasMore,
                         moreLoading = moreLoading,
                         onLoadMore = {
-                            if (!moreLoading) scope.launch {
-                                moreLoading = true
-                                try {
-                                    val start = if (tab == 0) cars.size else searched.size
-                                    val next = api.published(if (tab == 0) "" else search, start)
-                                    if (tab == 0) { cars = cars + next; homeHasMore = next.size == 100 }
-                                    else { searched = searched + next; searchHasMore = next.size == 100 }
-                                } finally { moreLoading = false }
+                            if (!moreLoading) {
+                                val requestedTab = tab
+                                val requestedSearch = if (requestedTab == 0) "" else search
+                                val start = if (requestedTab == 0) cars.size else searched.size
+                                scope.launch {
+                                    moreLoading = true
+                                    try {
+                                        val next = api.published(requestedSearch, start)
+                                        // Ignore a stale response if the user switched tabs or changed the query.
+                                        if (tab == requestedTab && (requestedTab == 0 || search == requestedSearch)) {
+                                            if (requestedTab == 0) {
+                                                cars = (cars + next).distinctBy { it.id }
+                                                homeHasMore = next.size == 100
+                                            } else {
+                                                searched = (searched + next).distinctBy { it.id }
+                                                searchHasMore = next.size == 100
+                                            }
+                                        }
+                                    } catch (_: Exception) {
+                                        if (tab == requestedTab && (requestedTab == 0 || search == requestedSearch))
+                                            android.widget.Toast.makeText(context, "دریافت آگهی‌های بیشتر ناموفق بود؛ دوباره تلاش کن.", android.widget.Toast.LENGTH_SHORT).show()
+                                    } finally { moreLoading = false }
+                                }
                             }
                         },
                         onSearchChange = { search = it },
@@ -224,7 +272,7 @@ private fun PelakNativeApp() {
                             }
                         },
                         onSelect = { selected = it },
-                        onPost = { tab = 2 }
+                        onPost = { editing = null; tab = 2 }
                     )
                 }
                 2 -> {
@@ -239,10 +287,29 @@ private fun PelakNativeApp() {
                 3 -> {
                     if (session == null) LoginRequired(onGoToLogin = { tab = 4 })
                     else ListingsPanel(
-                        cars = mine, loading = mineLoading, error = null,
+                        cars = mine, loading = mineLoading, error = mineError,
                         search = "", searching = false, onSearchChange = {}, session = session,
                         onRefresh = { session?.let(::refreshMine) },
-                        onSelect = { selected = it }, onPost = { tab = 2 },
+                        hasMore = mineHasMore,
+                        moreLoading = mineMoreLoading,
+                        moreError = mineMoreError,
+                        onLoadMore = {
+                            val active = session
+                            if (active != null && !mineMoreLoading) scope.launch {
+                                mineMoreLoading = true
+                                try {
+                                    val next = api.mine(active, mine.size)
+                                    if (session?.userId == active.userId) {
+                                        mine = (mine + next).distinctBy { it.id }
+                                        mineHasMore = next.size == 100
+                                        mineMoreError = null
+                                    }
+                                } catch (_: Exception) {
+                                    mineMoreError = "دریافت آگهی‌های بیشتر ناموفق بود؛ دوباره تلاش کن."
+                                } finally { mineMoreLoading = false }
+                            }
+                        },
+                        onSelect = { selected = it }, onPost = { editing = null; tab = 2 },
                         title = "آگهی‌های من"
                     )
                 }
@@ -252,7 +319,7 @@ private fun PelakNativeApp() {
                     onLogin = { saveSession(it); tab = 3 },
                     onLogout = {
                         val current = session
-                        session = null; store.clear(); mine = emptyList(); tab = 0
+                        session = null; store.clear(); mine = emptyList(); mineHasMore = false; mineError = null; mineMoreError = null; tab = 0
                         if (current != null) scope.launch {
                             val token = PelakPush.lastToken(context)
                             if (!token.isNullOrBlank()) runCatching { api.unregisterPush(current, token) }
@@ -292,7 +359,7 @@ private fun PelakNativeApp() {
                 }
             },
             confirmButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.End) {
                     if (car.userId == session?.userId && car.listingStatus == "draft") {
                         Button(onClick = { editing = car; selected = null; tab = 2 }) {
                             Text("ویرایش پیش‌نویس")
@@ -306,10 +373,43 @@ private fun PelakNativeApp() {
                         }
                         if (car.sellerPhone.isNotBlank()) {
                             TextButton(onClick = {
-                                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(
-                                    "tel:" + car.sellerPhone.filter { it.isDigit() || it == '+' })))
+                                try {
+                                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(
+                                        "tel:" + car.sellerPhone.filter { it.isDigit() || it == '+' })))
+                                } catch (_: ActivityNotFoundException) {
+                                    Toast.makeText(context, "برنامه تماس روی دستگاه موجود نیست.", Toast.LENGTH_SHORT).show()
+                                }
                             }) { Text("تماس") }
                         }
+                        if (car.sellerPhone.isNotBlank()) {
+                            TextButton(onClick = {
+                                val phone = car.sellerPhone.filter { it.isDigit() || it == '+' }
+                                try {
+                                    context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$phone")).apply {
+                                        putExtra("sms_body", "سلام، درباره آگهی " + car.title + " در پلاک پیام می‌دهم.")
+                                    })
+                                } catch (_: ActivityNotFoundException) {
+                                    Toast.makeText(context, "برنامه پیامک روی دستگاه موجود نیست.", Toast.LENGTH_SHORT).show()
+                                }
+                            }) { Text("پیامک") }
+                        }
+                        if (session != null && car.userId != session?.userId) {
+                            TextButton(onClick = { reporting = car; selected = null }) { Text("گزارش آگهی") }
+                        }
+                        TextButton(onClick = {
+                            val url = "https://pelakauto.com/" // Deep-link route requires website support before enabling
+                            val message = car.title + "\n" + car.priceLabel() + "\n" + url
+                            try {
+                                context.startActivity(Intent.createChooser(
+                                    Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, message)
+                                    }, "اشتراک‌گذاری آگهی"
+                                ))
+                            } catch (_: ActivityNotFoundException) {
+                                Toast.makeText(context, "برنامه‌ای برای اشتراک‌گذاری موجود نیست.", Toast.LENGTH_SHORT).show()
+                            }
+                        }) { Text("اشتراک‌گذاری") }
                     }
                 }
             },
@@ -318,9 +418,69 @@ private fun PelakNativeApp() {
             }
         )
     }
+    reporting?.let { car ->
+        val current = session
+        if (current != null) ReportListingDialog(api, current, car, onClose = { reporting = null })
+    }
     if (chatTarget != null && session != null) {
         ChatDialog(api, session!!, chatTarget!!, onClose = { chatTarget = null })
     }
+}
+
+@Composable
+private fun ReportListingDialog(api: PelakApi, session: PelakSession, car: Car, onClose: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val reasons = listOf(
+        "incorrect" to "مشخصات نادرست",
+        "wrong_photos" to "عکس‌های نامرتبط",
+        "fraud" to "احتمال کلاهبرداری",
+        "duplicate" to "آگهی تکراری",
+        "suspicious_contact" to "اطلاعات تماس مشکوک",
+        "other" to "سایر موارد"
+    )
+    var reason by remember(car.id) { mutableStateOf(reasons.first().first) }
+    var details by remember(car.id) { mutableStateOf("") }
+    var busy by remember(car.id) { mutableStateOf(false) }
+    var error by remember(car.id) { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = { if (!busy) onClose() },
+        title = { Text("گزارش آگهی") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(car.title, fontWeight = FontWeight.Bold)
+                reasons.forEach { (key, label) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = reason == key, onClick = { if (!busy) reason = key })
+                        Text(label, modifier = Modifier.clickable(enabled = !busy) { reason = key })
+                    }
+                }
+                OutlinedTextField(
+                    value = details,
+                    onValueChange = { details = it.take(1200) },
+                    label = { Text("شرح مشکل (۱۰ تا ۱۲۰۰ نویسه)") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy
+                )
+                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = {
+            Button(enabled = !busy && details.trim().length in 10..1200, onClick = {
+                scope.launch {
+                    busy = true
+                    error = ""
+                    try {
+                        api.reportListing(session, car.id, reason, details)
+                        onClose()
+                    } catch (_: Exception) {
+                        error = "ثبت گزارش ناموفق بود؛ اتصال یا محدودیت گزارش را بررسی کن."
+                    } finally { busy = false }
+                }
+            }) { Text(if (busy) "در حال ارسال…" else "ارسال گزارش") }
+        },
+        dismissButton = { TextButton(enabled = !busy, onClick = onClose) { Text("انصراف") } }
+    )
 }
 
 @Composable
@@ -333,6 +493,7 @@ private fun ListingsPanel(
     session: PelakSession? = null,
     hasMore: Boolean = false,
     moreLoading: Boolean = false,
+    moreError: String? = null,
     onLoadMore: () -> Unit = {},
     onSearchChange: (String) -> Unit,
     onRefresh: () -> Unit,
@@ -340,6 +501,15 @@ private fun ListingsPanel(
     onPost: () -> Unit,
     title: String = "جدیدترین آگهی‌های خودرو"
 ) {
+    var sortMode by rememberSaveable { mutableStateOf("جدیدترین") }
+    val sortedCars = remember(cars, sortMode) {
+        when (sortMode) {
+            "ارزان‌ترین" -> cars.sortedWith(compareBy<Car> { it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal("999999999999999999999") })
+            "گران‌ترین" -> cars.sortedWith(compareByDescending<Car> { it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO })
+            "کم‌کارکردترین" -> cars.sortedWith(compareBy<Car> { it.mileageKm ?: Int.MAX_VALUE })
+            else -> cars
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         if (searching) {
             OutlinedTextField(
@@ -358,6 +528,12 @@ private fun ListingsPanel(
             Text(title, color = Navy, fontWeight = FontWeight.Bold)
             TextButton(onClick = onRefresh, enabled = !loading) { Text("↻ تازه‌سازی") }
         }
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("جدیدترین", "ارزان‌ترین", "گران‌ترین", "کم‌کارکردترین").forEach { option ->
+                FilterChip(selected = sortMode == option, onClick = { sortMode = option }, label = { Text(option, fontSize = 12.sp) })
+            }
+        }
+        if (hasMore && sortMode != "جدیدترین") Text("مرتب‌سازی روی آگهی‌های بارگذاری‌شده انجام می‌شود.", modifier = Modifier.padding(horizontal = 16.dp), color = Color.Gray, fontSize = 11.sp)
         if (loading) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
         }
@@ -377,10 +553,11 @@ private fun ListingsPanel(
                 contentPadding = PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(9.dp)
             ) {
-                items(cars, key = { it.id }) { car ->
+                items(sortedCars, key = { it.id }) { car ->
                     CarRow(car = car, session = session, onClick = { onSelect(car) })
                 }
                 if (hasMore) item {
+                    if (moreError != null) Text(moreError, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                     Button(onClick = onLoadMore, enabled = !moreLoading,
                         modifier = Modifier.fillMaxWidth()) {
                         Text(if (moreLoading) "در حال دریافت…" else "نمایش آگهی‌های بیشتر")
@@ -410,6 +587,10 @@ private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
                     color = Color.Gray, fontSize = 12.sp, maxLines = 1
                 )
                 Text(car.priceLabel(), color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                car.mileageKm?.let { Text("کارکرد " + java.text.NumberFormat.getNumberInstance().format(it) + " کیلومتر", color = Color.Gray, fontSize = 12.sp) }
+                if (car.imagePaths.size > 1) Text(car.imagePaths.size.toString() + " عکس", color = Color.Gray, fontSize = 11.sp)
+                if (car.listingStatus != "published") Text("وضعیت: " + car.listingStatus, color = Gold, fontSize = 11.sp)
+
             }
         }
     }
@@ -477,33 +658,38 @@ private fun AccountPanel(
     var email by rememberSaveable { mutableStateOf("") }
     var otp by rememberSaveable { mutableStateOf("") }
     var sent by rememberSaveable { mutableStateOf(false) }
+    var sentToEmail by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("ورود / ثبت‌نام پلاک", fontWeight = FontWeight.Bold, color = Navy, fontSize = 21.sp)
         Text("با ایمیل خود کد ورود یک‌بارمصرف دریافت کن.", color = Color.Gray)
-        OutlinedTextField(value = email, onValueChange = { email = it },
+        OutlinedTextField(value = email, onValueChange = {
+            email = it
+            if (sent && it.trim() != sentToEmail) { sent = false; otp = ""; sentToEmail = "" }
+        },
             label = { Text("ایمیل") }, singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             modifier = Modifier.fillMaxWidth())
         if (sent) {
-            OutlinedTextField(value = otp, onValueChange = { otp = it },
+            OutlinedTextField(value = otp, onValueChange = { otp = it.filter(Char::isDigit).take(6) },
                 label = { Text("کد ۶ رقمی دریافتی") }, singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth())
         }
         Button(
-            enabled = !busy && email.contains("@") && (!sent || otp.length >= 6),
+            enabled = !busy && email.trim().contains("@") && (!sent || (otp.length == 6 && email.trim() == sentToEmail)),
             onClick = {
                 scope.launch {
                     busy = true; info = ""
                     try {
                         if (!sent) {
                             api.sendOtp(email)
+                            sentToEmail = email.trim()
                             sent = true
                             info = "کد به ایمیلت ارسال شد."
                         } else {
-                            onLogin(api.verifyOtp(email, otp))
+                            onLogin(api.verifyOtp(sentToEmail, otp))
                             otp = ""
                         }
                     } catch (_: Exception) {
@@ -512,7 +698,18 @@ private fun AccountPanel(
                 }
             }
         ) { Text(if (busy) "در حال بررسی…" else if (sent) "تأیید و ورود" else "دریافت کد") }
-        if (sent) TextButton(onClick = { sent = false; otp = "" }) { Text("ارسال مجدد کد") }
+        if (sent) TextButton(enabled = !busy, onClick = {
+            scope.launch {
+                busy = true; info = ""
+                try {
+                    api.sendOtp(sentToEmail)
+                    otp = ""
+                    info = "درخواست ارسال مجدد ثبت شد؛ ایمیل را بررسی کن."
+                } catch (_: Exception) {
+                    info = "ارسال مجدد ناموفق بود؛ کمی بعد دوباره تلاش کن."
+                } finally { busy = false }
+            }
+        }) { Text("ارسال مجدد کد") }
         if (info.isNotBlank()) Text(info, color = Navy)
     }
 }
@@ -563,7 +760,11 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
         item { NativeField("سال ساخت میلادی", year, KeyboardType.Number) { year = it } }
         item { NativeField("کشور", country) { country = it } }
         item { NativeField("شهر", city) { city = it } }
-        item { NativeField("شماره تماس فروشنده", phone, KeyboardType.Phone) { phone = it } }
+        item {
+            NativeField("شماره تماس فروشنده", phone, KeyboardType.Phone) { phone = it }
+            Text("برای انتشار، شماره را با کد کشور وارد کن (مثلاً ‎+989121234567). شماره تماس در آگهی منتشرشده عمومی است.",
+                fontSize = 12.sp, color = Color.Gray)
+        }
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(checked = negotiable, onCheckedChange = { negotiable = it })

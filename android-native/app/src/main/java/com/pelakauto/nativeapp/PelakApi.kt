@@ -134,9 +134,10 @@ internal class PelakApi {
                 "&order=created_at.desc&limit=" + pageSize.coerceIn(1,100) +
                 "&offset=" + offset.coerceAtLeast(0)))
         }
-    suspend fun mine(session: PelakSession): List<Car> = withContext(Dispatchers.IO) {
+    suspend fun mine(session: PelakSession, offset: Int = 0, pageSize: Int = 100): List<Car> = withContext(Dispatchers.IO) {
         parseCars(perform("/rest/v1/listings?select=" + carFields +
-            "&user_id=eq." + session.userId + "&order=created_at.desc&limit=100",
+            "&user_id=eq." + session.userId + "&order=created_at.desc" +
+            "&limit=" + pageSize.coerceIn(1, 100) + "&offset=" + offset.coerceAtLeast(0),
             jwt = session.accessToken))
     }
     // The Storage API returns /object/sign/... on some versions and /storage/v1/object/sign/... on others.
@@ -298,6 +299,16 @@ internal class PelakApi {
             perform("/rest/v1/rpc/pelak_send_listing_message", "POST",
                 JSONObject().put("p_listing_id", listingId)
                     .put("p_recipient_id", recipientId).put("p_body", body.trim()), session.accessToken)
+            Unit
+        }
+    suspend fun reportListing(session: PelakSession, listingId: String, category: String, details: String) =
+        withContext(Dispatchers.IO) {
+            require(category in setOf("fraud", "incorrect", "wrong_photos", "duplicate", "suspicious_contact", "other"))
+            require(details.trim().length in 10..1200)
+            perform("/rest/v1/rpc/pelak_report_listing", "POST",
+                JSONObject().put("p_listing_id", listingId)
+                    .put("p_category", category)
+                    .put("p_details", details.trim()), session.accessToken)
             Unit
         }
     suspend fun registerPush(session: PelakSession, token: String) = withContext(Dispatchers.IO) {
