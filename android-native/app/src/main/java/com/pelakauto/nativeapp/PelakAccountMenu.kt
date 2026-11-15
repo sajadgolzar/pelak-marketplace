@@ -32,6 +32,7 @@ internal fun PelakAccountMenu(
         AccountEntry("نمایشگاه مجازی", Icons.Outlined.Storefront, "dealer"),
         AccountEntry("نشان‌ها", Icons.Outlined.BookmarkBorder, "favorites"),
         AccountEntry("بازدیدهای اخیر", Icons.Outlined.History, "recent"),
+        AccountEntry("اشتراک‌گذاری پلاک", Icons.Outlined.Share, "share"),
         AccountEntry("تنظیمات", Icons.Outlined.Settings, "settings"),
         AccountEntry("امنیت و گزارش تخلف", Icons.Outlined.Security, "safety"),
         AccountEntry("اخبار و اطلاعیه‌های پلاک", Icons.Outlined.Article, "news"),
@@ -60,6 +61,13 @@ internal fun PelakAccountMenu(
                         "mine" -> onNavigate(3)
                         "favorites" -> onNavigate(6)
                         "recent" -> onNavigate(7)
+                        "share" -> {
+                            val message = "پلاک؛ خودروی بعدی تو، اینجاست.\nhttps://pelakauto.com"
+                            context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, message)
+                            }, "اشتراک‌گذاری پلاک"))
+                        }
                         "settings" -> {
                             context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                                 Uri.parse("package:" + context.packageName)))
