@@ -6,6 +6,8 @@
     <application
         android:allowBackup="false"
         android:label="پلاک"
+        android:icon="@drawable/pelak_launcher"
+        android:roundIcon="@drawable/pelak_launcher"
         android:supportsRtl="true"
         android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
