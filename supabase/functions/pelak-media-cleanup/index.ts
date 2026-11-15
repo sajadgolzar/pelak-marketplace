@@ -108,6 +108,11 @@ Deno.serve(async req=>{
            JSON.stringify(current.data.image_paths||[])!==JSON.stringify(referenced)){
           retained++;continue
         }
+        // A report submitted during the Storage checks must preserve evidence.
+        const latestReports=await db.from("pelak_listing_reports")
+          .select("id",{count:"exact",head:true}).eq("listing_id",row.id);
+        if(latestReports.error){failed++;continue}
+        if((latestReports.count||0)>0){retained++;continue}
         if(paths.length){
           const deletion=await db.storage.from("car-images").remove(paths);
           if(deletion.error){failed++;continue}
