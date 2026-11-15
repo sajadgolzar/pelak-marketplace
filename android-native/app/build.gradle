@@ -21,6 +21,27 @@ android {
         buildConfigField 'String', 'FIREBASE_SENDER_ID', '\"245022577031\"'
         buildConfigField 'String', 'FIREBASE_PROJECT_ID', '\"pelak-ae9f3\"'
     }
+    // Production signing material is injected by GitHub Actions secrets; never stored in Git.
+    def signingPath = System.getenv('PELAK_SIGNING_STORE_FILE')
+    def signingStorePass = System.getenv('PELAK_SIGNING_STORE_PASSWORD')
+    def signingAlias = System.getenv('PELAK_SIGNING_KEY_ALIAS')
+    def signingKeyPass = System.getenv('PELAK_SIGNING_KEY_PASSWORD')
+    if (signingPath && signingStorePass && signingAlias && signingKeyPass) {
+        signingConfigs {
+            pelakRelease {
+                storeFile file(signingPath)
+                storePassword signingStorePass
+                keyAlias signingAlias
+                keyPassword signingKeyPass
+            }
+        }
+        buildTypes {
+            release {
+                signingConfig signingConfigs.pelakRelease
+                minifyEnabled false
+            }
+        }
+    }
     buildFeatures { compose true; buildConfig true }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
