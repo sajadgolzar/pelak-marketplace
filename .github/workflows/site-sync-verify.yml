@@ -1,0 +1,38 @@
+name: Verify PELAK com and ir synchronization
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'android.html'
+      - 'assets/**'
+      - 'css/**'
+      - 'js/**'
+      - 'site-sync-version.txt'
+      - '.github/workflows/site-sync-verify.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Wait for both hosting providers to deploy
+        run: sleep 90
+      - name: Verify both public sites serve the same deployment marker
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 15); do
+            com=$(curl -fsSL --max-time 15 "https://pelakauto.com/site-sync-version.txt?check=${GITHUB_SHA}" || true)
+            ir=$(curl -fsSL --max-time 15 "https://pelakauto.ir/site-sync-version.txt?check=${GITHUB_SHA}" || true)
+            echo "Attempt $attempt: com=${com:0:120} ir=${ir:0:120}"
+            if [[ -n "$com" && "$com" == "$ir" ]]; then
+              echo "Both domains serve identical deployment marker"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::The .com and .ir sites are not synchronized"
+          exit 1
