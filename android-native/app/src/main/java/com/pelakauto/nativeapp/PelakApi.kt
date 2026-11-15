@@ -155,6 +155,37 @@ internal class PelakApi {
         } catch (_: Exception) { null }
     }
 
+    // Favorites are stored in the existing RLS-protected pelak_favorites table.
+    suspend fun favoriteIds(session: PelakSession): Set<String> = withContext(Dispatchers.IO) {
+        val rows = JSONArray(perform("/rest/v1/pelak_favorites?select=listing_id&user_id=eq." +
+            Uri.encode(session.userId) + "&limit=1000", jwt = session.accessToken))
+        (0 until rows.length()).map { rows.getJSONObject(it).getString("listing_id") }.toSet()
+    }
+
+    suspend fun setFavorite(session: PelakSession, listingId: String, saved: Boolean) =
+        withContext(Dispatchers.IO) {
+            if (saved) {
+                perform("/rest/v1/pelak_favorites", "POST", JSONObject()
+                    .put("user_id", session.userId).put("listing_id", listingId), session.accessToken)
+            } else {
+                perform("/rest/v1/pelak_favorites?user_id=eq." + Uri.encode(session.userId) +
+                    "&listing_id=eq." + Uri.encode(listingId), "DELETE", jwt = session.accessToken)
+            }
+            Unit
+        }
+
+    suspend fun favoriteCars(session: PelakSession): List<Car> = withContext(Dispatchers.IO) {
+        val ids = favoriteIds(session)
+        if (ids.isEmpty()) return@withContext emptyList()
+        val all = mutableListOf<Car>()
+        ids.chunked(50).forEach { chunk ->
+            val filter = chunk.joinToString(",")
+            all += parseCars(perform("/rest/v1/listings?select=" + carFields +
+                "&listing_status=eq.published&id=in.(" + filter + ")", jwt = session.accessToken))
+        }
+        all
+    }
+
     suspend fun sendOtp(email: String) = withContext(Dispatchers.IO) {
         perform("/auth/v1/otp", "POST", JSONObject().put("email", email.trim()).put("create_user", true))
         Unit
