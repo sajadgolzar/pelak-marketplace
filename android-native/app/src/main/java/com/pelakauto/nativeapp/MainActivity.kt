@@ -117,6 +117,9 @@ private fun PelakNativeApp() {
     var favoritesLoading by remember { mutableStateOf(false) }
     var favoritesError by remember { mutableStateOf<String?>(null) }
     var favoriteBusy by remember { mutableStateOf(false) }
+    var ownerActionBusy by remember { mutableStateOf(false) }
+    var ownerActionConfirm by remember { mutableStateOf<Pair<Car, String>?>(null) }
+
     fun refreshRecent() {
         scope.launch {
             recentLoading = true
@@ -478,7 +481,28 @@ private fun PelakNativeApp() {
                         Button(onClick = { editing = car; selected = null; tab = 2 }) {
                             Text("ویرایش پیش‌نویس")
                         }
-                    } else if (car.listingStatus == "published") {
+                    }
+                    if (car.userId == session?.userId) {
+                        if (car.listingStatus == "needs_revision") {
+                            TextButton(onClick = { editing = car; selected = null; tab = 2 }) {
+                                Text("اصلاح آگهی")
+                            }
+                            TextButton(onClick = { ownerActionConfirm = car to "resubmit"; selected = null }) {
+                                Text("ارسال مجدد برای بررسی")
+                            }
+                        }
+                        if (car.listingStatus == "published" || car.listingStatus == "archived") {
+                            TextButton(onClick = { ownerActionConfirm = car to "renew"; selected = null }) {
+                                Text("تمدید آگهی")
+                            }
+                        }
+                        if (car.listingStatus in listOf("draft", "published", "archived", "needs_revision")) {
+                            TextButton(onClick = { ownerActionConfirm = car to "cancel"; selected = null }) {
+                                Text("لغو آگهی")
+                            }
+                        }
+                    }
+                    if (car.listingStatus == "published") {
                         if (session != null && car.userId != session?.userId) {
                             Button(onClick = {
                                 chatTarget = ChatTarget(car.id, car.userId, car.title)
@@ -529,6 +553,47 @@ private fun PelakNativeApp() {
             },
             dismissButton = {
                 TextButton(onClick = { selected = null }) { Text("بازگشت") }
+            }
+        )
+    }
+    ownerActionConfirm?.let { (car, action) ->
+        val current = session
+        AlertDialog(
+            onDismissRequest = { if (!ownerActionBusy) ownerActionConfirm = null },
+            title = { Text(when (action) {
+                "cancel" -> "لغو آگهی"
+                "renew" -> "تمدید آگهی"
+                else -> "ارسال مجدد برای بررسی"
+            }) },
+            text = { Text(when (action) {
+                "cancel" -> "آگهی «${car.title}» لغو شود؟ ممکن است طبق سیاست پاک‌سازی پلاک، تصاویر آن بعداً حذف شوند."
+                "renew" -> "درخواست تمدید آگهی «${car.title}» ثبت شود؟"
+                else -> "آگهی «${car.title}» پس از اصلاح برای بررسی دوباره ارسال شود؟"
+            }) },
+            confirmButton = {
+                Button(enabled = !ownerActionBusy && current != null, onClick = {
+                    val active = current ?: return@Button
+                    scope.launch {
+                        ownerActionBusy = true
+                        try {
+                            when (action) {
+                                "cancel" -> api.cancelMyListing(active, car.id)
+                                "renew" -> api.renewMyListing(active, car.id)
+                                "resubmit" -> api.resubmitMyListing(active, car.id)
+                            }
+                            ownerActionConfirm = null
+                            refreshMine(active)
+                            Toast.makeText(context, "درخواست با موفقیت ثبت شد.", Toast.LENGTH_SHORT).show()
+                        } catch (_: Exception) {
+                            Toast.makeText(context, "عملیات انجام نشد؛ وضعیت آگهی یا دسترسی را بررسی کن.", Toast.LENGTH_LONG).show()
+                        } finally { ownerActionBusy = false }
+                    }
+                }) { Text(if (ownerActionBusy) "در حال انجام…" else "تأیید") }
+            },
+            dismissButton = {
+                TextButton(enabled = !ownerActionBusy, onClick = { ownerActionConfirm = null }) {
+                    Text("انصراف")
+                }
             }
         )
     }
