@@ -331,6 +331,7 @@ private fun PelakNativeApp() {
                             }
                         },
                         onSearchChange = { search = it },
+                        onOpenSearch = { tab = 1 },
                         onRefresh = {
                             if (tab == 0) refresh()
                             else scope.launch {
@@ -683,6 +684,7 @@ private fun ListingsPanel(
     moreError: String? = null,
     onLoadMore: () -> Unit = {},
     onSearchChange: (String) -> Unit,
+    onOpenSearch: () -> Unit = {},
     onRefresh: () -> Unit,
     onSelect: (Car) -> Unit,
     onPost: () -> Unit,
@@ -727,6 +729,12 @@ private fun ListingsPanel(
         }
     }
     Column(Modifier.fillMaxSize()) {
+        if (!searching && title == "جدیدترین آگهی‌های خودرو") {
+            OutlinedButton(onClick = onOpenSearch,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+                Text("⌕ جست‌وجوی برند، مدل، تیپ یا شهر")
+            }
+        }
         if (searching) {
             OutlinedTextField(
                 value = search, onValueChange = onSearchChange,
