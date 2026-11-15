@@ -67,6 +67,9 @@ class PelakMessagingService : FirebaseMessagingService() {
     }
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
+        // An unregister request may race with an already queued FCM delivery.
+        // Never display account-specific alerts after local sign-out.
+        if (PelakSessionStore(this).load() == null) return
         PelakPush.initialize(this)
         val title = message.notification?.title ?: "اعلان پلاک"
         val body = message.notification?.body ?: "برای بررسی پیام جدید به پلاک برگرد."
