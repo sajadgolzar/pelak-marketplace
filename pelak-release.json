@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "android": {
+    "versionCode": 2,
+    "versionName": "0.2-native-preview",
+    "apkUrl": "https://pelakauto.com/downloads/PELAK-Native-v0.2-preview.apk",
+    "minimumVersionCode": 1,
+    "notes": "نسخه آزمایشی پلاک؛ امکانات و رفع اشکال جدید."
+  },
+  "web": {
+    "version": "2026-11-15.1",
+    "notes": "نسخه تازه وب‌اپ پلاک آماده است.",
+    "build": 1
+  }
+}

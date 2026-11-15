@@ -81,8 +81,43 @@
       }).join('');
     }
     render();
+    // This value is bumped together with pelak-release.json when the web bundle changes.
+    const bundledWebBuild = 1;
+    const updateBar = document.createElement('div');
+    updateBar.id = 'pelakWebUpdateBar';
+    updateBar.setAttribute('role', 'status');
+    updateBar.style.cssText = 'display:none;position:fixed;bottom:16px;left:12px;right:12px;z-index:99999;max-width:520px;margin:auto;background:#10233f;color:#fff;border-radius:13px;padding:13px;box-shadow:0 8px 28px #0004;text-align:center;line-height:1.8';
+    updateBar.innerHTML = '<span id="pelakWebUpdateText"></span> <button type="button" id="pelakWebReload" style="background:#c9a158;color:#10233f;border:0;border-radius:8px;padding:7px 12px;font:inherit;font-weight:bold;cursor:pointer">بارگذاری نسخه جدید</button> <button type="button" id="pelakWebDismiss" aria-label="بستن" style="background:none;color:#fff;border:0;font-size:19px;cursor:pointer">×</button>';
+    document.body.appendChild(updateBar);
+    updateBar.querySelector('#pelakWebReload').addEventListener('click', function () { window.location.reload(); });
+    updateBar.querySelector('#pelakWebDismiss').addEventListener('click', function () { updateBar.style.display = 'none'; });
+    const updateButton = document.createElement('button');
+    updateButton.type = 'button';
+    updateButton.textContent = 'بررسی به‌روزرسانی سایت';
+    updateButton.style.cssText = 'margin:12px auto;display:block;border:1px solid #b69153;border-radius:10px;padding:9px 14px;background:transparent;color:inherit;font:inherit;cursor:pointer';
+    footerBox.appendChild(updateButton);
+    async function checkWebUpdate(manual) {
+      try {
+        const response = await fetch('./pelak-release.json?t=' + Date.now(), { cache: 'no-store' });
+        if (!response.ok) throw new Error('manifest');
+        const info = (await response.json()).web;
+        if (!info || !Number.isInteger(info.build)) throw new Error('version');
+        if (info.build > bundledWebBuild) {
+          updateBar.querySelector('#pelakWebUpdateText').textContent = info.notes || 'نسخه جدید پلاک آماده است.';
+          updateBar.style.display = 'block';
+        } else if (manual) {
+          window.alert('نسخه وب پلاک به‌روز است.');
+        }
+      } catch (_) {
+        if (manual) window.alert('بررسی نسخه ممکن نشد. اینترنت را بررسی کن.');
+      }
+    }
+    updateButton.addEventListener('click', function () { checkWebUpdate(true); });
+    checkWebUpdate(false);
+    window.setInterval(function () { if (!document.hidden) checkWebUpdate(false); }, 15 * 60 * 1000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) checkWebUpdate(false); });
     const language = document.getElementById('pelakSiteLang');
-    if (language) language.addEventListener('change', function () { setTimeout(render, 0); });
+    if (language) language.addEventListener('change', function () { setTimeout(function () { render(); footerBox.appendChild(updateButton); }, 0); });
     menu.addEventListener('click', function (event) {
       if (event.target.closest('button[data-target="apps"]') !== menuButton) return;
       event.preventDefault();
