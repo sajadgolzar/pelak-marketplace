@@ -34,3 +34,10 @@ After a successful merge to main, CI publishes `downloads/PELAK-Native-v0.2-prev
 - Verify anonymous and authenticated Storage permissions and check draft photo privacy
 - Configure FCM Service Account securely, enable server dispatch only after testing, grant notifications on Android 13+
 - Sign out, sign in again, verify messages and FCM token ownership, test offline/slow connectivity
+
+## Update notices (native + web)
+- `pelak-release.json` is the public, same-origin version manifest. The Android app checks it at startup and offers a manual check in its header. The website checks it on load, every 15 minutes while visible, and on returning to the tab; a manual check is available in the footer.
+- **Release discipline:** increment Android `versionCode` and `versionName` in `app/build.gradle` **and** `pelak-release.json` when publishing a newer APK. Increment `web.build` in `pelak-release.json` and `bundledWebBuild` in `pelak-platform-downloads.js` together when releasing new web assets. Keep the public download URL in sync if the filename changes.
+- Android's button opens the fixed PELAK HTTPS APK download URL. It does not silently install an APK or claim Play Store in-app updates.
+- **Production blocker:** CI debug APKs may be signed with different temporary keys. Configure one secure persistent release-signing key, validate matching `applicationId`, and test upgrade-in-place with data retained on a physical Samsung before promising seamless updates. Do not commit a signing keystore or passwords.
+- If version metadata is unreachable, the app/site retains normal functionality; manual checks show a retry message.
