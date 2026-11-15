@@ -1045,6 +1045,7 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
     var city by rememberSaveable(editing?.id) { mutableStateOf(editing?.city.orEmpty()) }
     var country by rememberSaveable(editing?.id) { mutableStateOf(editing?.country ?: "ایران") }
     var phone by rememberSaveable(editing?.id) { mutableStateOf(editing?.sellerPhone.orEmpty()) }
+    val validSellerPhone = remember(phone) { Regex("""^\+[1-9][0-9]{7,14}$""").matches(phone.trim()) }
     var price by rememberSaveable(editing?.id) {
         mutableStateOf(
             if (editing?.currency == "IRR" && editing.price != null)
@@ -1108,6 +1109,10 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
         }
         item {
             NativeField("شماره تماس فروشنده", phone, KeyboardType.Phone) { phone = it }
+            if (phone.isNotBlank() && !validSellerPhone) {
+                Text("شماره باید با + و کد کشور شروع شود؛ مانند +989121234567",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+            }
             Text("برای انتشار، شماره را با کد کشور وارد کن (مثلاً ‎+989121234567). شماره تماس در آگهی منتشرشده عمومی است.",
                 fontSize = 12.sp, color = Color.Gray)
         }
@@ -1164,9 +1169,9 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                         step == 0 && (title.isBlank() || make.isBlank() || model.isBlank() ||
                             y == null || y !in 1950..2100 || (mileage.isNotBlank() && mileage.toIntOrNull() == null)) ->
                             "عنوان، برند، مدل و سال ساخت معتبر را وارد کن."
-                        step == 1 && (country.isBlank() || phone.isBlank() ||
+                        step == 1 && (country.isBlank() || !validSellerPhone ||
                             (!negotiable && (p == null || p <= BigDecimal.ZERO))) ->
-                            "کشور، شماره تماس و قیمت معتبر را وارد کن."
+                            "کشور، شماره تماس بین‌المللی معتبر و قیمت را وارد کن."
                         else -> ""
                     }
                     if (info.isBlank()) step++
@@ -1182,8 +1187,8 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                     val p = price.replace(",", "").trim().toBigDecimalOrNull()
                     if (title.isBlank() || make.isBlank() || model.isBlank() ||
                         y == null || y !in 1950..2100 || country.isBlank() ||
-                        phone.isBlank() || (!negotiable && (p == null || p <= BigDecimal.ZERO))) {
-                        info = "عنوان، برند، مدل، سال، کشور، شماره تماس و قیمت را درست وارد کن."
+                        !validSellerPhone || (!negotiable && (p == null || p <= BigDecimal.ZERO))) {
+                        info = "عنوان، برند، مدل، سال، کشور، شماره بین‌المللی و قیمت را درست وارد کن."
                     } else {
                         scope.launch {
                             working = true; info = ""
