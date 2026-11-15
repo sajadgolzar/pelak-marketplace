@@ -699,16 +699,20 @@ private fun ListingsPanel(
     var maxYear by rememberSaveable { mutableStateOf("") }
     var minMileage by rememberSaveable { mutableStateOf("") }
     var maxMileage by rememberSaveable { mutableStateOf("") }
+    var priceCurrency by rememberSaveable { mutableStateOf("IRR") }
     var minPrice by rememberSaveable { mutableStateOf("") }
     var maxPrice by rememberSaveable { mutableStateOf("") }
     var statusFilter by rememberSaveable { mutableStateOf("همه") }
     var negotiableOnly by rememberSaveable { mutableStateOf(false) }
     var sortMode by rememberSaveable { mutableStateOf("جدیدترین") }
     val filteredCars = remember(cars, brandFilter, cityFilter, minYear, maxYear,
-        minMileage, maxMileage, minPrice, maxPrice, statusFilter, negotiableOnly) {
+        minMileage, maxMileage, minPrice, maxPrice, priceCurrency, statusFilter, negotiableOnly) {
         cars.filter { car ->
             val searchFields = listOf(car.make, car.model, car.trim, car.title).joinToString(" ")
             val amount = car.price?.toBigDecimalOrNull()
+            val priceFilterActive = minPrice.isNotBlank() || maxPrice.isNotBlank()
+            val priceInSelectedUnit = if (car.currency == "IRR" && priceCurrency == "IRR")
+                amount?.divide(java.math.BigDecimal.TEN) else amount
             (brandFilter.isBlank() || searchFields.contains(brandFilter.trim(), ignoreCase = true)) &&
                 (cityFilter.isBlank() || listOf(car.city, car.country).joinToString(" ")
                     .contains(cityFilter.trim(), ignoreCase = true)) &&
@@ -716,8 +720,9 @@ private fun ListingsPanel(
                 (maxYear.toIntOrNull()?.let { car.year <= it } ?: true) &&
                 (minMileage.toIntOrNull()?.let { (car.mileageKm ?: Int.MAX_VALUE) >= it } ?: true) &&
                 (maxMileage.toIntOrNull()?.let { (car.mileageKm ?: Int.MAX_VALUE) <= it } ?: true) &&
-                (minPrice.toBigDecimalOrNull()?.let { amount != null && amount >= it } ?: true) &&
-                (maxPrice.toBigDecimalOrNull()?.let { amount != null && amount <= it } ?: true) &&
+                (!priceFilterActive || car.currency == priceCurrency) &&
+                (minPrice.toBigDecimalOrNull()?.let { priceInSelectedUnit != null && priceInSelectedUnit >= it } ?: true) &&
+                (maxPrice.toBigDecimalOrNull()?.let { priceInSelectedUnit != null && priceInSelectedUnit <= it } ?: true) &&
                 (statusFilter == "همه" || car.vehicleStatus == statusFilter) &&
                 (!negotiableOnly || car.priceNegotiable)
         }
@@ -781,11 +786,19 @@ private fun ListingsPanel(
                     OutlinedTextField(maxMileage, { maxMileage = it.filter(Char::isDigit) },
                         label = { Text("کارکرد تا (km)") }, modifier = Modifier.weight(1f), singleLine = true)
                 }
+                Text("ارز قیمت برای فیلتر", fontSize = 12.sp)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf("تومان" to "IRR", "دلار" to "USD", "یورو" to "EUR",
+                        "درهم" to "AED", "ریال عمان" to "OMR", "لاری" to "GEL").forEach { (label, code) ->
+                        FilterChip(selected = priceCurrency == code, onClick = { priceCurrency = code },
+                            label = { Text(label) })
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(minPrice, { minPrice = it.filter(Char::isDigit) },
-                        label = { Text("قیمت از (واحد ذخیره)") }, modifier = Modifier.weight(1f), singleLine = true)
+                        label = { Text(if (priceCurrency == "IRR") "قیمت از (تومان)" else "قیمت از ($priceCurrency)") }, modifier = Modifier.weight(1f), singleLine = true)
                     OutlinedTextField(maxPrice, { maxPrice = it.filter(Char::isDigit) },
-                        label = { Text("قیمت تا (واحد ذخیره)") }, modifier = Modifier.weight(1f), singleLine = true)
+                        label = { Text(if (priceCurrency == "IRR") "قیمت تا (تومان)" else "قیمت تا ($priceCurrency)") }, modifier = Modifier.weight(1f), singleLine = true)
                 }
                 Text("وضعیت خودرو", fontSize = 12.sp)
                 Row(Modifier.horizontalScroll(rememberScrollState()),
@@ -804,9 +817,9 @@ private fun ListingsPanel(
                 TextButton(onClick = {
                     brandFilter = ""; cityFilter = ""; minYear = ""; maxYear = ""
                     minMileage = ""; maxMileage = ""; minPrice = ""; maxPrice = ""
-                    statusFilter = "همه"; negotiableOnly = false
+                    statusFilter = "همه"; priceCurrency = "IRR"; negotiableOnly = false
                 }) { Text("پاک‌کردن فیلترها") }
-                Text("فیلترها فعلاً روی آگهی‌های بارگذاری‌شده اعمال می‌شوند؛ قیمت‌ها در ارزهای مختلف قابل مقایسه مستقیم نیستند.",
+                Text("فیلترها روی آگهی‌های بارگذاری‌شده اعمال می‌شوند. محدوده قیمت فقط آگهی‌های هم‌ارز را نشان می‌دهد و ریال به تومان تبدیل می‌شود.",
                     color = Color.Gray, fontSize = 11.sp)
             }
         }
