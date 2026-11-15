@@ -292,7 +292,7 @@ private fun PelakNativeApp() {
                 }
             },
             confirmButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.End) {
                     if (car.userId == session?.userId && car.listingStatus == "draft") {
                         Button(onClick = { editing = car; selected = null; tab = 2 }) {
                             Text("ویرایش پیش‌نویس")
@@ -319,7 +319,7 @@ private fun PelakNativeApp() {
                             }) { Text("پیامک") }
                         }
                         TextButton(onClick = {
-                            val url = "https://pelakauto.com/?listing=" + Uri.encode(car.id)
+                            val url = "https://pelakauto.com/" // Deep-link route requires website support before enabling
                             val message = car.title + "\n" + car.priceLabel() + "\n" + url
                             context.startActivity(Intent.createChooser(
                                 Intent(Intent.ACTION_SEND).apply {
