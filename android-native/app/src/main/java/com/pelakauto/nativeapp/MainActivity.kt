@@ -1013,6 +1013,7 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
         val space = (8 - savedPhotoPaths.size).coerceAtLeast(0)
         photoUris = (photoUris + selected).distinct().take(space)
     }
+    var step by rememberSaveable(editing?.id) { mutableIntStateOf(0) }
     var working by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
     LazyColumn(
@@ -1021,15 +1022,28 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Text(if (editing == null) "ثبت پیش‌نویس آگهی" else "ویرایش پیش‌نویس",
+            Text(if (editing == null) "ثبت آگهی خودرو" else "ویرایش آگهی",
                 fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Navy)
             Text("ثبت مستقیم در Supabase؛ انتشار عمومی پس از بررسی مدیر انجام می‌شود.",
                 fontSize = 12.sp, color = Color.Gray)
         }
+        item {
+            Text("مرحله ${step + 1} از ۳", fontWeight = FontWeight.Bold, color = Navy)
+            LinearProgressIndicator(progress = { (step + 1) / 3f }, modifier = Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                listOf("مشخصات", "قیمت و موقعیت", "عکس و ثبت").forEachIndexed { index, label ->
+                    Text(label, fontSize = 11.sp,
+                        color = if (index == step) Navy else Color.Gray)
+                }
+            }
+        }
+        if (step == 0) {
         item { NativeField("عنوان آگهی", title) { title = it } }
         item { NativeField("برند خودرو", make) { make = it } }
         item { NativeField("مدل خودرو", model) { model = it } }
         item { NativeField("سال ساخت میلادی", year, KeyboardType.Number) { year = it } }
+        }
+        if (step == 1) {
         item { NativeField("کشور", country) { country = it } }
         item { NativeField("شهر", city) { city = it } }
         item {
@@ -1047,6 +1061,8 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
         if (!negotiable) item {
             NativeField("قیمت به تومان", price, KeyboardType.Number) { price = it }
         }
+        }
+        if (step == 2) {
         item {
             Text("عکس‌های خودرو: " + savedPhotoPaths.size + " ذخیره‌شده، " +
                 photoUris.count { it.toString() !in uploadedUris } + " انتخاب‌شده",
@@ -1070,7 +1086,29 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                 }
             }
         }
+        }
         item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (step > 0) OutlinedButton(onClick = { step-- }, enabled = !working) {
+                    Text("مرحله قبل")
+                }
+                if (step < 2) Button(onClick = {
+                    val y = year.toIntOrNull()
+                    val p = price.replace(",", "").trim().toBigDecimalOrNull()
+                    info = when {
+                        step == 0 && (title.isBlank() || make.isBlank() || model.isBlank() ||
+                            y == null || y !in 1950..2100) ->
+                            "عنوان، برند، مدل و سال ساخت معتبر را وارد کن."
+                        step == 1 && (country.isBlank() || phone.isBlank() ||
+                            (!negotiable && (p == null || p <= BigDecimal.ZERO))) ->
+                            "کشور، شماره تماس و قیمت معتبر را وارد کن."
+                        else -> ""
+                    }
+                    if (info.isBlank()) step++
+                }, enabled = !working) { Text("مرحله بعد") }
+            }
+        }
+        if (step == 2) item {
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !working,
