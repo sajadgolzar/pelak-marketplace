@@ -82,7 +82,7 @@
     }
     render();
     // This value is bumped together with pelak-release.json when the web bundle changes.
-    const bundledWebVersion = '2026-11-15.1';
+    const bundledWebBuild = 1;
     const updateBar = document.createElement('div');
     updateBar.id = 'pelakWebUpdateBar';
     updateBar.setAttribute('role', 'status');
@@ -101,8 +101,8 @@
         const response = await fetch('./pelak-release.json?t=' + Date.now(), { cache: 'no-store' });
         if (!response.ok) throw new Error('manifest');
         const info = (await response.json()).web;
-        if (!info || typeof info.version !== 'string') throw new Error('version');
-        if (info.version !== bundledWebVersion) {
+        if (!info || !Number.isInteger(info.build)) throw new Error('version');
+        if (info.build > bundledWebBuild) {
           updateBar.querySelector('#pelakWebUpdateText').textContent = info.notes || 'نسخه جدید پلاک آماده است.';
           updateBar.style.display = 'block';
         } else if (manual) {
