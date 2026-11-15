@@ -1380,7 +1380,14 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                                 }
                                 onSaved()
                             } catch (_: Exception) {
-                                info = "ذخیره کامل نشد. پیش‌نویس ثبت‌شده محفوظ است؛ برای عکس‌ها دوباره تلاش کن."
+                                val pendingPhotos = photoUris.count { it.toString() !in uploadedUris }
+                                info = if (draftId == null) {
+                                    "ثبت پیش‌نویس انجام نشد؛ اتصال اینترنت و اطلاعات آگهی را بررسی کن و دوباره تلاش کن."
+                                } else if (pendingPhotos > 0) {
+                                    "پیش‌نویس با شناسه ${draftId} ذخیره شده، اما ${pendingPhotos} عکس هنوز متصل نشده است. دوباره ذخیره را بزن؛ عکس‌های قبلی تکراری بارگذاری نمی‌شوند."
+                                } else {
+                                    "ذخیره آگهی کامل نشد؛ پیش‌نویس موجود است. دوباره تلاش کن."
+                                }
                             } finally { working = false }
                         }
                     }
