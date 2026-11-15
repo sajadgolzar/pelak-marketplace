@@ -361,6 +361,20 @@ internal class PelakApi {
                     .put("p_details", details.trim()), session.accessToken)
             Unit
         }
+    suspend fun myRevisionReasons(session: PelakSession): Map<String, String> =
+        withContext(Dispatchers.IO) {
+            val rows = JSONArray(perform(
+                "/rest/v1/pelak_listing_rejections?select=listing_id,reason,review_state" +
+                    "&owner_id=eq." + Uri.encode(session.userId) +
+                    "&review_state=eq.needs_revision",
+                jwt = session.accessToken
+            ))
+            (0 until rows.length()).associate { index ->
+                val item = rows.getJSONObject(index)
+                item.getString("listing_id") to item.optString("reason", "نیازمند اصلاح")
+            }
+        }
+
     suspend fun cancelMyListing(session: PelakSession, listingId: String) =
         withContext(Dispatchers.IO) {
             val result = perform("/rest/v1/rpc/pelak_cancel_my_listing", "POST",
