@@ -7,6 +7,7 @@ on:
       - feature/native-v02-2026-11-15
       - feature/native-listing-actions-2026-11-15
       - feature/update-notices-2026-11-15
+      - feature/android-release-signing-push-2026-11-15
     paths:
       - 'android-native/**'
       - '.github/workflows/android-native-preview.yml'
@@ -53,7 +54,7 @@ jobs:
       # Do not silently replace the public download when source code changes.
       # Publishing is a separate, manually approved release step after device QA.
       - name: Publish native preview APK for direct download on PELAK site
-        if: github.ref == 'refs/heads/main'
+        if: ${{ false }}
         run: |
           set -euo pipefail
           mkdir -p downloads

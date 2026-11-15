@@ -69,10 +69,19 @@ class PelakMessagingService : FirebaseMessagingService() {
         super.onMessageReceived(message)
         // An unregister request may race with an already queued FCM delivery.
         // Never display account-specific alerts after local sign-out.
-        if (PelakSessionStore(this).load() == null) return
+        val updateNotice = message.data["kind"] == "app_update"
+        if (!updateNotice && PelakSessionStore(this).load() == null) return
+        // An update notice must point only to our pinned site. The app never opens
+        // a URL supplied by a push payload.
+        if (updateNotice) {
+            val announcedCode = message.data["version_code"]?.toIntOrNull() ?: return
+            if (announcedCode <= BuildConfig.VERSION_CODE) return
+        }
         PelakPush.initialize(this)
-        val title = message.notification?.title ?: "اعلان پلاک"
-        val body = message.notification?.body ?: "برای بررسی پیام جدید به پلاک برگرد."
+        val title = if (updateNotice) "نسخه جدید پلاک آماده است"
+            else message.notification?.title ?: "اعلان پلاک"
+        val body = if (updateNotice) "برای دریافت نسخه جدید، وارد پلاک شو و بررسی به‌روزرسانی را بزن."
+            else message.notification?.body ?: "برای بررسی پیام جدید به پلاک برگرد."
         val launch = Intent(this, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or
