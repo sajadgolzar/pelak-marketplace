@@ -104,7 +104,10 @@ Deno.serve(async req=>{
         if(after.error || (after.data||[]).length){failed++;continue}
         const marked=await db.from("listings").update({
           image_paths:[],media_purged_at:new Date().toISOString(),updated_at:new Date().toISOString()
-        }).eq("id",row.id).eq("listing_status","archived").select("id");
+        }).eq("id",row.id).eq("listing_status","archived")
+          .in("archive_reason",["expired","cancelled","revision_timeout"])
+          .lte("purge_after",now).is("media_purged_at",null)
+          .select("id");
         if(marked.error||(marked.data||[]).length!==1){failed++;continue}
 
         // Foreign-key RESTRICT protects conversations: keep the record if messages exist.
