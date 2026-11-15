@@ -70,13 +70,13 @@ class MainActivity : ComponentActivity() {
 
 private data class ChatTarget(val listingId: String, val peerId: String, val title: String)
 
-private val nav = listOf(
-    "آگهی‌ها" to "🚘",
-    "جست‌وجو" to "⌕",
-    "ثبت آگهی" to "＋",
-    "آگهی‌های من" to "▣",
-    "حساب من" to "♙",
-    "پیام‌ها" to "✉"
+private // Visible navigation is five tabs; internal routes 1, 3 and 7 remain accessible.
+val nav = listOf(
+    Triple("آگهی‌ها", "🚘", 0),
+    Triple("نشان‌ها", "☆", 6),
+    Triple("ثبت آگهی", "＋", 2),
+    Triple("چت", "✉", 5),
+    Triple("پلاک من", "♙", 4)
 )
 
 @Composable
@@ -274,12 +274,15 @@ private fun PelakNativeApp() {
         },
         bottomBar = {
             NavigationBar(containerColor = Color.White) {
-                nav.forEachIndexed { index, item ->
+                nav.forEach { item ->
                     NavigationBarItem(
-                        selected = tab == index,
+                        selected = tab == item.third ||
+                            (tab == 1 && item.third == 0) ||
+                            (tab == 3 && item.third == 4) ||
+                            (tab == 7 && item.third == 4),
                         onClick = {
-                            if (index == 2 && tab != 2) editing = null
-                            tab = index
+                            if (item.third == 2 && tab != 2) editing = null
+                            tab = item.third
                         },
                         icon = { Text(item.second, fontSize = 21.sp) },
                         label = { Text(item.first, fontSize = 9.sp, maxLines = 1) }
