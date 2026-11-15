@@ -12,6 +12,8 @@ on:
       - 'pelak-listing-review.js'
       - 'index.html'
       - 'pelak-platform-downloads.js'
+      - 'pelak-visual-polish.js'
+      - 'pelak-visual-polish.css'
   pull_request:
     paths:
       - '.github/workflows/pelak-web-sanity.yml'
@@ -23,6 +25,8 @@ on:
       - 'pelak-listing-review.js'
       - 'index.html'
       - 'pelak-platform-downloads.js'
+      - 'pelak-visual-polish.js'
+      - 'pelak-visual-polish.css'
 permissions:
   contents: read
 jobs:
@@ -37,7 +41,7 @@ jobs:
       - name: Verify JS parses
         run: |
           set -euo pipefail
-          for f in pelak-simple.js pelak-android-bridge.js pelak-sw.js pelak-analytics.js pelak-listing-reports.js pelak-listing-review.js pelak-platform-downloads.js; do
+          for f in pelak-simple.js pelak-android-bridge.js pelak-sw.js pelak-analytics.js pelak-listing-reports.js pelak-listing-review.js pelak-platform-downloads.js pelak-visual-polish.js; do
             node --check "$f"
           done
       - name: Verify website entrypoints exist
@@ -47,3 +51,14 @@ jobs:
           test -s pelak-simple.css
           test -s manifest.webmanifest
           test -s pelak-sw.js
+      - name: Verify approved banner-free layout and visual polish assets
+        run: |
+          set -euo pipefail
+          test -s pelak-visual-polish.css
+          test -s pelak-visual-polish.js
+          grep -Fq 'src="./pelak-visual-polish.js?v=1"' index.html
+          grep -Fq 'href="./pelak-visual-polish.css?v=1"' index.html
+          if grep -Fq 'class="pelak-sales-banner"' index.html; then
+            echo 'Unexpected marketing banner found in approved compact layout' >&2
+            exit 1
+          fi
