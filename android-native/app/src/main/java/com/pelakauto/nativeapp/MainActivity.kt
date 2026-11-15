@@ -1220,6 +1220,7 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
     var savedPhotoPaths by remember(editing?.id) { mutableStateOf(editing?.imagePaths.orEmpty()) }
     var uploadedUris by remember(editing?.id) { mutableStateOf<Set<String>>(emptySet()) }
     var draftId by remember(editing?.id) { mutableStateOf(editing?.id) }
+    var pickerNotice by remember { mutableStateOf("") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { selected ->
         val space = (8 - savedPhotoPaths.size).coerceAtLeast(0)
         val merged = (photoUris + selected).distinct()
@@ -1230,7 +1231,6 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
     var working by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
     var uploadProgress by remember { mutableStateOf("") }
-    var pickerNotice by remember { mutableStateOf("") }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
