@@ -655,6 +655,8 @@ private fun AccountPanel(
         return
     }
     val scope = rememberCoroutineScope()
+    var emailLocale by rememberSaveable { mutableStateOf("fa") }
+    val emailLanguages = listOf("fa" to "فارسی", "en" to "English", "ar" to "العربية", "ka" to "ქართული")
     var email by rememberSaveable { mutableStateOf("") }
     var otp by rememberSaveable { mutableStateOf("") }
     var sent by rememberSaveable { mutableStateOf(false) }
@@ -664,6 +666,19 @@ private fun AccountPanel(
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("ورود / ثبت‌نام پلاک", fontWeight = FontWeight.Bold, color = Navy, fontSize = 21.sp)
         Text("با ایمیل خود کد ورود یک‌بارمصرف دریافت کن.", color = Color.Gray)
+        Text("زبان ایمیل ورود", color = Navy)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            emailLanguages.forEach { (code, label) ->
+                FilterChip(
+                    selected = emailLocale == code,
+                    onClick = {
+                        if (!sent) emailLocale = code
+                    },
+                    enabled = !sent && !busy,
+                    label = { Text(label, fontSize = 11.sp) }
+                )
+            }
+        }
         OutlinedTextField(value = email, onValueChange = {
             email = it
             if (sent && it.trim() != sentToEmail) { sent = false; otp = ""; sentToEmail = "" }
@@ -684,7 +699,7 @@ private fun AccountPanel(
                     busy = true; info = ""
                     try {
                         if (!sent) {
-                            api.sendOtp(email)
+                            api.sendOtp(email, emailLocale)
                             sentToEmail = email.trim()
                             sent = true
                             info = "کد به ایمیلت ارسال شد."
@@ -702,7 +717,7 @@ private fun AccountPanel(
             scope.launch {
                 busy = true; info = ""
                 try {
-                    api.sendOtp(sentToEmail)
+                    api.sendOtp(sentToEmail, emailLocale)
                     otp = ""
                     info = "درخواست ارسال مجدد ثبت شد؛ ایمیل را بررسی کن."
                 } catch (_: Exception) {
