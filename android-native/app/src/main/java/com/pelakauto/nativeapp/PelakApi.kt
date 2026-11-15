@@ -155,6 +155,16 @@ internal class PelakApi {
         } catch (_: Exception) { null }
     }
 
+    suspend fun publishedByIds(ids: List<String>): List<Car> = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext emptyList()
+        val valid = ids.filter { it.matches(Regex("[0-9a-fA-F-]{36}")) }.distinct().take(50)
+        if (valid.isEmpty()) return@withContext emptyList()
+        val rows = parseCars(perform("/rest/v1/listings?select=" + carFields +
+            "&listing_status=eq.published&id=in.(" + valid.joinToString(",") + ")"))
+        val order = valid.withIndex().associate { it.value to it.index }
+        rows.sortedBy { order[it.id] ?: Int.MAX_VALUE }
+    }
+
     // Favorites are stored in the existing RLS-protected pelak_favorites table.
     suspend fun favoriteIds(session: PelakSession): Set<String> = withContext(Dispatchers.IO) {
         val rows = JSONArray(perform("/rest/v1/pelak_favorites?select=listing_id&user_id=eq." +
