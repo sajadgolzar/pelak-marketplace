@@ -114,7 +114,8 @@ Deno.serve(async req=>{
         const deleted=await db.from("listings").delete()
           .eq("id",row.id).eq("listing_status","archived")
           .in("archive_reason",["expired","cancelled","revision_timeout"])
-          .not("media_purged_at","is",null).select("id");
+          .not("media_purged_at","is",null)
+          .eq("image_paths","{}").select("id");
         if(deleted.error||(deleted.data||[]).length!==1){retained++;continue}
         removed++;
       }catch(_){failed++}
@@ -125,7 +126,8 @@ Deno.serve(async req=>{
       .eq("listing_status","archived")
       .in("archive_reason",["expired","cancelled","revision_timeout"])
       .lte("purge_after",now)
-      .not("media_purged_at","is",null).limit(20);
+      .not("media_purged_at","is",null)
+      .eq("image_paths","{}").limit(20);
     if(pending.error)throw Error("final deletion queue unavailable");
     for(const row of pending.data||[]){
       if(!uuid.test(row.id))continue;
@@ -139,7 +141,8 @@ Deno.serve(async req=>{
         const deleted=await db.from("listings").delete()
           .eq("id",row.id).eq("listing_status","archived")
           .in("archive_reason",["expired","cancelled","revision_timeout"])
-          .not("media_purged_at","is",null).select("id");
+          .not("media_purged_at","is",null)
+          .eq("image_paths","{}").select("id");
         if(deleted.error||(deleted.data||[]).length!==1){failed++;continue}
         removed++;
       }catch(_){failed++}
