@@ -1,0 +1,65 @@
+name: Create encrypted PELAK signing-key backup (one time)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  create-encrypted-backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check owner-provided secrets
+        env:
+          STORE_PASSWORD: ${{ secrets.PELAK_ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.PELAK_ANDROID_KEY_PASSWORD }}
+          BACKUP_PASSWORD: ${{ secrets.PELAK_ANDROID_BACKUP_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.PELAK_ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          for key in STORE_PASSWORD KEY_PASSWORD BACKUP_PASSWORD KEY_ALIAS; do
+            if [ -z "${!key}" ]; then echo "::error::Missing GitHub Actions secret $key"; exit 1; fi
+          done
+          if [ "${#BACKUP_PASSWORD}" -lt 20 ]; then
+            echo "::error::Backup password must be at least 20 characters"; exit 1
+          fi
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Generate keystore and encrypt backup before upload
+        env:
+          STORE_PASSWORD: ${{ secrets.PELAK_ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.PELAK_ANDROID_KEY_PASSWORD }}
+          BACKUP_PASSWORD: ${{ secrets.PELAK_ANDROID_BACKUP_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.PELAK_ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/pelak-key"
+          trap 'rm -f "$RUNNER_TEMP/pelak-key/release.jks"' EXIT
+          keytool -genkeypair -noprompt \
+            -keystore "$RUNNER_TEMP/pelak-key/release.jks" \
+            -storetype PKCS12 \
+            -alias "$KEY_ALIAS" \
+            -keyalg RSA -keysize 3072 -validity 10000 \
+            -dname "CN=PELAK Android Release, O=PELAK, C=IR" \
+            -storepass:env STORE_PASSWORD -keypass:env KEY_PASSWORD
+          keytool -list -v -keystore "$RUNNER_TEMP/pelak-key/release.jks" \
+            -storepass:env STORE_PASSWORD | grep -E 'Alias name:|SHA256:' \
+            > "$RUNNER_TEMP/pelak-key/certificate-fingerprint.txt"
+          openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
+            -in "$RUNNER_TEMP/pelak-key/release.jks" \
+            -out "$RUNNER_TEMP/pelak-key/PELAK-android-release.jks.enc" \
+            -pass env:BACKUP_PASSWORD
+          test -s "$RUNNER_TEMP/pelak-key/PELAK-android-release.jks.enc"
+          rm -f "$RUNNER_TEMP/pelak-key/release.jks"
+          echo 'Encrypted backup generated; NEVER rerun after distributing a signed APK.' >> "$RUNNER_TEMP/pelak-key/certificate-fingerprint.txt"
+      - name: Upload encrypted backup only
+        uses: actions/upload-artifact@v4
+        with:
+          name: pelak-encrypted-signing-backup
+          path: |
+            ${{ runner.temp }}/pelak-key/PELAK-android-release.jks.enc
+            ${{ runner.temp }}/pelak-key/certificate-fingerprint.txt
+          retention-days: 7
+          if-no-files-found: error
