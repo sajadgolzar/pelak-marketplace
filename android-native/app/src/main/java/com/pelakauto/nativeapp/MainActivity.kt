@@ -132,14 +132,23 @@ private fun PelakNativeApp() {
     }
     LaunchedEffect(tab, search) {
         if (tab == 1) {
+            searchLoading = true
+            val requestedSearch = search
             delay(320)
             searchLoading = true
             searchError = null
             try {
-                searched = api.published(search)
-                searchHasMore = searched.size == 100
-            } catch (_: Exception) { searchError = "خطای جست‌وجوی سرور؛ دوباره تلاش کن." }
-            finally { searchLoading = false }
+                val results = api.published(requestedSearch)
+                if (tab == 1 && search == requestedSearch) {
+                    searched = results
+                    searchHasMore = results.size == 100
+                }
+            } catch (_: Exception) {
+                if (tab == 1 && search == requestedSearch)
+                    searchError = "خطای جست‌وجوی سرور؛ دوباره تلاش کن."
+            } finally {
+                if (tab == 1 && search == requestedSearch) searchLoading = false
+            }
         }
     }
 
