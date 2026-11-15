@@ -89,7 +89,7 @@ private fun PelakNativeApp() {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var cars by remember { mutableStateOf<List<Car>>(emptyList()) }
     var mine by remember { mutableStateOf<List<Car>>(emptyList()) }
-    var revisionReasons by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var revisionReasons by remember { mutableStateOf<Map<String, PelakApi.RevisionNotice>>(emptyMap()) }
     var loading by remember { mutableStateOf(true) }
     var mineLoading by remember { mutableStateOf(false) }
     var mineHasMore by remember { mutableStateOf(false) }
@@ -494,7 +494,24 @@ private fun PelakNativeApp() {
                     }
                     if (car.userId == session?.userId) {
                         if (car.id in revisionReasons && car.listingStatus == "draft") {
-                            Text("علت بازگشت: " + revisionReasons[car.id].orEmpty(), color = Gold)
+                            val notice = revisionReasons[car.id]!!
+                            Text("علت بازگشت: " + notice.reason, color = Gold)
+                            notice.deleteAfter?.let { deadline ->
+                                val deadlineMs = runCatching {
+                                    java.time.Instant.parse(deadline).toEpochMilli()
+                                }.getOrNull()
+                                if (deadlineMs != null) {
+                                    val days = kotlin.math.ceil(
+                                        (deadlineMs - System.currentTimeMillis()) / 86400000.0
+                                    ).toInt()
+                                    Text(if (days > 0) "مهلت اصلاح: $days روز باقی مانده" else
+                                        "مهلت اصلاح به پایان رسیده؛ ارسال مجدد ممکن نیست.",
+                                        color = if (days > 0) Gold else MaterialTheme.colorScheme.error,
+                                        fontSize = 12.sp)
+                                } else {
+                                    Text("آخرین مهلت اصلاح: $deadline", fontSize = 12.sp)
+                                }
+                            }
                             TextButton(onClick = { editing = car; selected = null; tab = 2 }) {
                                 Text("اصلاح آگهی")
                             }
