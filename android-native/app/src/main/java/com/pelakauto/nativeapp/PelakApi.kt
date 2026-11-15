@@ -300,6 +300,16 @@ internal class PelakApi {
                     .put("p_recipient_id", recipientId).put("p_body", body.trim()), session.accessToken)
             Unit
         }
+    suspend fun reportListing(session: PelakSession, listingId: String, category: String, details: String) =
+        withContext(Dispatchers.IO) {
+            require(category in setOf("fraud", "incorrect", "wrong_photos", "duplicate", "suspicious_contact", "other"))
+            require(details.trim().length in 10..1200)
+            perform("/rest/v1/rpc/pelak_report_listing", "POST",
+                JSONObject().put("p_listing_id", listingId)
+                    .put("p_category", category)
+                    .put("p_details", details.trim()), session.accessToken)
+            Unit
+        }
     suspend fun registerPush(session: PelakSession, token: String) = withContext(Dispatchers.IO) {
         perform("/rest/v1/rpc/pelak_register_android_push", "POST",
             JSONObject().put("p_token", token), session.accessToken)
