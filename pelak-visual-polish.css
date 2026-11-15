@@ -253,3 +253,16 @@ footer.foot #pelakPlatformFooter .pelak-platform-icon{color:#f8fafc!important}
     min-height:41px!important;padding:8px 12px!important;font-size:12px!important
   }
 }
+
+/* Mobile screenshot follow-up: compact app introduction and balanced shortcut badge. */
+@media(max-width:620px){
+  #apps .app-panel{padding:17px 16px!important;border-radius:17px!important;min-height:0!important}
+  #apps .app-panel h2,#apps .app-panel h3{font-size:21px!important;line-height:1.45!important;margin:5px 0 8px!important}
+  #apps .app-panel p{font-size:12px!important;line-height:1.85!important;margin:6px 0 10px!important}
+  #apps .app-actions{margin-top:9px!important}
+  #apps .pelak-platform-grid{margin:9px 0 0!important;gap:7px!important}
+  #apps .pelak-platform-choice{min-height:94px!important;padding:9px 4px!important}
+  #apps .pelak-platform-choice small{font-size:10px!important}
+  #apps .app-panel [aria-label="بستن"],#apps .app-panel .close-btn{width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;padding:7px!important}
+  .pelak-shortcuts > button.pv-shortcut .pelak-fav-total{top:5px!important;left:5px!important;min-width:18px!important;height:18px!important;font-size:10px!important}
+}
