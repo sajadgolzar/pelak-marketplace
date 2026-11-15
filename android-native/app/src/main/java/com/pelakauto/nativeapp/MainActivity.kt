@@ -203,7 +203,7 @@ private fun PelakNativeApp() {
                     Text("پلاک | PELAK", color = Navy, fontWeight = FontWeight.Bold, fontSize = 21.sp)
                     Text("خودروی بعدی تو، اینجاست.", fontSize = 11.sp, color = Color.Gray)
                 }
-                Text("نسخه بومی آزمایشی", color = Navy, fontSize = 11.sp)
+                NativeUpdateChecker()
             }
         },
         bottomBar = {
