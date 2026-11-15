@@ -221,16 +221,29 @@ private fun PelakNativeApp() {
                         hasMore = if (tab == 0) homeHasMore else searchHasMore,
                         moreLoading = moreLoading,
                         onLoadMore = {
-                            if (!moreLoading) scope.launch {
-                                moreLoading = true
-                                try {
-                                    val start = if (tab == 0) cars.size else searched.size
-                                    val next = api.published(if (tab == 0) "" else search, start)
-                                    if (tab == 0) { cars = (cars + next).distinctBy { it.id }; homeHasMore = next.size == 100 }
-                                    else { searched = (searched + next).distinctBy { it.id }; searchHasMore = next.size == 100 }
-                                } catch (_: Exception) {
-                                    android.widget.Toast.makeText(context, "دریافت آگهی‌های بیشتر ناموفق بود؛ دوباره تلاش کن.", android.widget.Toast.LENGTH_SHORT).show()
-                                } finally { moreLoading = false }
+                            if (!moreLoading) {
+                                val requestedTab = tab
+                                val requestedSearch = if (requestedTab == 0) "" else search
+                                val start = if (requestedTab == 0) cars.size else searched.size
+                                scope.launch {
+                                    moreLoading = true
+                                    try {
+                                        val next = api.published(requestedSearch, start)
+                                        // Ignore a stale response if the user switched tabs or changed the query.
+                                        if (tab == requestedTab && (requestedTab == 0 || search == requestedSearch)) {
+                                            if (requestedTab == 0) {
+                                                cars = (cars + next).distinctBy { it.id }
+                                                homeHasMore = next.size == 100
+                                            } else {
+                                                searched = (searched + next).distinctBy { it.id }
+                                                searchHasMore = next.size == 100
+                                            }
+                                        }
+                                    } catch (_: Exception) {
+                                        if (tab == requestedTab && (requestedTab == 0 || search == requestedSearch))
+                                            android.widget.Toast.makeText(context, "دریافت آگهی‌های بیشتر ناموفق بود؛ دوباره تلاش کن.", android.widget.Toast.LENGTH_SHORT).show()
+                                    } finally { moreLoading = false }
+                                }
                             }
                         },
                         onSearchChange = { search = it },
