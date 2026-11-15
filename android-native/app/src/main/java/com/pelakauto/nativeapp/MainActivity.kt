@@ -92,6 +92,7 @@ private fun PelakNativeApp() {
     var mineLoading by remember { mutableStateOf(false) }
     var mineHasMore by remember { mutableStateOf(false) }
     var mineMoreLoading by remember { mutableStateOf(false) }
+    var mineMoreError by remember { mutableStateOf<String?>(null) }
     var mineError by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
@@ -154,7 +155,13 @@ private fun PelakNativeApp() {
     fun refreshMine(current: PelakSession) {
         scope.launch {
             mineLoading = true
-            try { mine = api.mine(current); mineHasMore = mine.size == 100; mineError = null }
+            try {
+                val result = api.mine(current)
+                if (session?.userId == current.userId) {
+                    mine = result; mineHasMore = result.size == 100
+                    mineError = null; mineMoreError = null
+                }
+            }
             catch (_: Exception) { mineError = "دریافت آگهی‌های من ناموفق بود. دوباره تلاش کن." }
             finally { mineLoading = false }
         }
@@ -253,6 +260,7 @@ private fun PelakNativeApp() {
                         onRefresh = { session?.let(::refreshMine) },
                         hasMore = mineHasMore,
                         moreLoading = mineMoreLoading,
+                        moreError = mineMoreError,
                         onLoadMore = {
                             val active = session
                             if (active != null && !mineMoreLoading) scope.launch {
@@ -262,10 +270,10 @@ private fun PelakNativeApp() {
                                     if (session?.userId == active.userId) {
                                         mine = (mine + next).distinctBy { it.id }
                                         mineHasMore = next.size == 100
-                                        mineError = null
+                                        mineMoreError = null
                                     }
                                 } catch (_: Exception) {
-                                    mineError = "دریافت آگهی‌های بیشتر ناموفق بود؛ دوباره تلاش کن."
+                                    mineMoreError = "دریافت آگهی‌های بیشتر ناموفق بود؛ دوباره تلاش کن."
                                 } finally { mineMoreLoading = false }
                             }
                         },
@@ -279,7 +287,7 @@ private fun PelakNativeApp() {
                     onLogin = { saveSession(it); tab = 3 },
                     onLogout = {
                         val current = session
-                        session = null; store.clear(); mine = emptyList(); mineHasMore = false; mineError = null; tab = 0
+                        session = null; store.clear(); mine = emptyList(); mineHasMore = false; mineError = null; mineMoreError = null; tab = 0
                         if (current != null) scope.launch {
                             val token = PelakPush.lastToken(context)
                             if (!token.isNullOrBlank()) runCatching { api.unregisterPush(current, token) }
@@ -453,6 +461,7 @@ private fun ListingsPanel(
     session: PelakSession? = null,
     hasMore: Boolean = false,
     moreLoading: Boolean = false,
+    moreError: String? = null,
     onLoadMore: () -> Unit = {},
     onSearchChange: (String) -> Unit,
     onRefresh: () -> Unit,
@@ -516,6 +525,7 @@ private fun ListingsPanel(
                     CarRow(car = car, session = session, onClick = { onSelect(car) })
                 }
                 if (hasMore) item {
+                    if (moreError != null) Text(moreError, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                     Button(onClick = onLoadMore, enabled = !moreLoading,
                         modifier = Modifier.fillMaxWidth()) {
                         Text(if (moreLoading) "در حال دریافت…" else "نمایش آگهی‌های بیشتر")
