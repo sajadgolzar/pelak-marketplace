@@ -223,20 +223,26 @@ internal class PelakApi {
 
     private fun listingPayload(
         title: String, make: String, model: String, year: Int, priceRials: String?,
-        country: String, city: String, phone: String
+        country: String, city: String, phone: String, trim: String = "", mileageKm: Int? = null,
+        description: String = "", vehicleStatus: String = "ready"
     ): JSONObject = JSONObject()
         .put("title", title.trim()).put("make", make.trim()).put("model", model.trim())
         .put("year", year).put("currency", "IRR")
+        .put("trim", trim.trim()).put("mileage_km", mileageKm ?: JSONObject.NULL)
+        .put("description", description.trim())
         .put("country", country.trim()).put("city", city.trim())
-        .put("vehicle_status", "ready").put("seller_phone", phone.trim())
+        .put("vehicle_status", vehicleStatus).put("seller_phone", phone.trim())
         .put("seller_contact_consent", true)
         .put("price_negotiable", priceRials == null)
         .put("price", if (priceRials == null) JSONObject.NULL else BigDecimal(priceRials))
     suspend fun createDraft(
         session: PelakSession, title: String, make: String, model: String,
-        year: Int, priceRials: String?, country: String, city: String, phone: String
+        year: Int, priceRials: String?, country: String, city: String, phone: String,
+        trim: String = "", mileageKm: Int? = null, description: String = "",
+        vehicleStatus: String = "ready"
     ): String = withContext(Dispatchers.IO) {
-        val payload = listingPayload(title, make, model, year, priceRials, country, city, phone)
+        val payload = listingPayload(title, make, model, year, priceRials, country, city, phone,
+            trim, mileageKm, description, vehicleStatus)
             .put("user_id", session.userId).put("listing_status", "draft")
         val row = JSONArray(perform("/rest/v1/listings", "POST", payload, session.accessToken))
         if (row.length() == 0) throw IllegalStateException("پیش‌نویس ذخیره نشد")
@@ -244,9 +250,12 @@ internal class PelakApi {
     }
     suspend fun updateDraft(
         session: PelakSession, id: String, title: String, make: String,
-        model: String, year: Int, priceRials: String?, country: String, city: String, phone: String
+        model: String, year: Int, priceRials: String?, country: String, city: String, phone: String,
+        trim: String = "", mileageKm: Int? = null, description: String = "",
+        vehicleStatus: String = "ready"
     ) = withContext(Dispatchers.IO) {
-        val payload = listingPayload(title, make, model, year, priceRials, country, city, phone)
+        val payload = listingPayload(title, make, model, year, priceRials, country, city, phone,
+            trim, mileageKm, description, vehicleStatus)
         val result = JSONArray(perform("/rest/v1/listings?id=eq." + Uri.encode(id) +
             "&user_id=eq." + session.userId + "&listing_status=eq.draft",
             "PATCH", payload, session.accessToken))
