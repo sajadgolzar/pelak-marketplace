@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
+import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -106,6 +107,7 @@ private fun PelakNativeApp() {
     var error by remember { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
     var selected by remember { mutableStateOf<Car?>(null) }
+    var expandedPhoto by remember { mutableStateOf<Pair<Car, Int>?>(null) }
     var reporting by remember { mutableStateOf<Car?>(null) }
     var session by remember { mutableStateOf<PelakSession?>(store.load()) }
     var editing by remember { mutableStateOf<Car?>(null) }
@@ -445,6 +447,26 @@ private fun PelakNativeApp() {
         }
     }
 
+    expandedPhoto?.let { (photoCar, photoIndex) ->
+        Dialog(onDismissRequest = { expandedPhoto = null }) {
+            Column(Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(18.dp)).padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(photoCar.title, fontWeight = FontWeight.Bold, color = Navy)
+                CarPhoto(photoCar.imagePaths.getOrNull(photoIndex), photoCar.title,
+                    if (photoCar.userId == session?.userId) session?.accessToken else null,
+                    Modifier.fillMaxWidth().height(350.dp))
+                Text("عکس ${photoIndex + 1} از ${photoCar.imagePaths.size}")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(enabled = photoIndex > 0,
+                        onClick = { expandedPhoto = photoCar to (photoIndex - 1) }) { Text("قبلی") }
+                    TextButton(onClick = { expandedPhoto = null }) { Text("بستن") }
+                    TextButton(enabled = photoIndex < photoCar.imagePaths.lastIndex,
+                        onClick = { expandedPhoto = photoCar to (photoIndex + 1) }) { Text("بعدی") }
+                }
+            }
+        }
+    }
     selected?.let { car ->
         val context = LocalContext.current
         AlertDialog(
@@ -457,9 +479,10 @@ private fun PelakNativeApp() {
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        car.imagePaths.forEach { path ->
+                        car.imagePaths.forEachIndexed { index, path ->
                             CarPhoto(path, car.title, if (car.userId == session?.userId) session?.accessToken else null,
-                                Modifier.size(width = 210.dp, height = 140.dp))
+                                Modifier.size(width = 210.dp, height = 140.dp)
+                                    .clickable { expandedPhoto = car to index })
                         }
                     }
                     Text(car.make + "  " + car.model + "  " + car.trim)
