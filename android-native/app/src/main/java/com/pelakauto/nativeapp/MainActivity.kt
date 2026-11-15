@@ -94,6 +94,7 @@ private fun PelakNativeApp() {
     var error by remember { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
     var selected by remember { mutableStateOf<Car?>(null) }
+    var reporting by remember { mutableStateOf<Car?>(null) }
     var session by remember { mutableStateOf<PelakSession?>(store.load()) }
     var editing by remember { mutableStateOf<Car?>(null) }
     var chatTarget by remember { mutableStateOf<ChatTarget?>(null) }
@@ -332,6 +333,9 @@ private fun PelakNativeApp() {
                                 }
                             }) { Text("پیامک") }
                         }
+                        if (session != null && car.userId != session?.userId) {
+                            TextButton(onClick = { reporting = car; selected = null }) { Text("گزارش آگهی") }
+                        }
                         TextButton(onClick = {
                             val url = "https://pelakauto.com/" // Deep-link route requires website support before enabling
                             val message = car.title + "\n" + car.priceLabel() + "\n" + url
@@ -354,9 +358,69 @@ private fun PelakNativeApp() {
             }
         )
     }
+    reporting?.let { car ->
+        val current = session
+        if (current != null) ReportListingDialog(api, current, car, onClose = { reporting = null })
+    }
     if (chatTarget != null && session != null) {
         ChatDialog(api, session!!, chatTarget!!, onClose = { chatTarget = null })
     }
+}
+
+@Composable
+private fun ReportListingDialog(api: PelakApi, session: PelakSession, car: Car, onClose: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val reasons = listOf(
+        "incorrect" to "مشخصات نادرست",
+        "wrong_photos" to "عکس‌های نامرتبط",
+        "fraud" to "احتمال کلاهبرداری",
+        "duplicate" to "آگهی تکراری",
+        "suspicious_contact" to "اطلاعات تماس مشکوک",
+        "other" to "سایر موارد"
+    )
+    var reason by remember(car.id) { mutableStateOf(reasons.first().first) }
+    var details by remember(car.id) { mutableStateOf("") }
+    var busy by remember(car.id) { mutableStateOf(false) }
+    var error by remember(car.id) { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = { if (!busy) onClose() },
+        title = { Text("گزارش آگهی") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(car.title, fontWeight = FontWeight.Bold)
+                reasons.forEach { (key, label) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = reason == key, onClick = { if (!busy) reason = key })
+                        Text(label, modifier = Modifier.clickable(enabled = !busy) { reason = key })
+                    }
+                }
+                OutlinedTextField(
+                    value = details,
+                    onValueChange = { details = it.take(1200) },
+                    label = { Text("شرح مشکل (۱۰ تا ۱۲۰۰ نویسه)") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy
+                )
+                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = {
+            Button(enabled = !busy && details.trim().length in 10..1200, onClick = {
+                scope.launch {
+                    busy = true
+                    error = ""
+                    try {
+                        api.reportListing(session, car.id, reason, details)
+                        onClose()
+                    } catch (_: Exception) {
+                        error = "ثبت گزارش ناموفق بود؛ اتصال یا محدودیت گزارش را بررسی کن."
+                    } finally { busy = false }
+                }
+            }) { Text(if (busy) "در حال ارسال…" else "ارسال گزارش") }
+        },
+        dismissButton = { TextButton(enabled = !busy, onClick = onClose) { Text("انصراف") } }
+    )
 }
 
 @Composable
