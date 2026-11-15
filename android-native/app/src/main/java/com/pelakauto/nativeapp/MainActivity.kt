@@ -358,6 +358,15 @@ private fun ListingsPanel(
     onPost: () -> Unit,
     title: String = "جدیدترین آگهی‌های خودرو"
 ) {
+    var sortMode by rememberSaveable { mutableStateOf("جدیدترین") }
+    val sortedCars = remember(cars, sortMode) {
+        when (sortMode) {
+            "ارزان‌ترین" -> cars.sortedWith(compareBy<Car> { it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal("999999999999999999999") })
+            "گران‌ترین" -> cars.sortedWith(compareByDescending<Car> { it.price?.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO })
+            "کم‌کارکردترین" -> cars.sortedWith(compareBy<Car> { it.mileageKm ?: Int.MAX_VALUE })
+            else -> cars
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         if (searching) {
             OutlinedTextField(
@@ -376,6 +385,12 @@ private fun ListingsPanel(
             Text(title, color = Navy, fontWeight = FontWeight.Bold)
             TextButton(onClick = onRefresh, enabled = !loading) { Text("↻ تازه‌سازی") }
         }
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("جدیدترین", "ارزان‌ترین", "گران‌ترین", "کم‌کارکردترین").forEach { option ->
+                FilterChip(selected = sortMode == option, onClick = { sortMode = option }, label = { Text(option, fontSize = 12.sp) })
+            }
+        }
+        if (hasMore && sortMode != "جدیدترین") Text("مرتب‌سازی روی آگهی‌های بارگذاری‌شده انجام می‌شود.", modifier = Modifier.padding(horizontal = 16.dp), color = Color.Gray, fontSize = 11.sp)
         if (loading) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
         }
@@ -395,7 +410,7 @@ private fun ListingsPanel(
                 contentPadding = PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(9.dp)
             ) {
-                items(cars, key = { it.id }) { car ->
+                items(sortedCars, key = { it.id }) { car ->
                     CarRow(car = car, session = session, onClick = { onSelect(car) })
                 }
                 if (hasMore) item {
@@ -428,6 +443,10 @@ private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
                     color = Color.Gray, fontSize = 12.sp, maxLines = 1
                 )
                 Text(car.priceLabel(), color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                car.mileageKm?.let { Text("کارکرد " + java.text.NumberFormat.getNumberInstance().format(it) + " کیلومتر", color = Color.Gray, fontSize = 12.sp) }
+                if (car.imagePaths.size > 1) Text(car.imagePaths.size.toString() + " عکس", color = Color.Gray, fontSize = 11.sp)
+                if (car.listingStatus != "published") Text("وضعیت: " + car.listingStatus, color = Gold, fontSize = 11.sp)
+
             }
         }
     }
