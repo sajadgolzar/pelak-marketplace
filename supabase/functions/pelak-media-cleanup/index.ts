@@ -54,12 +54,11 @@ Deno.serve(async req=>{
     if(expired.error)throw Error("expired queue unavailable");
     for(const row of expired.data||[]){
       if(!uuid.test(row.listing_id))continue;
-      const result=await db.from("listings").update({
-        listing_status:"archived",archive_reason:"revision_timeout",
-        archived_at:now,purge_after:now,updated_at:now
-      }).eq("id",row.listing_id).eq("listing_status","draft").select("id");
+      // The RPC locks listing then rejection (same order as resubmission)
+      // and checks the deadline atomically before archiving.
+      const result=await db.rpc("pelak_archive_expired_revision",{p_listing_id:row.listing_id});
       if(result.error){failed++;continue}
-      archived+=(result.data||[]).length;
+      if(result.data===true)archived++;
     }
 
     const due=await db.from("listings")
