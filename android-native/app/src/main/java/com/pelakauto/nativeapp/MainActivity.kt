@@ -1227,6 +1227,7 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
     var step by rememberSaveable(editing?.id) { mutableIntStateOf(0) }
     var working by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
+    var uploadProgress by remember { mutableStateOf("") }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -1353,7 +1354,7 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                         info = "عنوان، برند، مدل، سال، کارکرد، کشور، شهر، شماره بین‌المللی و قیمت را درست وارد کن."
                     } else {
                         scope.launch {
-                            working = true; info = ""
+                            working = true; info = ""; uploadProgress = "در حال ذخیره اطلاعات آگهی…"
                             try {
                                 val rials = if (negotiable) null else
                                     p!!.multiply(BigDecimal.TEN).toPlainString()
@@ -1368,6 +1369,7 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                                 }
                                 for (uri in photoUris) {
                                     if (uri.toString() in uploadedUris) continue
+                                    uploadProgress = "در حال آپلود عکس ${savedPhotoPaths.size + 1} از ۸…"
                                     val path = api.uploadPhoto(session, context.contentResolver, uri)
                                     val next = savedPhotoPaths + path
                                     try { api.attachPhotos(session, id, next) }
@@ -1377,6 +1379,9 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                                     }
                                     savedPhotoPaths = next
                                     uploadedUris = uploadedUris + uri.toString()
+                                    // A successfully attached photo is no longer pending. Keeping it
+                                    // in photoUris double-counts the 8-photo limit on the next selection.
+                                    photoUris = photoUris - uri
                                 }
                                 onSaved()
                             } catch (_: Exception) {
@@ -1388,11 +1393,15 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                                 } else {
                                     "ذخیره آگهی کامل نشد؛ پیش‌نویس موجود است. دوباره تلاش کن."
                                 }
-                            } finally { working = false }
+                            } finally { working = false; uploadProgress = "" }
                         }
                     }
                 }
             ) { Text(if (working) "در حال ذخیره و آپلود…" else "ذخیره پیش‌نویس و عکس‌ها") }
+            if (working && uploadProgress.isNotBlank()) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Text(uploadProgress, fontSize = 12.sp, color = Navy)
+            }
         }
         item { if (info.isNotBlank()) Text(info, color = Navy) }
         item {
