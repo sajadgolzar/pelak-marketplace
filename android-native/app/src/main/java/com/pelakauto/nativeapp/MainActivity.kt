@@ -89,6 +89,7 @@ private fun PelakNativeApp() {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var cars by remember { mutableStateOf<List<Car>>(emptyList()) }
     var mine by remember { mutableStateOf<List<Car>>(emptyList()) }
+    var revisionReasons by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var loading by remember { mutableStateOf(true) }
     var mineLoading by remember { mutableStateOf(false) }
     var mineHasMore by remember { mutableStateOf(false) }
@@ -214,7 +215,9 @@ private fun PelakNativeApp() {
             mineLoading = true
             try {
                 val result = api.mine(current)
+                val reasons = runCatching { api.myRevisionReasons(current) }.getOrDefault(emptyMap())
                 if (session?.userId == current.userId) {
+                    revisionReasons = reasons
                     mine = result; mineHasMore = result.size == 100
                     mineError = null; mineMoreError = null
                 }
@@ -483,7 +486,8 @@ private fun PelakNativeApp() {
                         }
                     }
                     if (car.userId == session?.userId) {
-                        if (car.listingStatus == "needs_revision") {
+                        if (car.id in revisionReasons && car.listingStatus == "draft") {
+                            Text("علت بازگشت: " + revisionReasons[car.id].orEmpty(), color = Gold)
                             TextButton(onClick = { editing = car; selected = null; tab = 2 }) {
                                 Text("اصلاح آگهی")
                             }
@@ -496,7 +500,7 @@ private fun PelakNativeApp() {
                                 Text("تمدید آگهی")
                             }
                         }
-                        if (car.listingStatus in listOf("draft", "published", "archived", "needs_revision")) {
+                        if (car.listingStatus in listOf("draft", "published", "archived")) {
                             TextButton(onClick = { ownerActionConfirm = car to "cancel"; selected = null }) {
                                 Text("لغو آگهی")
                             }
