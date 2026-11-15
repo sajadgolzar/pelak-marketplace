@@ -7,6 +7,7 @@ on:
       - feature/native-v02-2026-11-15
       - feature/native-listing-actions-2026-11-15
       - feature/update-notices-2026-11-15
+      - feature/android-release-signing-push-2026-11-15
     paths:
       - 'android-native/**'
       - '.github/workflows/android-native-preview.yml'
