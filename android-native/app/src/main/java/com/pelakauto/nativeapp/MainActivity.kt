@@ -1127,8 +1127,8 @@ private fun AccountPanel(
                 label = { Text("ورود پیامکی") })
         }
         if (loginMethod == "sms") {
-            Text("ورود با پیامک پس از دریافت مجوز و اتصال سرویس ارسال پیامک فعال می‌شود.",
-                color = Color.Gray)
+            Text("ورود پیامکی پلاک به‌زودی فعال می‌شود. ❤️",
+                color = Navy, fontWeight = FontWeight.Bold)
             OutlinedTextField(
                 value = phone,
                 onValueChange = { phone = it.filter { ch -> ch.isDigit() }.take(11) },
