@@ -1,4 +1,5 @@
 name: Host PELAK native APK on website
+# Auth alignment: native app uses existing website email/password sign-in.
 on:
   push:
     branches: [main]
