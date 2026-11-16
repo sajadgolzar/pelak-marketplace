@@ -1,5 +1,5 @@
 name: Host PELAK native APK on website
-# Release: SMS coming-soon notice, native settings, and email/password login.
+# QA build: vector icon, SMS coming-soon, settings, and native v0.3.
 on:
   push:
     branches: [main]
