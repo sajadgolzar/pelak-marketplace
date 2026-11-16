@@ -17,8 +17,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 // Only our own fixed HTTPS endpoints are trusted. Metadata cannot redirect downloads to arbitrary hosts.
-private const val UPDATE_MANIFEST = "https://pelakauto.com/pelak-release.json"
-private const val APK_DOWNLOAD = "https://pelakauto.com/downloads/PELAK-Native-v0.2-preview.apk"
+private const val UPDATE_MANIFEST = "https://pelakauto.ir/pelak-release.json"
+private const val APK_DOWNLOAD = "https://pelakauto.ir/downloads/PELAK-Android-Latest.apk"
 private data class UpdateInfo(val code: Int, val label: String, val notes: String, val required: Boolean)
 
 private suspend fun fetchUpdateInfo(): UpdateInfo = withContext(Dispatchers.IO) {
