@@ -1110,12 +1110,39 @@ private fun AccountPanel(
     val scope = rememberCoroutineScope()
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
+    var loginMethod by rememberSaveable { mutableStateOf("email") }
     var busy by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
     val normalizedEmail = email.trim().lowercase(java.util.Locale.ROOT)
     val emailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(normalizedEmail).matches()
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("ورود به حساب پلاک", fontWeight = FontWeight.Bold, color = Navy, fontSize = 21.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = loginMethod == "email",
+                onClick = { loginMethod = "email"; info = "" },
+                label = { Text("ورود با ایمیل") })
+            FilterChip(selected = loginMethod == "sms",
+                onClick = { loginMethod = "sms"; info = "" },
+                label = { Text("ورود پیامکی") })
+        }
+        if (loginMethod == "sms") {
+            Text("ورود با پیامک پس از دریافت مجوز و اتصال سرویس ارسال پیامک فعال می‌شود.",
+                color = Color.Gray)
+            OutlinedTextField(
+                value = phone,
+                onValueChange = { phone = it.filter { ch -> ch.isDigit() }.take(11) },
+                label = { Text("شماره موبایل ایران (۰۹...)") },
+                placeholder = { Text("09123456789") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Button(onClick = {}, enabled = false) { Text("دریافت کد تأیید (به‌زودی)") }
+            Text("فعلاً هیچ پیامکی ارسال نمی‌شود و شماره واردشده به سرور فرستاده نمی‌شود.",
+                style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            return@Column
+        }
         Text("با همان ایمیل و رمز عبور سایت پلاک وارد شو.", color = Color.Gray)
         OutlinedTextField(
             value = email, onValueChange = { email = it },
