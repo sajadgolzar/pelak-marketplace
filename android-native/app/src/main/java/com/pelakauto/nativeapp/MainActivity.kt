@@ -1109,85 +1109,49 @@ private fun AccountPanel(
     }
     val scope = rememberCoroutineScope()
     var email by rememberSaveable { mutableStateOf("") }
-    var otp by rememberSaveable { mutableStateOf("") }
-    var sent by rememberSaveable { mutableStateOf(false) }
-    var sentToEmail by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
-    var resendCooldown by rememberSaveable { mutableIntStateOf(0) }
     val normalizedEmail = email.trim().lowercase(java.util.Locale.ROOT)
     val emailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(normalizedEmail).matches()
-    LaunchedEffect(resendCooldown > 0) {
-        while (resendCooldown > 0) {
-            delay(1000)
-            resendCooldown--
-        }
-    }
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("ورود / ثبت‌نام پلاک", fontWeight = FontWeight.Bold, color = Navy, fontSize = 21.sp)
-        Text("با ایمیل خود کد ورود یک‌بارمصرف دریافت کن.", color = Color.Gray)
-        OutlinedTextField(value = email, onValueChange = {
-            email = it
-            if (sent && it.trim().lowercase(java.util.Locale.ROOT) != sentToEmail) {
-                sent = false; otp = ""; sentToEmail = ""
-            }
-        },
+        Text("ورود به حساب پلاک", fontWeight = FontWeight.Bold, color = Navy, fontSize = 21.sp)
+        Text("با همان ایمیل و رمز عبور سایت پلاک وارد شو.", color = Color.Gray)
+        OutlinedTextField(
+            value = email, onValueChange = { email = it },
             label = { Text("ایمیل") }, singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth())
-        if (sent) {
-            OutlinedTextField(value = otp, onValueChange = { input ->
-                otp = input.mapNotNull { ch ->
-                    val digit = Character.digit(ch, 10)
-                    if (digit in 0..9) ('0' + digit) else null
-                }.take(6).joinToString("")
-            },
-                label = { Text("کد ۶ رقمی دریافتی") }, singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth())
-        }
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = password, onValueChange = { password = it },
+            label = { Text("رمز عبور") }, singleLine = true,
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            modifier = Modifier.fillMaxWidth()
+        )
         Button(
-            enabled = !busy && emailValid && (!sent || (otp.length == 6 && normalizedEmail == sentToEmail)) && (sent || resendCooldown == 0),
+            enabled = !busy && emailValid && password.isNotBlank(),
             onClick = {
                 scope.launch {
-                    busy = true; info = ""
+                    busy = true
+                    info = ""
                     try {
-                        if (!sent) {
-                            api.sendOtp(normalizedEmail)
-                            sentToEmail = normalizedEmail
-                            sent = true
-                            resendCooldown = 60
-                            info = "درخواست ارسال کد ثبت شد. صندوق ورودی و هرزنامه را بررسی کن."
-                        } else {
-                            onLogin(api.verifyOtp(sentToEmail, otp))
-                            otp = ""
-                        }
+                        onLogin(api.signInWithPassword(normalizedEmail, password))
+                        password = ""
                     } catch (e: Exception) {
                         info = when {
                             e.message?.contains("(429)") == true ->
-                                "تعداد درخواست‌ها زیاد شده؛ کمی صبر کن و دوباره تلاش کن."
+                                "تعداد درخواست‌ها زیاد شده؛ کمی بعد دوباره تلاش کن."
                             e.message?.contains("(400)") == true || e.message?.contains("(422)") == true ->
-                                if (sent) "کد معتبر نیست یا منقضی شده؛ کد جدید درخواست کن."
-                                else "درخواست ارسال کد پذیرفته نشد؛ نشانی ایمیل را بررسی کن."
-                            else -> "عملیات ورود ناموفق بود؛ اتصال اینترنت را بررسی کن و دوباره تلاش کن."
+                                "ایمیل یا رمز عبور صحیح نیست؛ از همان اطلاعات ورود سایت استفاده کن."
+                            else -> "ورود انجام نشد؛ اتصال اینترنت را بررسی کن و دوباره تلاش کن."
                         }
                     } finally { busy = false }
                 }
             }
-        ) { Text(if (busy) "در حال بررسی…" else if (sent) "تأیید و ورود" else "دریافت کد") }
-        if (sent) TextButton(enabled = !busy && resendCooldown == 0, onClick = {
-            scope.launch {
-                busy = true; info = ""
-                try {
-                    api.sendOtp(sentToEmail)
-                    otp = ""
-                    resendCooldown = 60
-                    info = "درخواست ارسال مجدد ثبت شد؛ صندوق ورودی و هرزنامه را بررسی کن."
-                } catch (_: Exception) {
-                    info = "ارسال مجدد ناموفق بود؛ کمی بعد دوباره تلاش کن."
-                } finally { busy = false }
-            }
-        }) { Text(if (resendCooldown > 0) "ارسال مجدد تا ${resendCooldown} ثانیه دیگر" else "ارسال مجدد کد") }
+        ) { Text(if (busy) "در حال ورود…" else "ورود به پلاک") }
+        Text("برای ثبت‌نام یا بازیابی رمز عبور، فعلاً از سایت پلاک استفاده کن.", color = Color.Gray)
         if (info.isNotBlank()) Text(info, color = Navy)
     }
 }
