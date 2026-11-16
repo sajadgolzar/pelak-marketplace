@@ -196,6 +196,11 @@ internal class PelakApi {
         all
     }
 
+    suspend fun signInWithPassword(email: String, password: String): PelakSession = withContext(Dispatchers.IO) {
+        val raw = JSONObject(perform("/auth/v1/token?grant_type=password", "POST",
+            JSONObject().put("email", email.trim()).put("password", password)))
+        newSession(raw, email.trim())
+    }
     suspend fun sendOtp(email: String) = withContext(Dispatchers.IO) {
         perform("/auth/v1/otp", "POST", JSONObject().put("email", email.trim()).put("create_user", true))
         Unit
