@@ -1,0 +1,42 @@
+name: Stage signed Android 0.3 APK for site hosting
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/stage-android-v03-download.yml']
+permissions:
+  contents: write
+jobs:
+  stage-download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and stage the exact published APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          name=PELAK-Native-v0.3-preview.apk
+          gh release download android-v0.3-preview --pattern "$name" --dir "$RUNNER_TEMP"
+          printf '%s  %s\n' '5ba9e5f16d6ab03fb45e32cc2ae62245c0c6137b537c10e7da71d8a07f984460' "$RUNNER_TEMP/$name" | sha256sum --check
+          mkdir -p downloads
+          cp "$RUNNER_TEMP/$name" "downloads/$name"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          page = Path("android.html")
+          html = page.read_text(encoding="utf-8")
+          remote = "https://github.com/sajadgolzar/pelak-marketplace/releases/download/android-v0.3-preview/PELAK-Native-v0.3-preview.apk"
+          local = "./downloads/PELAK-Native-v0.3-preview.apk"
+          if html.count(remote) == 1:
+              page.write_text(html.replace(remote, local), encoding="utf-8")
+          elif f'href="{local}"' not in html:
+              raise SystemExit("Android 0.3 download link was not found")
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add android.html "downloads/$name"
+          if ! git diff --cached --quiet; then
+            git commit -m 'release(web): host the verified Android 0.3 APK on the site'
+            git push origin HEAD:main
+          fi
