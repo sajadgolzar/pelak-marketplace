@@ -356,6 +356,15 @@ private fun PelakNativeApp() {
                     Text(car.priceLabel(), color = Navy, fontWeight = FontWeight.Bold)
                     if (car.listingStatus != "published") Text("وضعیت: " + car.listingStatus)
                     if (car.description.isNotBlank()) Text(car.description)
+                    if (car.listingStatus == "published") {
+                        HorizontalDivider()
+                        Text(
+                            "امنیت معامله: پیش از بازدید و بررسی مدارک خودرو بیعانه پرداخت نکن. " +
+                                "لینک‌های پرداخت ناشناس را باز نکن و اطلاعات رمز یا کد ورودت را در اختیار دیگران نگذار.",
+                            color = Color(0xFF8B5E18),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             },
             confirmButton = {
