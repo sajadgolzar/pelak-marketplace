@@ -9,6 +9,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: feature/native-account-menu-20261115
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -52,6 +54,13 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
           unzip -t "$APK" >/dev/null
           cp "$APK" "$RUNNER_TEMP/PELAK-Native-signed-release.apk"
+      - name: Validate release package and version
+        run: |
+          set -euo pipefail
+          grep -q "versionCode 3" android-native/app/build.gradle
+          grep -q "versionName '0.3-native-preview'" android-native/app/build.gradle
+          grep -q 'android:label="پلاک"' android-native/app/src/main/AndroidManifest.xml
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$RUNNER_TEMP/PELAK-Native-signed-release.apk" | grep -E "package:|application-label:"
       - name: Upload signed APK for manual device QA
         uses: actions/upload-artifact@v4
         with:
