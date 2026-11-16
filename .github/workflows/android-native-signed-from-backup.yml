@@ -1,4 +1,4 @@
-name: Build signed PELAK APK from encrypted backup (manual QA)
+name: Build and publish PELAK native Android 0.3 preview
 on:
   push:
     branches: [main]
@@ -19,6 +19,11 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/native-account-menu-20261115
+          path: native-source
+          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -74,36 +79,41 @@ jobs:
         run: |
           set -euo pipefail
           export PELAK_SIGNING_STORE_FILE="$RUNNER_TEMP/pelak-signing/release.jks"
-          cd android-native
+          cd native-source/android-native
           gradle :app:assembleRelease --no-daemon
           apk="app/build/outputs/apk/release/app-release.apk"
           test -s "$apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/pelak-signing/apk-certificate.txt"
+          normalize_digest() { tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]'; }
+          expected=$(sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' "$RUNNER_TEMP/pelak-signing/certificate-fingerprint.txt" | head -n1 | normalize_digest)
+          actual=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pelak-signing/apk-certificate.txt" | normalize_digest)
+          test -n "$expected" && test "$expected" = "$actual"
+          badging=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk")
+          grep -F "package: name='com.pelakauto.nativepreview' versionCode='3' versionName='0.3-native-preview'" <<< "$badging"
+          if grep -q '^application-debuggable' <<< "$badging"; then exit 1; fi
           unzip -t "$apk" >/dev/null
-          cp "$apk" "$RUNNER_TEMP/PELAK-Native-signed-QA.apk"
+          cp "$apk" "$RUNNER_TEMP/PELAK-Native-v0.3-preview.apk"
       - name: Erase plaintext signing material
         if: always()
         run: rm -f "$RUNNER_TEMP/pelak-signing/release.jks" "$RUNNER_TEMP/pelak-signing/key-info.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: pelak-native-signed-qa-apk
-          path: ${{ runner.temp }}/PELAK-Native-signed-QA.apk
+          path: ${{ runner.temp }}/PELAK-Native-v0.3-preview.apk
           retention-days: 7
           if-no-files-found: error
 
-      - name: Publish verified signed APK to existing website download path
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      - name: Publish signed Android preview
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test -s "$RUNNER_TEMP/PELAK-Native-signed-QA.apk"
-          mkdir -p downloads
-          cp "$RUNNER_TEMP/PELAK-Native-signed-QA.apk" downloads/PELAK-Native-v0.2-preview.apk
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add downloads/PELAK-Native-v0.2-preview.apk
-          if ! git diff --cached --quiet; then
-            git commit -m 'release(android): replace website APK with signed native QA build'
-            git fetch origin main
-            git rebase origin/main
-            git push origin HEAD:main
-          fi
+          tag=android-v0.3-preview
+          name=PELAK-Native-v0.3-preview.apk
+          apk="$RUNNER_TEMP/$name"
+          (cd "$RUNNER_TEMP" && sha256sum "$name" > "$name.sha256")
+          source_commit=$(git -C native-source rev-parse HEAD)
+          gh release create "$tag" "$apk" "$apk.sha256" \
+            --target "$source_commit" --prerelease --title 'PELAK Android 0.3 Preview' \
+            --notes 'نسخه بومی آزمایشی پلاک با امضای ثابت. نصب و به‌روزرسانی روی سامسونگ هنوز تأیید نشده است.'
