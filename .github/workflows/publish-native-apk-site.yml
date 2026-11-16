@@ -1,5 +1,5 @@
 name: Host PELAK native APK on website
-# Native settings and update endpoint release.
+# Release: SMS coming-soon notice, native settings, and email/password login.
 on:
   push:
     branches: [main]
