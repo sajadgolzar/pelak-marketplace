@@ -33,6 +33,7 @@ internal fun PelakAccountMenu(
 ) {
     val context = LocalContext.current
     var dialog by remember { mutableStateOf<String?>(null) }
+    var showSettings by remember { mutableStateOf(false) }
     var notificationAllowed by remember {
         mutableStateOf(Build.VERSION.SDK_INT < 33 ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
@@ -100,10 +101,7 @@ internal fun PelakAccountMenu(
                                 putExtra(Intent.EXTRA_TEXT, message)
                             }, "اشتراک‌گذاری پلاک"))
                         }
-                        "settings" -> {
-                            context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                Uri.parse("package:" + context.packageName)))
-                        }
+                        "settings" -> showSettings = true
                         "help", "news", "safety", "dealer" -> dialog = entry.action
                         "about" -> dialog = entry.action
                     }
@@ -124,6 +122,41 @@ internal fun PelakAccountMenu(
             }
             Text("PELAK Android · نسخه آزمایشی", modifier = Modifier.padding(horizontal = 18.dp))
         }
+    }
+    if (showSettings) {
+        AlertDialog(
+            onDismissRequest = { showSettings = false },
+            title = { Text("تنظیمات پلاک") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("حساب کاربری", fontWeight = FontWeight.Bold)
+                    Text(email, style = MaterialTheme.typography.bodySmall)
+                    HorizontalDivider()
+                    Text("اعلان‌ها", fontWeight = FontWeight.Bold)
+                    Text("مجوز اعلان‌ها از تنظیمات گوشی مدیریت می‌شود.", style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(onClick = {
+                        val intent = if (Build.VERSION.SDK_INT >= 26) {
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                        } else {
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                Uri.parse("package:" + context.packageName))
+                        }
+                        context.startActivity(intent)
+                    }) { Text("تنظیمات اعلان‌های گوشی") }
+                    HorizontalDivider()
+                    Text("زبان", fontWeight = FontWeight.Bold)
+                    Text("فارسی · زبان‌های دیگر در دست توسعه", style = MaterialTheme.typography.bodySmall)
+                    HorizontalDivider()
+                    Text("ظاهر", fontWeight = FontWeight.Bold)
+                    Text("حالت تاریک در نسخه‌های بعدی اضافه می‌شود.", style = MaterialTheme.typography.bodySmall)
+                    HorizontalDivider()
+                    Text("نسخه برنامه: " + BuildConfig.VERSION_NAME, style = MaterialTheme.typography.bodySmall)
+                    NativeUpdateChecker()
+                }
+            },
+            confirmButton = { TextButton(onClick = { showSettings = false }) { Text("بستن") } }
+        )
     }
     if (dialog != null) {
         val key = dialog!!
