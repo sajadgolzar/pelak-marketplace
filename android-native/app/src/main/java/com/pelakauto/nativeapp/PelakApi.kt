@@ -66,7 +66,8 @@ internal class PelakApi {
         route: String,
         method: String = "GET",
         data: JSONObject? = null,
-        jwt: String? = null
+        jwt: String? = null,
+        prefer: String = "return=representation"
     ): String {
         val connection = URL(PelakConfig.API_ROOT + route).openConnection() as HttpURLConnection
         try {
@@ -79,7 +80,7 @@ internal class PelakApi {
             if (data != null) {
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                connection.setRequestProperty("Prefer", "return=representation")
+                connection.setRequestProperty("Prefer", prefer)
                 connection.outputStream.use { it.write(data.toString().toByteArray(StandardCharsets.UTF_8)) }
             }
             val code = connection.responseCode
@@ -201,6 +202,32 @@ internal class PelakApi {
             JSONObject().put("email", email.trim()).put("password", password)))
         newSession(raw, email.trim())
     }
+    suspend fun createAccount(email: String, password: String): PelakSession? = withContext(Dispatchers.IO) {
+        val response = JSONObject(perform("/auth/v1/signup", "POST",
+            JSONObject().put("email", email).put("password", password)))
+        if (response.optString("access_token").isNotBlank()) newSession(response, email) else null
+    }
+
+    suspend fun requestPasswordReset(email: String): Unit = withContext(Dispatchers.IO) {
+        perform("/auth/v1/recover", "POST", JSONObject().put("email", email))
+    }
+
+    suspend fun resendSignupCode(email: String): Unit = withContext(Dispatchers.IO) {
+        perform("/auth/v1/resend", "POST", JSONObject().put("email", email).put("type", "signup"))
+    }
+
+    suspend fun verifyAccountCode(email: String, code: String, recovery: Boolean): PelakSession =
+        withContext(Dispatchers.IO) {
+            val type = if (recovery) "recovery" else "email"
+            val response = JSONObject(perform("/auth/v1/verify", "POST",
+                JSONObject().put("email", email).put("token", code).put("type", type)))
+            newSession(response, email)
+        }
+
+    suspend fun updatePassword(session: PelakSession, password: String): Unit = withContext(Dispatchers.IO) {
+        perform("/auth/v1/user", "PUT", JSONObject().put("password", password), session.accessToken)
+    }
+
     suspend fun sendOtp(email: String) = withContext(Dispatchers.IO) {
         perform("/auth/v1/otp", "POST", JSONObject().put("email", email.trim()).put("create_user", true))
         Unit
@@ -415,6 +442,56 @@ internal class PelakApi {
             Unit
         }
 
+    suspend fun supportThreads(session: PelakSession): List<SupportThread> = withContext(Dispatchers.IO) {
+        val rows = JSONArray(perform("/rest/v1/pelak_support_threads" +
+            "?select=id,subject,status&user_id=eq.${session.userId}&hidden_for_user=eq.false&order=last_message_at.desc",
+            jwt = session.accessToken))
+        List(rows.length()) { index ->
+            val row = rows.getJSONObject(index)
+            SupportThread(row.getString("id"), row.getString("subject"), row.getString("status"))
+        }
+    }
+
+    suspend fun supportMessages(session: PelakSession, thread: SupportThread): List<SupportMessage> =
+        withContext(Dispatchers.IO) {
+            val rows = JSONArray(perform("/rest/v1/pelak_support_messages" +
+                "?select=sender_id,body&thread_id=eq.${thread.id}&order=created_at.asc,id.asc", jwt = session.accessToken))
+            List(rows.length()) { index ->
+                val row = rows.getJSONObject(index)
+                SupportMessage(row.getString("sender_id") == session.userId, row.getString("body"))
+            }
+        }
+
+    suspend fun createSupportThread(session: PelakSession, thread: SupportThread): Unit =
+        withContext(Dispatchers.IO) {
+            perform("/rest/v1/pelak_support_threads", "POST", JSONObject()
+                .put("id", thread.id).put("user_id", session.userId).put("subject", thread.subject),
+                session.accessToken, "resolution=ignore-duplicates,return=minimal")
+        }
+
+    suspend fun sendSupportMessage(session: PelakSession, thread: SupportThread, id: String, body: String): Unit =
+        withContext(Dispatchers.IO) {
+            perform("/rest/v1/pelak_support_messages", "POST", JSONObject().put("id", id)
+                .put("thread_id", thread.id).put("sender_id", session.userId).put("body", body),
+                session.accessToken, "resolution=ignore-duplicates,return=minimal")
+        }
+
+    suspend fun myShowroom(session: PelakSession): ShowroomProfile? = withContext(Dispatchers.IO) {
+        val body = perform("/rest/v1/rpc/pelak_free_showroom_me", "POST", JSONObject(), session.accessToken)
+        if (body.trim() == "null") return@withContext null
+        val row = JSONObject(body)
+        ShowroomProfile(row.optString("business_name"), row.optString("city"),
+            if (row.isNull("public_phone")) "" else row.optString("public_phone"),
+            if (row.isNull("bio")) "" else row.optString("bio"), row.optString("status"))
+    }
+
+    suspend fun saveShowroom(session: PelakSession, profile: ShowroomProfile): Unit =
+        withContext(Dispatchers.IO) {
+            perform("/rest/v1/rpc/pelak_free_showroom_save", "POST", JSONObject()
+                .put("p_business_name", profile.name).put("p_city", profile.city)
+                .put("p_public_phone", profile.phone).put("p_bio", profile.bio), session.accessToken)
+        }
+
     suspend fun registerPush(session: PelakSession, token: String) = withContext(Dispatchers.IO) {
         perform("/rest/v1/rpc/pelak_register_android_push", "POST",
             JSONObject().put("p_token", token), session.accessToken)
@@ -426,3 +503,4 @@ internal class PelakApi {
         Unit
     }
 }
+

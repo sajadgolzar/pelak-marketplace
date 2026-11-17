@@ -13,8 +13,8 @@ android {
         applicationId 'com.pelakauto.nativepreview'
         minSdk 24
         targetSdk 35
-        versionCode 4
-        versionName '0.3.1-native-preview'
+        versionCode 5
+        versionName '0.3.2-native-preview'
         resConfigs 'fa', 'en', 'ar', 'ka'
         buildConfigField 'String', 'FIREBASE_APP_ID', '\"1:245022577031:android:8bc31b15733dba8ce58322\"'
         buildConfigField 'String', 'FIREBASE_API_KEY', '\"AIzaSyBJWadEPLZdrwcnKI9sFk64IfvDfUed8Xo\"'

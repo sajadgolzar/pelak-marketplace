@@ -1,5 +1,6 @@
 package com.pelakauto.nativeapp
 
+import androidx.activity.compose.BackHandler
 import android.Manifest
 import android.os.Build
 import android.content.pm.PackageManager
@@ -27,11 +28,14 @@ private data class AccountEntry(val title: String, val icon: ImageVector, val ac
 
 @Composable
 internal fun PelakAccountMenu(
-    email: String,
+    api: PelakApi,
+    session: PelakSession,
     onNavigate: (Int) -> Unit,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
+    val email = session.email
+    var page by remember { mutableStateOf<String?>(null) }
     var dialog by remember { mutableStateOf<String?>(null) }
     var showSettings by remember { mutableStateOf(false) }
     var notificationAllowed by remember {
@@ -53,8 +57,32 @@ internal fun PelakAccountMenu(
         AccountEntry("راهنما و پشتیبانی", Icons.Outlined.HelpOutline, "help"),
         AccountEntry("درباره پلاک", Icons.Outlined.Info, "about")
     )
-    fun openSite() {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://pelakauto.com")))
+    val currentPage = page
+    if (currentPage != null) {
+        BackHandler { page = null }
+        val title = entries.first { it.action == currentPage }.title
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                TextButton(onClick = { page = null }) { Text("بازگشت") }
+            }
+            HorizontalDivider()
+            Box(Modifier.weight(1f)) {
+                when (currentPage) {
+                    "dealer" -> PelakShowroomPage(api, session)
+                    "help" -> PelakSupportPage(api, session)
+                    "news" -> PelakNewsPage()
+                    "safety" -> Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("برای گزارش یک آگهی، جزئیات آن را باز کن و «گزارش آگهی» را بزن.")
+                        Text("پیش از بازدید و بررسی مدارک، پول یا کد تأیید در اختیار فروشنده قرار نده.")
+                        OutlinedButton(onClick = { page = null; onNavigate(0) }) { Text("رفتن به آگهی‌ها") }
+                        TextButton(onClick = { page = "help" }) { Text("پیام به پشتیبانی") }
+                    }
+                }
+            }
+        }
+        return
     }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -102,7 +130,7 @@ internal fun PelakAccountMenu(
                             }, "اشتراک‌گذاری پلاک"))
                         }
                         "settings" -> showSettings = true
-                        "help", "news", "safety", "dealer" -> dialog = entry.action
+                        "help", "news", "safety", "dealer" -> page = entry.action
                         "about" -> dialog = entry.action
                     }
                 }.padding(horizontal = 18.dp, vertical = 18.dp),
@@ -159,34 +187,11 @@ internal fun PelakAccountMenu(
         )
     }
     if (dialog != null) {
-        val key = dialog!!
-        val title = when (key) {
-            "dealer" -> "نمایشگاه مجازی"
-            "favorites" -> "نشان‌ها"
-            "recent" -> "بازدیدهای اخیر"
-            "safety" -> "امنیت و گزارش تخلف"
-            "news" -> "اخبار و اطلاعیه‌ها"
-            "help" -> "راهنما و پشتیبانی"
-            else -> "درباره پلاک"
-        }
-        val description = when (key) {
-            "favorites", "recent" -> "این بخش هنوز در نسخه آزمایشی اندروید فعال نشده است؛ تا آماده‌شدن ذخیره‌سازی و همگام‌سازی، داده‌ای نمایش داده نمی‌شود."
-            "dealer" -> "مدیریت نمایشگاه در نسخه وب پلاک در دسترس است؛ بخش بومی اندروید هنوز تکمیل نشده است."
-            "help" -> "برای ارتباط با پشتیبانی، بخش پشتیبانی سایت پلاک را باز کن."
-            "safety" -> "برای گزارش تخلف از گزینه «گزارش آگهی» در جزئیات خودرو استفاده کن. راهنمای امنیت در سایت موجود است."
-            "news" -> "اطلاعیه‌های رسمی پلاک را در سایت دنبال کن."
-            else -> "پلاک؛ خودروی بعدی تو، اینجاست. اپلیکیشن بومی اندروید، مستقل از وب‌ویو."
-        }
         AlertDialog(
             onDismissRequest = { dialog = null },
-            title = { Text(title) },
-            text = { Text(description) },
-            confirmButton = {
-                if (key in listOf("dealer", "help", "news", "safety")) {
-                    TextButton(onClick = { dialog = null; openSite() }) { Text("بازکردن سایت پلاک") }
-                } else TextButton(onClick = { dialog = null }) { Text("متوجه شدم") }
-            },
-            dismissButton = { TextButton(onClick = { dialog = null }) { Text("بستن") } }
+            title = { Text("درباره پلاک") },
+            text = { Text("پلاک؛ خودروی بعدی تو، اینجاست.\nنسخهٔ اندروید " + BuildConfig.VERSION_NAME) },
+            confirmButton = { TextButton(onClick = { dialog = null }) { Text("بستن") } }
         )
     }
 }

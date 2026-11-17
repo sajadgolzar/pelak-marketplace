@@ -15,6 +15,10 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -50,7 +54,8 @@ private val Ink = Color(0xFF172940)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = android.graphics.Color.rgb(16, 35, 63)
+        enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(
+            android.graphics.Color.WHITE, android.graphics.Color.WHITE))
         runCatching { PelakPush.initialize(applicationContext) }
         setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -288,14 +293,19 @@ private fun PelakNativeApp() {
         containerColor = Pale,
         topBar = {
             Row(
-                modifier = Modifier.fillMaxWidth().background(Color.White)
+                modifier = Modifier.fillMaxWidth().background(Color.White).statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 11.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text("پلاک | PELAK", color = Navy, fontWeight = FontWeight.Bold, fontSize = 21.sp)
-                    Text("خودروی بعدی تو، اینجاست.", fontSize = 11.sp, color = Color.Gray)
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Image(painterResource(R.mipmap.ic_launcher), contentDescription = "لوگوی PELAK",
+                        modifier = Modifier.size(48.dp))
+                    Column {
+                        Text("پلاک", color = Navy, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        Text("خودروی بعدی تو، اینجاست.", fontSize = 11.sp, color = Color.Gray)
+                    }
                 }
                 NativeUpdateChecker()
             }
@@ -1087,7 +1097,7 @@ private fun LoginRequired(onGoToLogin: () -> Unit) {
     ) {
         Text("برای ادامه وارد حساب پلاک شو", fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(15.dp))
-        Button(onClick = onGoToLogin) { Text("ورود با کد ایمیلی") }
+        Button(onClick = onGoToLogin) { Text("ورود یا ساخت حساب") }
     }
 }
 
@@ -1100,86 +1110,9 @@ private fun AccountPanel(
     onNavigate: (Int) -> Unit
 ) {
     if (session != null) {
-        PelakAccountMenu(
-            email = session.email,
-            onNavigate = onNavigate,
-            onLogout = onLogout
-        )
-        return
-    }
-    val scope = rememberCoroutineScope()
-    var email by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
-    var phone by rememberSaveable { mutableStateOf("") }
-    var loginMethod by rememberSaveable { mutableStateOf("email") }
-    var busy by remember { mutableStateOf(false) }
-    var info by remember { mutableStateOf("") }
-    val normalizedEmail = email.trim().lowercase(java.util.Locale.ROOT)
-    val emailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(normalizedEmail).matches()
-    Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("ورود به حساب پلاک", fontWeight = FontWeight.Bold, color = Navy, fontSize = 21.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = loginMethod == "email",
-                onClick = { loginMethod = "email"; info = "" },
-                label = { Text("ورود با ایمیل") })
-            FilterChip(selected = loginMethod == "sms",
-                onClick = { loginMethod = "sms"; info = "" },
-                label = { Text("ورود پیامکی") })
-        }
-        if (loginMethod == "sms") {
-            Text("ورود پیامکی پلاک به‌زودی فعال می‌شود. ❤️",
-                color = Navy, fontWeight = FontWeight.Bold)
-            OutlinedTextField(
-                value = phone,
-                onValueChange = { phone = it.filter { ch -> ch.isDigit() }.take(11) },
-                label = { Text("شماره موبایل ایران (۰۹...)") },
-                placeholder = { Text("09123456789") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Button(onClick = {}, enabled = false) { Text("دریافت کد تأیید (به‌زودی)") }
-            Text("فعلاً هیچ پیامکی ارسال نمی‌شود و شماره واردشده به سرور فرستاده نمی‌شود.",
-                style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-            return@Column
-        }
-        Text("با همان ایمیل و رمز عبور سایت پلاک وارد شو.", color = Color.Gray)
-        OutlinedTextField(
-            value = email, onValueChange = { email = it },
-            label = { Text("ایمیل") }, singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth()
-        )
-        OutlinedTextField(
-            value = password, onValueChange = { password = it },
-            label = { Text("رمز عبور") }, singleLine = true,
-            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth()
-        )
-        Button(
-            enabled = !busy && emailValid && password.isNotBlank(),
-            onClick = {
-                scope.launch {
-                    busy = true
-                    info = ""
-                    try {
-                        onLogin(api.signInWithPassword(normalizedEmail, password))
-                        password = ""
-                    } catch (e: Exception) {
-                        info = when {
-                            e.message?.contains("(429)") == true ->
-                                "تعداد درخواست‌ها زیاد شده؛ کمی بعد دوباره تلاش کن."
-                            e.message?.contains("(400)") == true || e.message?.contains("(422)") == true ->
-                                "ایمیل یا رمز عبور صحیح نیست؛ از همان اطلاعات ورود سایت استفاده کن."
-                            else -> "ورود انجام نشد؛ اتصال اینترنت را بررسی کن و دوباره تلاش کن."
-                        }
-                    } finally { busy = false }
-                }
-            }
-        ) { Text(if (busy) "در حال ورود…" else "ورود به پلاک") }
-        Text("برای ثبت‌نام یا بازیابی رمز عبور، فعلاً از سایت پلاک استفاده کن.", color = Color.Gray)
-        if (info.isNotBlank()) Text(info, color = Navy)
+        PelakAccountMenu(api, session, onNavigate, onLogout)
+    } else {
+        PelakAuthPanel(api, onLogin)
     }
 }
 
@@ -1579,3 +1512,4 @@ private fun ChatDialog(api: PelakApi, session: PelakSession, target: ChatTarget,
         }
     )
 }
+
