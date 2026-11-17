@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "android": {
-    "versionCode": 5,
-    "versionName": "0.3.2-native-preview",
-    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.3.2-preview.apk",
+    "versionCode": 6,
+    "versionName": "0.3.3-native-preview",
+    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.3.3-preview.apk",
     "minimumVersionCode": 1,
-    "notes": "ثبت‌نام و بازیابی رمز ایمیلی، پشتیبانی، پروفایل نمایشگاه و هدر تازهٔ پلاک."
+    "notes": "شمارهٔ تماس محلی با کد خودکار کشور آگهی و پیشنهاد برند هنگام تایپ برند، مدل یا تیپ."
   },
   "web": {
     "version": "2026-11-15.1",
