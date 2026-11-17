@@ -107,8 +107,10 @@ private val nav = listOf(
     Triple("پلاک من", "♙", 4)
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PelakNativeApp(notification: NotificationRoute?) {
+    val keyboardVisible = WindowInsets.isImeVisible
     val api = remember { PelakApi() }
     val context = LocalContext.current
     val store = remember { PelakSessionStore(context) }
@@ -327,6 +329,7 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
     }
 
     Scaffold(
+        modifier = Modifier.imePadding(),
         containerColor = Pale,
         topBar = {
             Row(
@@ -341,14 +344,14 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
                         modifier = Modifier.size(48.dp))
                     Column {
                         Text("پلاک", color = Navy, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                        Text("خودروی بعدی تو، اینجاست.", fontSize = 11.sp, color = Color.Gray)
+                        if (!keyboardVisible) Text("خودروی بعدی تو، اینجاست.", fontSize = 11.sp, color = Color.Gray)
                     }
                 }
                 NativeUpdateChecker()
             }
         },
         bottomBar = {
-            NavigationBar(containerColor = Color.White) {
+            if (!keyboardVisible) NavigationBar(containerColor = Color.White) {
                 nav.forEach { item ->
                     NavigationBarItem(
                         selected = tab == item.third ||
@@ -366,7 +369,7 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
             }
         }
     ) { padding ->
-        Box(Modifier.padding(padding).fillMaxSize()) {
+        Box(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
             when (tab) {
                 0, 1 -> {
                     val filtered = if (tab == 0) cars else searched
@@ -1158,8 +1161,11 @@ private fun AccountPanel(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSaved: () -> Unit) {
+    val keyboardVisible = WindowInsets.isImeVisible
+    val formScroll = androidx.compose.foundation.lazy.rememberLazyListState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var title by rememberSaveable(editing?.id) { mutableStateOf(editing?.title.orEmpty()) }
@@ -1196,15 +1202,17 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
     var working by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
     var uploadProgress by remember { mutableStateOf("") }
+    LaunchedEffect(step) { formScroll.scrollToItem(0) }
     LazyColumn(
-        modifier = Modifier.fillMaxSize().imePadding(),
+        state = formScroll,
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
             Text(if (editing == null) "ثبت آگهی خودرو" else "ویرایش آگهی",
                 fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Navy)
-            Text("آگهی را ذخیره کن و از «آگهی‌های من» برای بررسی بفرست.",
+            if (!keyboardVisible) Text("آگهی را ذخیره کن و از «آگهی‌های من» برای بررسی بفرست.",
                 fontSize = 12.sp, color = Color.Gray)
         }
         item {
