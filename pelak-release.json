@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "android": {
-    "versionCode": 6,
-    "versionName": "0.3.3-native-preview",
-    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.3.3-preview.apk",
+    "versionCode": 7,
+    "versionName": "0.4.0-native-preview",
+    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.4.0-preview.apk",
     "minimumVersionCode": 1,
-    "notes": "شمارهٔ تماس محلی با کد خودکار کشور آگهی و پیشنهاد برند هنگام تایپ برند، مدل یا تیپ."
+    "notes": "ویرایش و جایگزینی عکس‌ها، اصلاح جهت تصویر و آپلود ۸ عکس، گالری روان‌تر، انتخاب مدل و تیپ و جست‌وجوی کامل."
   },
   "web": {
     "version": "2026-11-15.1",
