@@ -821,7 +821,7 @@ private fun ListingsPanel(
             val priceFilterActive = minPrice.isNotBlank() || maxPrice.isNotBlank()
             val priceInSelectedUnit = if (car.currency == "IRR" && priceCurrency == "IRR")
                 amount?.divide(java.math.BigDecimal.TEN) else amount
-            (brandFilter.isBlank() || searchFields.contains(brandFilter.trim(), ignoreCase = true)) &&
+            (brandFilter.isBlank() || vehicleSearchKey(brandFilter) in vehicleSearchKey(searchFields)) &&
                 (cityFilter.isBlank() || listOf(car.city, car.country).joinToString(" ")
                     .contains(cityFilter.trim(), ignoreCase = true)) &&
                 (minYear.toIntOrNull()?.let { car.year >= it } ?: true) &&
@@ -907,8 +907,7 @@ private fun ListingsPanel(
         if (filterOpen) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedTextField(brandFilter, { brandFilter = it }, label = { Text("برند، مدل یا تیپ") },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+                VehicleBrandField(brandFilter, "برند، مدل یا تیپ") { brandFilter = it }
                 OutlinedTextField(cityFilter, { cityFilter = it }, label = { Text("شهر یا کشور") },
                     modifier = Modifier.fillMaxWidth(), singleLine = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1130,8 +1129,13 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
     var year by rememberSaveable(editing?.id) { mutableStateOf(editing?.year?.toString().orEmpty()) }
     var city by rememberSaveable(editing?.id) { mutableStateOf(editing?.city.orEmpty()) }
     var country by rememberSaveable(editing?.id) { mutableStateOf(editing?.country ?: "ایران") }
-    var phone by rememberSaveable(editing?.id) { mutableStateOf(editing?.sellerPhone.orEmpty()) }
-    val validSellerPhone = remember(phone) { Regex("""^\+[1-9][0-9]{7,14}$""").matches(phone.trim()) }
+    var phone by rememberSaveable(editing?.id) {
+        mutableStateOf(ListingPhone.nationalDisplay(editing?.sellerPhone.orEmpty(),
+            ListingPhone.region(editing?.country ?: "ایران")))
+    }
+    val phoneRegion = remember(country) { ListingPhone.region(country) }
+    val countryCode = remember(phoneRegion) { ListingPhone.callingCode(phoneRegion) }
+    val normalizedPhone = remember(phone, phoneRegion) { ListingPhone.normalize(phone, phoneRegion) }
     var price by rememberSaveable(editing?.id) {
         mutableStateOf(
             if (editing?.currency == "IRR" && editing.price != null)
@@ -1178,14 +1182,21 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
         }
         if (step == 0) {
         item { NativeField("عنوان آگهی", title) { title = it } }
-        item { NativeField("برند خودرو", make) { make = it } }
+        item { VehicleBrandField(make, "برند خودرو") { make = it } }
         item { NativeField("مدل خودرو", model) { model = it } }
         item { NativeField("تیپ خودرو", trim) { trim = it } }
         item { NativeField("کارکرد (کیلومتر)", mileage, KeyboardType.Number) { mileage = it.filter(Char::isDigit) } }
         item { NativeField("سال ساخت میلادی", year, KeyboardType.Number) { year = it } }
         }
         if (step == 1) {
-        item { NativeField("کشور", country) { country = it } }
+        item {
+            NativeField("کشور", country) { country = it }
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                ListingPhone.preferredCountries.forEach { option ->
+                    FilterChip(selected = country == option, onClick = { country = option }, label = { Text(option) })
+                }
+            }
+        }
         item { NativeField("شهر", city) { city = it } }
         item {
             Text("وضعیت خودرو", color = Navy)
@@ -1198,13 +1209,23 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
             }
         }
         item {
-            NativeField("شماره تماس فروشنده", phone, KeyboardType.Phone) { phone = it }
-            if (phone.isNotBlank() && !validSellerPhone) {
-                Text("شماره باید با + و کد کشور شروع شود؛ مانند +989121234567",
+            OutlinedTextField(phone, { phone = it.take(40) }, label = { Text("شماره تماس فروشنده") },
+                placeholder = { if (phoneRegion == "IR") Text("۰۹۱۱۲۳۴۵۶۷۸") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                textStyle = LocalTextStyle.current.copy(textDirection = androidx.compose.ui.text.style.TextDirection.Ltr),
+                isError = phone.isNotBlank() && normalizedPhone == null,
+                singleLine = true, modifier = Modifier.fillMaxWidth())
+            if (phone.isNotBlank() && normalizedPhone == null) {
+                Text(if (phoneRegion == "IR") "شماره را مثل ۰۹۱۱۲۳۴۵۶۷۸ وارد کن."
+                    else if (countryCode != null) "شمارهٔ محلی معتبر وارد کن."
+                    else "کشور را مشخص کن یا شمارهٔ بین‌المللی را با + وارد کن.",
                     fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
             }
-            Text("برای انتشار، شماره را با کد کشور وارد کن (مثلاً ‎+989121234567). شماره تماس در آگهی منتشرشده عمومی است.",
-                fontSize = 12.sp, color = Color.Gray)
+            if (countryCode != null) {
+                Text("کد کشور آگهی: \u2066$countryCode\u2069 · برای شمارهٔ محلی خودکار اضافه می‌شود.",
+                    fontSize = 12.sp, color = Color.Gray)
+            }
+            Text("شماره تماس در آگهی منتشرشده عمومی است.", fontSize = 12.sp, color = Color.Gray)
         }
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1260,9 +1281,9 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                         step == 0 && (title.isBlank() || make.isBlank() || model.isBlank() ||
                             y == null || y !in 1950..2100 || (mileage.isNotBlank() && mileage.toIntOrNull() == null)) ->
                             "عنوان، برند، مدل و سال ساخت معتبر را وارد کن."
-                        step == 1 && (country.isBlank() || city.isBlank() || !validSellerPhone ||
+                        step == 1 && (country.isBlank() || city.isBlank() || normalizedPhone == null ||
                             (!negotiable && (p == null || p <= BigDecimal.ZERO))) ->
-                            "کشور، شهر، شماره تماس بین‌المللی معتبر و قیمت را وارد کن."
+                            "کشور، شهر، شماره تماس معتبر و قیمت را وارد کن."
                         else -> ""
                     }
                     if (info.isBlank()) step++
@@ -1278,8 +1299,8 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                     val p = price.replace(",", "").trim().toBigDecimalOrNull()
                     if (title.isBlank() || make.isBlank() || model.isBlank() ||
                         y == null || y !in 1950..2100 || country.isBlank() || city.isBlank() ||
-                        (mileage.isNotBlank() && mileage.toIntOrNull() == null) || !validSellerPhone || (!negotiable && (p == null || p <= BigDecimal.ZERO))) {
-                        info = "عنوان، برند، مدل، سال، کارکرد، کشور، شهر، شماره بین‌المللی و قیمت را درست وارد کن."
+                        (mileage.isNotBlank() && mileage.toIntOrNull() == null) || normalizedPhone == null || (!negotiable && (p == null || p <= BigDecimal.ZERO))) {
+                        info = "عنوان، برند، مدل، سال، کارکرد، کشور، شهر، شماره تماس و قیمت را درست وارد کن."
                     } else {
                         scope.launch {
                             working = true; info = ""; uploadProgress = "در حال ذخیره اطلاعات آگهی…"
@@ -1288,11 +1309,11 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                                     p!!.multiply(BigDecimal.TEN).toPlainString()
                                 val savedId = draftId
                                 val id = if (savedId == null) {
-                                    api.createDraft(session, title, make, model, y, rials, country, city, phone, trim, mileage.toIntOrNull(), description, vehicleStatus)
+                                    api.createDraft(session, title, make, model, y, rials, country, city, normalizedPhone, trim, mileage.toIntOrNull(), description, vehicleStatus)
                                         .also { draftId = it }
                                 } else {
                                     api.updateDraft(session, savedId, title, make, model, y, rials,
-                                        country, city, phone, trim, mileage.toIntOrNull(), description, vehicleStatus)
+                                        country, city, normalizedPhone, trim, mileage.toIntOrNull(), description, vehicleStatus)
                                     savedId
                                 }
                                 for (uri in photoUris) {
@@ -1512,4 +1533,5 @@ private fun ChatDialog(api: PelakApi, session: PelakSession, target: ChatTarget,
         }
     )
 }
+
 
