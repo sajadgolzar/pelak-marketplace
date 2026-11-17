@@ -14,6 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
@@ -51,9 +52,23 @@ private val Gold = Color(0xFFC9A158)
 private val Pale = Color(0xFFF6F8FB)
 private val Ink = Color(0xFF172940)
 
+internal data class NotificationRoute(val kind: String, val sourceId: String, val event: Long)
+
 class MainActivity : ComponentActivity() {
+    private var notification by mutableStateOf<NotificationRoute?>(null)
+    private fun readNotification(intent: Intent?) {
+        val kind = intent?.getStringExtra("pelak_kind") ?: return
+        val source = intent.getStringExtra("pelak_source").orEmpty()
+        notification = NotificationRoute(kind, source, System.nanoTime())
+    }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        readNotification(intent)
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        readNotification(intent)
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(
             android.graphics.Color.WHITE, android.graphics.Color.WHITE))
         runCatching { PelakPush.initialize(applicationContext) }
@@ -68,7 +83,7 @@ class MainActivity : ComponentActivity() {
                         onPrimary = Color.White,
                         onSurface = Ink
                     )
-                ) { PelakNativeApp() }
+                ) { PelakNativeApp(notification) }
             }
         }
     }
@@ -93,7 +108,7 @@ private val nav = listOf(
 )
 
 @Composable
-private fun PelakNativeApp() {
+private fun PelakNativeApp(notification: NotificationRoute?) {
     val api = remember { PelakApi() }
     val context = LocalContext.current
     val store = remember { PelakSessionStore(context) }
@@ -111,6 +126,7 @@ private fun PelakNativeApp() {
     var mineError by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
+    var publicFilters by remember { mutableStateOf(ListingFilters()) }
     val searchPrefs = remember { context.getSharedPreferences("pelak_native_search_history", android.content.Context.MODE_PRIVATE) }
     var searchHistory by remember {
         mutableStateOf(searchPrefs.getString("recent_queries", "").orEmpty().split("\n")
@@ -213,14 +229,14 @@ private fun PelakNativeApp() {
             if (tab == 1) saveSearchQuery(search)
         }
     }
-    LaunchedEffect(tab, search) {
+    LaunchedEffect(tab, search, publicFilters) {
         if (tab == 1) {
             searchLoading = true
             val requestedSearch = search
             delay(320)
             searchError = null
             try {
-                val results = api.published(requestedSearch)
+                val results = api.published(requestedSearch, filters = publicFilters)
                 if (tab == 1 && search == requestedSearch) {
                     searched = results
                     searchHasMore = results.size == 100
@@ -238,7 +254,7 @@ private fun PelakNativeApp() {
         scope.launch {
             loading = true
             error = null
-            try { cars = api.published(); homeHasMore = cars.size == 100 }
+            try { cars = api.published(filters = publicFilters); homeHasMore = cars.size == 100 }
             catch (_: Exception) { error = "دریافت آگهی‌ها ممکن نشد. اینترنت را بررسی کن." }
             finally { loading = false }
         }
@@ -280,13 +296,34 @@ private fun PelakNativeApp() {
             try { favoriteIds = api.favoriteIds(current) } catch (_: Exception) {}
         }
     }
-    LaunchedEffect(Unit) { refresh() }
+    LaunchedEffect(publicFilters) { refresh() }
     LaunchedEffect(tab, session?.userId) {
         if (tab == 6) session?.let { refreshFavorites(it) }
     }
     LaunchedEffect(tab, session) {
         val current = session
         if (tab == 3 && current != null) refreshMine(current)
+    }
+
+    var supportMessage by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(notification?.event, session?.userId) {
+        val route = notification ?: return@LaunchedEffect
+        val active = session ?: return@LaunchedEffect
+        when (route.kind) {
+            "listing_message" -> {
+                tab = 5
+                runCatching { api.messageById(active, route.sourceId) }.getOrNull()?.let { message ->
+                    val peer = if (message.senderId == active.userId) message.recipientId else message.senderId
+                    chatTarget = ChatTarget(message.listingId, peer, "گفتگوی آگهی")
+                }
+            }
+            "support_message" -> { supportMessage = route.sourceId; tab = 4 }
+            "listing_needs_revision", "listing_published" -> tab = 3
+        }
+    }
+
+    BackHandler(enabled = tab != 0 && selected == null && expandedPhoto == null && chatTarget == null) {
+        tab = if (tab in listOf(3, 6, 7)) 4 else 0
     }
 
     Scaffold(
@@ -339,6 +376,8 @@ private fun PelakNativeApp() {
                         error = if (tab == 0) error else searchError,
                         search = search,
                         searching = tab == 1,
+                        serverFiltered = true,
+                        onFiltersChanged = { publicFilters = it },
                         searchHistory = if (tab == 1) searchHistory else emptyList(),
                         onHistorySelect = { search = it },
                         onHistoryClear = {
@@ -351,14 +390,15 @@ private fun PelakNativeApp() {
                         onLoadMore = {
                             if (!moreLoading) {
                                 val requestedTab = tab
+                                val requestedFilters = publicFilters
                                 val requestedSearch = if (requestedTab == 0) "" else search
                                 val start = if (requestedTab == 0) cars.size else searched.size
                                 scope.launch {
                                     moreLoading = true
                                     try {
-                                        val next = api.published(requestedSearch, start)
+                                        val next = api.published(requestedSearch, start, filters = requestedFilters)
                                         // Ignore a stale response if the user switched tabs or changed the query.
-                                        if (tab == requestedTab && (requestedTab == 0 || search == requestedSearch)) {
+                                        if (tab == requestedTab && publicFilters == requestedFilters && (requestedTab == 0 || search == requestedSearch)) {
                                             if (requestedTab == 0) {
                                                 cars = (cars + next).distinctBy { it.id }
                                                 homeHasMore = next.size == 100
@@ -368,7 +408,7 @@ private fun PelakNativeApp() {
                                             }
                                         }
                                     } catch (_: Exception) {
-                                        if (tab == requestedTab && (requestedTab == 0 || search == requestedSearch))
+                                        if (tab == requestedTab && publicFilters == requestedFilters && (requestedTab == 0 || search == requestedSearch))
                                             android.widget.Toast.makeText(context, "دریافت آگهی‌های بیشتر ناموفق بود؛ دوباره تلاش کن.", android.widget.Toast.LENGTH_SHORT).show()
                                     } finally { moreLoading = false }
                                 }
@@ -380,7 +420,7 @@ private fun PelakNativeApp() {
                             if (tab == 0) refresh()
                             else scope.launch {
                                 searchLoading = true
-                                try { searched = api.published(search); searchHasMore = searched.size == 100; searchError = null }
+                                try { searched = api.published(search, filters = publicFilters); searchHasMore = searched.size == 100; searchError = null }
                                 catch (_: Exception) { searchError = "جست‌وجو ناموفق بود." }
                                 finally { searchLoading = false }
                             }
@@ -464,6 +504,7 @@ private fun PelakNativeApp() {
                     session = session,
                     onLogin = { saveSession(it); tab = 4; refreshMine(it) },
                     onNavigate = { tab = it },
+                    supportMessage = supportMessage,
                     onLogout = {
                         val current = session
                         session = null; store.clear(); mine = emptyList(); revisionReasons = emptyMap();
@@ -488,18 +529,9 @@ private fun PelakNativeApp() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(photoCar.title, fontWeight = FontWeight.Bold, color = Navy)
-                CarPhoto(photoCar.imagePaths.getOrNull(photoIndex), photoCar.title,
-                    if (photoCar.userId == session?.userId) session?.accessToken else null,
-                    Modifier.fillMaxWidth().height(350.dp),
-                    contentScale = androidx.compose.ui.layout.ContentScale.Fit)
-                Text("عکس ${photoIndex + 1} از ${photoCar.imagePaths.size}")
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    TextButton(enabled = photoIndex > 0,
-                        onClick = { expandedPhoto = photoCar to (photoIndex - 1) }) { Text("قبلی") }
-                    TextButton(onClick = { expandedPhoto = null }) { Text("بستن") }
-                    TextButton(enabled = photoIndex < photoCar.imagePaths.lastIndex,
-                        onClick = { expandedPhoto = photoCar to (photoIndex + 1) }) { Text("بعدی") }
-                }
+                PhotoGallery(photoCar.imagePaths, photoCar.title,
+                    if (photoCar.userId == session?.userId) session?.accessToken else null, photoIndex)
+                TextButton(onClick = { expandedPhoto = null }) { Text("بستن") }
             }
         }
     }
@@ -557,6 +589,9 @@ private fun PelakNativeApp() {
                         Button(onClick = { editing = car; selected = null; tab = 2 }) {
                             Text("ویرایش پیش‌نویس")
                         }
+                        Button(enabled = car.imagePaths.isNotEmpty(), onClick = {
+                            ownerActionConfirm = car to "submit"; selected = null
+                        }) { Text("ارسال برای بررسی") }
                     }
                     if (car.userId == session?.userId) {
                         if (car.id in revisionReasons && car.listingStatus == "draft") {
@@ -678,11 +713,13 @@ private fun PelakNativeApp() {
             title = { Text(when (action) {
                 "cancel" -> "لغو آگهی"
                 "renew" -> "تمدید آگهی"
+                "submit" -> "ارسال برای بررسی"
                 else -> "ارسال مجدد برای بررسی"
             }) },
             text = { Text(when (action) {
                 "cancel" -> "آگهی «${car.title}» لغو شود؟ ممکن است طبق سیاست پاک‌سازی پلاک، تصاویر آن بعداً حذف شوند."
                 "renew" -> "درخواست تمدید آگهی «${car.title}» ثبت شود؟"
+                "submit" -> "آگهی «${car.title}» برای بررسی مدیر ارسال شود؟"
                 else -> "آگهی «${car.title}» پس از اصلاح برای بررسی دوباره ارسال شود؟"
             }) },
             confirmButton = {
@@ -695,6 +732,7 @@ private fun PelakNativeApp() {
                                 "cancel" -> api.cancelMyListing(active, car.id)
                                 "renew" -> api.renewMyListing(active, car.id)
                                 "resubmit" -> api.resubmitMyListing(active, car.id)
+                                "submit" -> api.submitDraft(active, car.id)
                             }
                             ownerActionConfirm = null
                             refreshMine(active)
@@ -795,6 +833,8 @@ private fun ListingsPanel(
     onSelect: (Car) -> Unit,
     onPost: () -> Unit,
     title: String = "جدیدترین آگهی‌های خودرو",
+    serverFiltered: Boolean = false,
+    onFiltersChanged: (ListingFilters) -> Unit = {},
     searchHistory: List<String> = emptyList(),
     onHistorySelect: (String) -> Unit = {},
     onHistoryClear: () -> Unit = {}
@@ -813,9 +853,14 @@ private fun ListingsPanel(
     var negotiableOnly by rememberSaveable { mutableStateOf(false) }
     var photosOnly by rememberSaveable { mutableStateOf(false) }
     var sortMode by rememberSaveable { mutableStateOf("جدیدترین") }
-    val filteredCars = remember(cars, brandFilter, cityFilter, minYear, maxYear,
+    val requestedFilters = ListingFilters(brandFilter, cityFilter, minYear, maxYear, minMileage, maxMileage,
+        minPrice, maxPrice, priceCurrency, statusFilter, negotiableOnly, photosOnly, sortMode)
+    LaunchedEffect(requestedFilters, serverFiltered) {
+        if (serverFiltered) { delay(350); onFiltersChanged(requestedFilters) }
+    }
+    val filteredCars = remember(cars, serverFiltered, brandFilter, cityFilter, minYear, maxYear,
         minMileage, maxMileage, minPrice, maxPrice, priceCurrency, statusFilter, negotiableOnly, photosOnly) {
-        cars.filter { car ->
+        if (serverFiltered) cars else cars.filter { car ->
             val searchFields = listOf(car.make, car.model, car.trim, car.title).joinToString(" ")
             val amount = car.price?.toBigDecimalOrNull()
             val priceFilterActive = minPrice.isNotBlank() || maxPrice.isNotBlank()
@@ -837,7 +882,8 @@ private fun ListingsPanel(
         }
     }
     // Compare prices only within one currency; mixed-currency feeds must not imply an FX rate.
-    val sortedCars = remember(filteredCars, sortMode, priceCurrency) {
+    val sortedCars = remember(filteredCars, sortMode, priceCurrency, serverFiltered) {
+        if (serverFiltered) return@remember filteredCars
         val sameCurrency = filteredCars.all { it.currency == priceCurrency }
         when (sortMode) {
             "ارزان‌ترین" -> if (sameCurrency)
@@ -875,13 +921,9 @@ private fun ListingsPanel(
                     }
                 }
             }
-            OutlinedTextField(
-                value = search, onValueChange = onSearchChange,
-                label = { Text("نام برند، مدل، تیپ یا شهر") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                shape = RoundedCornerShape(15.dp)
-            )
+            Box(Modifier.padding(12.dp)) {
+                VehicleBrandField(search, "نام برند، مدل، تیپ یا شهر", onSearchChange)
+            }
         }
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
@@ -959,11 +1001,11 @@ private fun ListingsPanel(
                     minMileage = ""; maxMileage = ""; minPrice = ""; maxPrice = ""
                     statusFilter = "همه"; priceCurrency = "IRR"; negotiableOnly = false; photosOnly = false
                 }) { Text("پاک‌کردن فیلترها") }
-                Text("فیلترها روی آگهی‌های بارگذاری‌شده اعمال می‌شوند. محدوده قیمت فقط آگهی‌های هم‌ارز را نشان می‌دهد و ریال به تومان تبدیل می‌شود.",
+                Text(if (serverFiltered) "فیلترها روی همهٔ آگهی‌های منتشرشده اعمال می‌شوند. مرتب‌سازی قیمت در ارز انتخاب‌شده انجام می‌شود." else "فیلترها روی آگهی‌های بارگذاری‌شده اعمال می‌شوند.",
                     color = Color.Gray, fontSize = 11.sp)
             }
         }
-        if (hasMore && sortMode != "جدیدترین") Text("مرتب‌سازی روی آگهی‌های بارگذاری‌شده انجام می‌شود.", modifier = Modifier.padding(horizontal = 16.dp), color = Color.Gray, fontSize = 11.sp)
+        if (!serverFiltered && hasMore && sortMode != "جدیدترین") Text("مرتب‌سازی روی آگهی‌های بارگذاری‌شده انجام می‌شود.", modifier = Modifier.padding(horizontal = 16.dp), color = Color.Gray, fontSize = 11.sp)
         if (loading) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
         }
@@ -1106,10 +1148,11 @@ private fun AccountPanel(
     session: PelakSession?,
     onLogin: (PelakSession) -> Unit,
     onLogout: () -> Unit,
-    onNavigate: (Int) -> Unit
+    onNavigate: (Int) -> Unit,
+    supportMessage: String? = null
 ) {
     if (session != null) {
-        PelakAccountMenu(api, session, onNavigate, onLogout)
+        PelakAccountMenu(api, session, onNavigate, onLogout, supportMessage)
     } else {
         PelakAuthPanel(api, onLogin)
     }
@@ -1144,30 +1187,24 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
         )
     }
     var negotiable by rememberSaveable(editing?.id) { mutableStateOf(editing?.priceNegotiable ?: false) }
-    var photoUris by remember(editing?.id) { mutableStateOf<List<Uri>>(emptyList()) }
-    var savedPhotoPaths by remember(editing?.id) { mutableStateOf(editing?.imagePaths.orEmpty()) }
-    var uploadedUris by remember(editing?.id) { mutableStateOf<Set<String>>(emptySet()) }
-    var draftId by remember(editing?.id) { mutableStateOf(editing?.id) }
-    var pickerNotice by remember { mutableStateOf("") }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { selected ->
-        val space = (8 - savedPhotoPaths.size).coerceAtLeast(0)
-        val merged = (photoUris + selected).distinct()
-        photoUris = merged.take(space)
-        pickerNotice = if (merged.size > space) "حداکثر ۸ عکس مجاز است؛ ${merged.size - space} عکس اضافی انتخاب نشد." else ""
+    var photos by remember(editing?.id) {
+        mutableStateOf(editing?.imagePaths.orEmpty().map { DraftPhoto(path = it) })
     }
+    var photoErrors by remember(editing?.id) { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var draftId by remember(editing?.id) { mutableStateOf(editing?.id) }
     var step by rememberSaveable(editing?.id) { mutableIntStateOf(0) }
     var working by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
     var uploadProgress by remember { mutableStateOf("") }
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().imePadding(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
             Text(if (editing == null) "ثبت آگهی خودرو" else "ویرایش آگهی",
                 fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Navy)
-            Text("ثبت مستقیم در Supabase؛ انتشار عمومی پس از بررسی مدیر انجام می‌شود.",
+            Text("آگهی را ذخیره کن و از «آگهی‌های من» برای بررسی بفرست.",
                 fontSize = 12.sp, color = Color.Gray)
         }
         item {
@@ -1182,9 +1219,9 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
         }
         if (step == 0) {
         item { NativeField("عنوان آگهی", title) { title = it } }
-        item { VehicleBrandField(make, "برند خودرو") { make = it } }
-        item { NativeField("مدل خودرو", model) { model = it } }
-        item { NativeField("تیپ خودرو", trim) { trim = it } }
+        item { VehicleBrandField(make, "برند خودرو") { if (it != make) { model = ""; trim = "" }; make = it } }
+        item { VehicleDetailField(model, make, null, "مدل خودرو") { if (it != model) trim = ""; model = it } }
+        item { VehicleDetailField(trim, make, model, "تیپ خودرو") { trim = it } }
         item { NativeField("کارکرد (کیلومتر)", mileage, KeyboardType.Number) { mileage = it.filter(Char::isDigit) } }
         item { NativeField("سال ساخت میلادی", year, KeyboardType.Number) { year = it } }
         }
@@ -1245,27 +1282,9 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                 minLines = 3, maxLines = 6)
         }
         item {
-            Text("عکس‌های خودرو: " + savedPhotoPaths.size + " ذخیره‌شده، " +
-                photoUris.count { it.toString() !in uploadedUris } + " انتخاب‌شده",
-                color = Navy, fontWeight = FontWeight.Bold)
-            TextButton(
-                onClick = { picker.launch("image/*") },
-                enabled = !working && savedPhotoPaths.size + photoUris.size < 8
-            ) { Text("＋ افزودن عکس از گالری (حداکثر ۸ عکس)") }
-            if (pickerNotice.isNotBlank()) Text(pickerNotice, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
-        }
-        if (photoUris.isNotEmpty()) item {
-            Row(Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                photoUris.forEach { uri ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        AsyncImage(model = uri, contentDescription = "عکس خودرو",
-                            modifier = Modifier.size(100.dp))
-                        TextButton(onClick = { photoUris = photoUris - uri }, enabled = !working) {
-                            Text("حذف", fontSize = 11.sp)
-                        }
-                    }
-                }
+            DraftPhotoEditor(photos, photoErrors, session.accessToken, !working) {
+                photos = it
+                photoErrors = photoErrors.filterKeys { id -> it.any { photo -> photo.id == id } }
             }
         }
         }
@@ -1316,25 +1335,30 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                                         country, city, normalizedPhone, trim, mileage.toIntOrNull(), description, vehicleStatus)
                                     savedId
                                 }
-                                for (uri in photoUris) {
-                                    if (uri.toString() in uploadedUris) continue
-                                    uploadProgress = "در حال آپلود عکس ${savedPhotoPaths.size + 1} از ۸…"
-                                    val path = api.uploadPhoto(session, context.contentResolver, uri)
-                                    val next = savedPhotoPaths + path
-                                    try { api.attachPhotos(session, id, next) }
-                                    catch (failure: Exception) {
-                                        runCatching { api.removeUnattachedPhoto(session, path) }
-                                        throw failure
-                                    }
-                                    savedPhotoPaths = next
-                                    uploadedUris = uploadedUris + uri.toString()
-                                    // A successfully attached photo is no longer pending. Keeping it
-                                    // in photoUris double-counts the 8-photo limit on the next selection.
-                                    photoUris = photoUris - uri
-                                }
-                                onSaved()
+                                photoErrors = emptyMap()
+                                // Persist removals first, then attach each successful upload in the selected order.
+                                api.attachPhotos(session, id, photos.mapNotNull { it.path })
+                                val pending = photos.filter { it.path == null }
+                                uploadPhotoBatch(pending,
+                                    onProgress = { index, count -> uploadProgress = "در حال بارگذاری عکس $index از $count…" },
+                                    upload = { photo ->
+                                        val path = api.uploadPhoto(session, context.contentResolver,
+                                            photo.uri ?: error("فایل عکس در دسترس نیست"), photo.id, photo.rotation)
+                                        photos = photos.map { if (it.id == photo.id) it.copy(path = path) else it }
+                                        api.attachPhotos(session, id, photos.mapNotNull { it.path })
+                                    },
+                                    onFailure = { photo -> photoErrors = photoErrors + (photo.id to "نیازمند تلاش دوباره") }
+                                )
+                                // One final reconciliation covers an attachment whose first response was lost.
+                                api.attachPhotos(session, id, photos.mapNotNull { it.path })
+                                val missing = photos.count { it.path == null }
+                                if (missing == 0) onSaved()
+                                else info = "پیش‌نویس ذخیره شد؛ $missing عکس باقی مانده است. دوباره ذخیره را بزن یا آن عکس را جایگزین کن."
+
+                            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                                throw cancel
                             } catch (_: Exception) {
-                                val pendingPhotos = photoUris.count { it.toString() !in uploadedUris }
+                                val pendingPhotos = photos.count { it.path == null }
                                 info = if (draftId == null) {
                                     "ثبت پیش‌نویس انجام نشد؛ اتصال اینترنت و اطلاعات آگهی را بررسی کن و دوباره تلاش کن."
                                 } else if (pendingPhotos > 0) {
@@ -1377,22 +1401,34 @@ private fun NativeField(
 }
 
 @Composable
-private fun CarPhoto(
+internal fun CarPhoto(
     path: String?, title: String, jwt: String?, modifier: Modifier = Modifier,
     contentScale: androidx.compose.ui.layout.ContentScale = androidx.compose.ui.layout.ContentScale.Crop
 ) {
     val api = remember { PelakApi() }
-    val url by produceState<String?>(null, path, jwt) {
+    val context = LocalContext.current
+    var retry by remember(path, jwt) { mutableIntStateOf(0) }
+    var failed by remember(path, jwt, retry) { mutableStateOf(false) }
+    var loaded by remember(path, jwt, retry) { mutableStateOf(false) }
+    val url by produceState<String?>(null, path, jwt, retry) {
+        value = null
+        failed = false
+        loaded = false
         value = path?.let { api.signedPhoto(it, jwt) }
+        if (path != null && value == null) failed = true
     }
-    Box(modifier.background(Pale, RoundedCornerShape(11.dp)),
-        contentAlignment = Alignment.Center) {
-        if (url == null) Text("🚘", fontSize = 27.sp)
-        else AsyncImage(
-            model = url, contentDescription = title,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = contentScale
-        )
+    val request = remember(url, path, jwt) {
+        coil.request.ImageRequest.Builder(context).data(url)
+            .memoryCacheKey(path?.let { photoCacheKey(it, jwt) })
+            .diskCacheKey(path?.let { photoCacheKey(it, jwt) }).crossfade(false).build()
+    }
+    Box(modifier.background(Pale, RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
+        if (url != null) AsyncImage(request, title, Modifier.fillMaxSize(),
+            contentScale = contentScale, onSuccess = { loaded = true; failed = false },
+            onError = { failed = true })
+        if (path == null) Text("🚘", fontSize = 27.sp)
+        else if (failed) TextButton(onClick = { retry++ }) { Text("دریافت دوبارهٔ عکس") }
+        else if (!loaded) CircularProgressIndicator(Modifier.size(24.dp))
     }
 }
 

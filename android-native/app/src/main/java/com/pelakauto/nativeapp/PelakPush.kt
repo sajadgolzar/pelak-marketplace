@@ -93,6 +93,8 @@ class PelakMessagingService : FirebaseMessagingService() {
         val body = if (updateNotice) "برای دریافت نسخه جدید، وارد پلاک شو و بررسی به‌روزرسانی را بزن."
             else message.notification?.body ?: "برای بررسی پیام جدید به پلاک برگرد."
         val launch = Intent(this, MainActivity::class.java)
+            .putExtra("pelak_kind", message.data["kind"].orEmpty())
+            .putExtra("pelak_source", message.data["source_id"].orEmpty())
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or
             if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0

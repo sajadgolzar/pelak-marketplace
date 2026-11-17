@@ -98,3 +98,43 @@ internal fun VehicleBrandField(value: String, label: String, onChange: (String) 
         }
     }
 }
+
+@Composable
+internal fun VehicleDetailField(value: String, make: String, model: String?, label: String, onChange: (String) -> Unit) {
+    val assets = LocalContext.current.assets
+    val options by produceState(emptyList<String>(), make, model) {
+        this.value = withContext(Dispatchers.IO) {
+            val catalog = assets.open("pelak-vehicle-catalog.json").bufferedReader().use { JSONArray(it.readText()) }
+            val brand = (0 until catalog.length()).map { catalog.getJSONObject(it) }
+                .firstOrNull { vehicleSearchKey(it.getString("name")) == vehicleSearchKey(make) }
+            val models = brand?.getJSONArray("models")
+            if (models == null) emptyList()
+            else if (model == null) List(models.length()) { models.getJSONObject(it).getString("name") }
+            else {
+                val selected = (0 until models.length()).map { models.getJSONObject(it) }
+                    .firstOrNull { vehicleSearchKey(it.getString("name")) == vehicleSearchKey(model) }
+                val trims = selected?.getJSONArray("trims")
+                if (trims == null) emptyList() else List(trims.length()) { trims.getString(it) }
+            }
+        }
+    }
+    var showOptions by remember(make, model) { mutableStateOf(false) }
+    Column {
+        OutlinedTextField(value, { showOptions = true; onChange(it) }, label = { Text(label) },
+            singleLine = true, modifier = Modifier.fillMaxWidth())
+        if (options.isNotEmpty()) TextButton(onClick = { showOptions = !showOptions }) {
+            Text(if (showOptions) "بستن فهرست" else "انتخاب از فهرست")
+        }
+        if (showOptions) {
+            val matches = options.filter { value.isBlank() || vehicleSearchKey(value) in vehicleSearchKey(it) }
+            androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxWidth().heightIn(max = 180.dp)) {
+                items(matches.size) { index ->
+                    Text(matches[index], Modifier.fillMaxWidth().clickable {
+                        onChange(matches[index])
+                        showOptions = false
+                    }.padding(12.dp))
+                }
+            }
+        }
+    }
+}

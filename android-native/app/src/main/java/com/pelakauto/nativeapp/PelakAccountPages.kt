@@ -22,7 +22,7 @@ internal data class ShowroomProfile(
 )
 
 @Composable
-internal fun PelakSupportPage(api: PelakApi, session: PelakSession) {
+internal fun PelakSupportPage(api: PelakApi, session: PelakSession, messageId: String? = null) {
     val scope = rememberCoroutineScope()
     var threads by remember { mutableStateOf(emptyList<SupportThread>()) }
     var messages by remember { mutableStateOf(emptyList<SupportMessage>()) }
@@ -37,6 +37,11 @@ internal fun PelakSupportPage(api: PelakApi, session: PelakSession) {
     var error by remember { mutableStateOf("") }
     var refresh by remember { mutableIntStateOf(0) }
 
+    LaunchedEffect(messageId) {
+        if (!messageId.isNullOrBlank()) {
+            runCatching { api.supportThreadForMessage(session, messageId) }.getOrNull()?.let { active = it }
+        }
+    }
     LaunchedEffect(active?.id, refresh) {
         loading = true
         error = ""
@@ -228,3 +233,4 @@ internal fun PelakNewsPage() {
         TextButton(onClick = { refresh++ }) { Text("تازه‌سازی") }
     }
 }
+

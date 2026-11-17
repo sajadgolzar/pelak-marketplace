@@ -10,6 +10,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,7 +33,8 @@ internal fun PelakAccountMenu(
     api: PelakApi,
     session: PelakSession,
     onNavigate: (Int) -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    supportMessage: String? = null
 ) {
     val context = LocalContext.current
     val email = session.email
@@ -57,6 +60,7 @@ internal fun PelakAccountMenu(
         AccountEntry("راهنما و پشتیبانی", Icons.Outlined.HelpOutline, "help"),
         AccountEntry("درباره پلاک", Icons.Outlined.Info, "about")
     )
+    LaunchedEffect(supportMessage) { if (!supportMessage.isNullOrBlank()) page = "help" }
     val currentPage = page
     if (currentPage != null) {
         BackHandler { page = null }
@@ -71,7 +75,7 @@ internal fun PelakAccountMenu(
             Box(Modifier.weight(1f)) {
                 when (currentPage) {
                     "dealer" -> PelakShowroomPage(api, session)
-                    "help" -> PelakSupportPage(api, session)
+                    "help" -> PelakSupportPage(api, session, supportMessage)
                     "news" -> PelakNewsPage()
                     "safety" -> Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("برای گزارش یک آگهی، جزئیات آن را باز کن و «گزارش آگهی» را بزن.")
@@ -156,7 +160,7 @@ internal fun PelakAccountMenu(
             onDismissRequest = { showSettings = false },
             title = { Text("تنظیمات پلاک") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("حساب کاربری", fontWeight = FontWeight.Bold)
                     Text(email, style = MaterialTheme.typography.bodySmall)
                     HorizontalDivider()
