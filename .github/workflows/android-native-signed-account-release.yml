@@ -1,4 +1,4 @@
-name: Publish PELAK Android 0.4.0 photo and listing update
+name: Publish PELAK Android 0.4.1 keyboard fix
 on:
   push:
     branches: [main]
@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
-          ref: 7f3d48fad3dff06a088faa558fca762c3898962b
+          ref: 334f43ff33a44799ea7c95c9e71f39bb93eb3c90
           path: native-source
           persist-credentials: false
       - uses: actions/setup-java@v4
@@ -88,14 +88,14 @@ jobs:
           expected=$(sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' "$RUNNER_TEMP/pelak-signing/certificate-fingerprint.txt" | head -n1 | normalize_digest)
           actual=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pelak-signing/apk-certificate.txt" | normalize_digest)
           test -n "$expected" && test "$expected" = "$actual"
-          previous="$GITHUB_WORKSPACE/downloads/PELAK-Native-v0.3.3-preview.apk"
+          previous="$GITHUB_WORKSPACE/downloads/PELAK-Native-v0.4.0-preview.apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$previous" > "$RUNNER_TEMP/pelak-signing/previous-certificate.txt"
           previous_digest=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pelak-signing/previous-certificate.txt" | normalize_digest)
           test "$previous_digest" = "$actual"
           previous_badging=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$previous")
-          grep -F "package: name='com.pelakauto.nativepreview' versionCode='6'" <<< "$previous_badging"
+          grep -F "package: name='com.pelakauto.nativepreview' versionCode='7'" <<< "$previous_badging"
           badging=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk")
-          grep -F "package: name='com.pelakauto.nativepreview' versionCode='7' versionName='0.4.0-native-preview'" <<< "$badging"
+          grep -F "package: name='com.pelakauto.nativepreview' versionCode='8' versionName='0.4.1-native-preview'" <<< "$badging"
           if grep -q '^application-debuggable' <<< "$badging"; then exit 1; fi
           icon_paths=$(sed -nE "s/^application-icon-[0-9]+:'([^']+)'$/\1/p" <<< "$badging" | sort -u)
           expected_densities=(160 240 320 480 640)
@@ -109,7 +109,7 @@ jobs:
           test "${source_hashes[*]}" = "${expected_hashes[*]}"
           unzip -p "$apk" assets/pelak-vehicle-catalog.json | cmp - app/src/main/assets/pelak-vehicle-catalog.json
           unzip -t "$apk" >/dev/null
-          cp "$apk" "$RUNNER_TEMP/PELAK-Native-v0.4.0-preview.apk"
+          cp "$apk" "$RUNNER_TEMP/PELAK-Native-v0.4.1-preview.apk"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -122,7 +122,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: pelak-native-signed-qa-apk
-          path: ${{ runner.temp }}/PELAK-Native-v0.4.0-preview.apk
+          path: ${{ runner.temp }}/PELAK-Native-v0.4.1-preview.apk
           retention-days: 7
           if-no-files-found: error
 
@@ -132,20 +132,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag=android-v0.4.0-preview
-          name=PELAK-Native-v0.4.0-preview.apk
+          tag=android-v0.4.1-preview
+          name=PELAK-Native-v0.4.1-preview.apk
           apk="$RUNNER_TEMP/$name"
           (cd "$RUNNER_TEMP" && sha256sum "$name" > "$name.sha256")
           source_commit=$(git -C native-source rev-parse HEAD)
           gh release create "$tag" "$apk" "$apk.sha256" \
-            --target "$source_commit" --prerelease --title 'PELAK Android 0.4.0 Preview' \
-            --notes 'ویرایش عکس‌ها و اصلاح آپلود، گالری، جست‌وجو و ارسال برای بررسی.'
+            --target "$source_commit" --prerelease --title 'PELAK Android 0.4.1 Preview' \
+            --notes 'اصلاح چیدمان فرم ثبت آگهی هنگام بازشدن کیبورد.'
 
       - name: Publish the APK and its update metadata together
         if: ${{ github.ref == 'refs/heads/main' }}
         run: |
           set -euo pipefail
-          name=PELAK-Native-v0.4.0-preview.apk
+          name=PELAK-Native-v0.4.1-preview.apk
           cp "$RUNNER_TEMP/$name" "downloads/$name"
           cp "$RUNNER_TEMP/$name" downloads/PELAK-Android-Latest.apk
           python3 - <<'PY'
@@ -154,25 +154,25 @@ jobs:
 
           page = Path("android.html")
           html = page.read_text(encoding="utf-8")
-          old_name = "PELAK-Native-v0.3.3-preview.apk"
-          assert html.count(old_name) == 1 and html.count("۰٫۳٫۳") == 1
-          page.write_text(html.replace(old_name, "PELAK-Native-v0.4.0-preview.apk")
-                          .replace("۰٫۳٫۳", "۰٫۴٫۰"), encoding="utf-8")
+          old_name = "PELAK-Native-v0.4.0-preview.apk"
+          assert html.count(old_name) == 1 and html.count("۰٫۴٫۰") == 1
+          page.write_text(html.replace(old_name, "PELAK-Native-v0.4.1-preview.apk")
+                          .replace("۰٫۴٫۰", "۰٫۴٫۱"), encoding="utf-8")
 
           manifest = Path("pelak-release.json")
           data = json.loads(manifest.read_text(encoding="utf-8"))
           data["android"].update(
-              versionCode=7,
-              versionName="0.4.0-native-preview",
-              apkUrl="https://pelakauto.ir/downloads/PELAK-Native-v0.4.0-preview.apk",
-              notes="ویرایش و جایگزینی عکس‌ها، اصلاح جهت تصویر و آپلود ۸ عکس، گالری روان‌تر، انتخاب مدل و تیپ و جست‌وجوی کامل.",
+              versionCode=8,
+              versionName="0.4.1-native-preview",
+              apkUrl="https://pelakauto.ir/downloads/PELAK-Native-v0.4.1-preview.apk",
+              notes="اصلاح فضای فرم هنگام بازشدن کیبورد و پیمایش مراحل ثبت آگهی.",
           )
           manifest.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android.html pelak-release.json "downloads/$name" downloads/PELAK-Android-Latest.apk
-          git commit -m 'release(web): publish signed Android 0.4.0 and in-app updates'
+          git commit -m 'release(web): publish signed Android 0.4.1 and in-app updates'
           git fetch origin main
           git rebase origin/main
           git push origin HEAD:main
