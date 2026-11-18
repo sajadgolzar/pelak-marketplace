@@ -54,17 +54,18 @@ Deno.serve(async req=>{
     if(expired.error)throw Error("expired queue unavailable");
     for(const row of expired.data||[]){
       if(!uuid.test(row.listing_id))continue;
-      const result=await db.from("listings").update({
-        listing_status:"archived",archive_reason:"revision_timeout",
-        archived_at:now,purge_after:now,updated_at:now
-      }).eq("id",row.listing_id).eq("listing_status","draft").select("id");
+      // The RPC locks listing then rejection (same order as resubmission)
+      // and checks the deadline atomically before archiving.
+      const result=await db.rpc("pelak_archive_expired_revision",{p_listing_id:row.listing_id});
       if(result.error){failed++;continue}
-      archived+=(result.data||[]).length;
+      if(result.data===true)archived++;
     }
 
     const due=await db.from("listings")
       .select("id,user_id,image_paths,purge_after,listing_status")
-      .eq("listing_status","archived").lte("purge_after",now)
+      .eq("listing_status","archived")
+      .in("archive_reason",["expired","cancelled","revision_timeout"])
+      .lte("purge_after",now)
       .is("media_purged_at",null).order("purge_after",{ascending:true}).limit(20);
     if(due.error)throw Error("retention queue unavailable");
     for(const row of due.data||[]){
@@ -94,6 +95,23 @@ Deno.serve(async req=>{
           if((check.data||[]).length){shared=true;break}
         }
         if(shared){retained++;continue}
+        // Re-read the lifecycle immediately before irreversible Storage removal.
+        // A concurrent renewal or moderation action must stop this worker.
+        const current=await db.from("listings")
+          .select("id,image_paths").eq("id",row.id)
+          .eq("listing_status","archived")
+          .in("archive_reason",["expired","cancelled","revision_timeout"])
+          .lte("purge_after",now).is("media_purged_at",null).maybeSingle();
+        if(current.error){failed++;continue}
+        if(!current.data ||
+           JSON.stringify(current.data.image_paths||[])!==JSON.stringify(referenced)){
+          retained++;continue
+        }
+        // A report submitted during the Storage checks must preserve evidence.
+        const latestReports=await db.from("pelak_listing_reports")
+          .select("id",{count:"exact",head:true}).eq("listing_id",row.id);
+        if(latestReports.error){failed++;continue}
+        if((latestReports.count||0)>0){retained++;continue}
         if(paths.length){
           const deletion=await db.storage.from("car-images").remove(paths);
           if(deletion.error){failed++;continue}
@@ -102,16 +120,40 @@ Deno.serve(async req=>{
         if(after.error || (after.data||[]).length){failed++;continue}
         const marked=await db.from("listings").update({
           image_paths:[],media_purged_at:new Date().toISOString(),updated_at:new Date().toISOString()
-        }).eq("id",row.id).eq("listing_status","archived").select("id");
+        }).eq("id",row.id).eq("listing_status","archived")
+          .in("archive_reason",["expired","cancelled","revision_timeout"])
+          .lte("purge_after",now).is("media_purged_at",null)
+          .select("id");
         if(marked.error||(marked.data||[]).length!==1){failed++;continue}
 
-        // Foreign-key RESTRICT protects conversations: keep the record if messages exist.
+        // Final deletion happens in the dedicated pass below, where both
+        // reports and conversations are checked after media is confirmed gone.
+      }catch(_){failed++}
+    }
+    // Retry records whose media was already purged but whose conversations/reports
+    // previously blocked final deletion. Never erase evidence or message history.
+    const pending=await db.from("listings").select("id")
+      .eq("listing_status","archived")
+      .in("archive_reason",["expired","cancelled","revision_timeout"])
+      .lte("purge_after",now)
+      .not("media_purged_at","is",null)
+      .eq("image_paths","{}").order("purge_after",{ascending:true}).limit(20);
+    if(pending.error)throw Error("final deletion queue unavailable");
+    for(const row of pending.data||[]){
+      if(!uuid.test(row.id))continue;
+      try {
+        const reports=await db.from("pelak_listing_reports")
+          .select("id",{count:"exact",head:true}).eq("listing_id",row.id);
         const messages=await db.from("pelak_listing_messages")
           .select("id",{count:"exact",head:true}).eq("listing_id",row.id);
-        if(messages.error || (messages.count||0)>0){retained++;continue}
+        if(reports.error||messages.error){failed++;continue}
+        if((reports.count||0)>0||(messages.count||0)>0){retained++;continue}
         const deleted=await db.from("listings").delete()
-          .eq("id",row.id).eq("listing_status","archived").select("id");
-        if(deleted.error||(deleted.data||[]).length!==1){retained++;continue}
+          .eq("id",row.id).eq("listing_status","archived")
+          .in("archive_reason",["expired","cancelled","revision_timeout"])
+          .not("media_purged_at","is",null)
+          .eq("image_paths","{}").select("id");
+        if(deleted.error||(deleted.data||[]).length!==1){failed++;continue}
         removed++;
       }catch(_){failed++}
     }

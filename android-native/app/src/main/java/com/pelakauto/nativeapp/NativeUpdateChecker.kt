@@ -17,11 +17,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 // Only our own fixed HTTPS endpoints are trusted. Metadata cannot redirect downloads to arbitrary hosts.
-private const val UPDATE_MANIFEST = "https://pelakauto.com/pelak-release.json"
-private const val APK_DOWNLOAD = "https://pelakauto.com/downloads/PELAK-Native-v0.2-preview.apk"
+private const val UPDATE_MANIFEST = "https://pelakauto.ir/pelak-release.json"
+private const val APK_DOWNLOAD = "https://pelakauto.ir/downloads/PELAK-Android-Latest.apk"
 private data class UpdateInfo(val code: Int, val label: String, val notes: String, val required: Boolean)
 
-private suspend fun fetchUpdateInfo(): UpdateInfo = withContext(Dispatchers.IO) {
+internal suspend fun loadPelakRelease(): JSONObject = withContext(Dispatchers.IO) {
     val conn = URL(UPDATE_MANIFEST).openConnection() as HttpURLConnection
     try {
         conn.connectTimeout = 8000
@@ -30,11 +30,14 @@ private suspend fun fetchUpdateInfo(): UpdateInfo = withContext(Dispatchers.IO) 
         conn.setRequestProperty("Cache-Control", "no-cache")
         if (conn.responseCode != 200) throw IllegalStateException("HTTP ${conn.responseCode}")
         val body = conn.inputStream.bufferedReader().use { it.readText() }
-        val data = JSONObject(body).getJSONObject("android")
-        val version = data.getInt("versionCode")
-        val minimum = data.optInt("minimumVersionCode", 0)
-        UpdateInfo(version, data.optString("versionName", ""), data.optString("notes", ""), minimum > BuildConfig.VERSION_CODE)
+        JSONObject(body)
     } finally { conn.disconnect() }
+}
+
+private suspend fun fetchUpdateInfo(): UpdateInfo {
+    val data = loadPelakRelease().getJSONObject("android")
+    return UpdateInfo(data.getInt("versionCode"), data.optString("versionName"), data.optString("notes"),
+        data.optInt("minimumVersionCode", 0) > BuildConfig.VERSION_CODE)
 }
 
 @Composable
@@ -90,3 +93,4 @@ internal fun NativeUpdateChecker() {
             text = { Text(msg) }, confirmButton = { TextButton(onClick = { message = null }) { Text("متوجه شدم") } })
     }
 }
+
