@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {estimate,number,parseMarket,isFresh} from '../pelak-price-core.mjs';
+const now=Date.parse('2026-11-21T00:00:00Z'),row={year:1405,price:1000000000,updatedAt:'2026-11-20T20:00:00Z'};
+const base={year:'۱۴۰۵',km:'۰',paint:0,replaced:0,technical:'healthy',repairs:0,insurance:0};
+test('Persian and Arabic digits, thousands; reject arbitrary strings',()=>{assert.equal(number('۹۱٬۰۰۰'),91000);assert.equal(number('١٢٣'),123);assert.ok(Number.isNaN(number('12abc')));assert.ok(Number.isNaN(number('')));});
+test('zero reference uses exact toman units',()=>{const v=estimate(row,base,undefined,now);assert.equal(v.center,1e9);assert.equal(v.low,900e6);});
+test('age, mileage and paint reduce the illustrative estimate',()=>{assert.ok(estimate(row,{...base,year:1403,km:60000,paint:1},undefined,now).center<1e9);});
+test('freshness blocks stale and future-dated market prices',()=>{assert.ok(isFresh(row,now));assert.throws(()=>estimate({...row,updatedAt:'2026-11-01'},base,undefined,now));assert.throws(()=>estimate({...row,updatedAt:'2027-01-01'},base,undefined,now));});
+test('structural and serious technical damage require expert',()=>{for(const input of [{structural:true},{technical:'major'},{technical:'minor'}])assert.throws(()=>estimate(row,{...base,...input},undefined,now));});
+test('invalid years, quantities and duplicate panel totals rejected',()=>{for(const input of [{year:2025},{year:1406},{year:1399},{km:-1},{km:1.5},{paint:8,replaced:4},{insurance:31000000},{repairs:-1}])assert.throws(()=>estimate(row,{...base,...input},undefined,now));});
+test('insurance discount alone never fabricates monetary credit',()=>{assert.equal(estimate(row,{...base,discount:70,months:12},undefined,now).center,1e9);assert.equal(estimate(row,{...base,insurance:1e7},undefined,now).center,1010e6);});
+test('upstream parse fails closed on missing data',()=>assert.throws(()=>parseMarket('<html>unavailable</html>')));
