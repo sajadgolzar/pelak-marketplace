@@ -8,7 +8,7 @@ export function usable(data,now=Date.now()){if(data?.schema!==1||data.currency!=
 export function modelRows(data,slug,now=Date.now()){const m=MODELS.find(v=>v[0]===slug);return m?usable(data,now).filter(r=>r.brand===m[2]&&r.model===m[3]).sort((a,b)=>b.year-a.year||a.price-b.price):[];}
 export function budgetRows(data,cap,now=Date.now()){
  if(!Number.isFinite(cap)||cap<0)return [];
- const latest=new Map();for(const r of usable(data,now)){if(/وانت|کامیون|کامیونت/.test(r.model))continue;const k=r.brand+'|'+r.model+'|'+r.trim;if(!latest.has(k)||r.year>latest.get(k).year)latest.set(k,r);}
+ const latest=new Map();for(const r of usable(data,now)){if(/وانت|کامیون|کامیونت|پراید\s*151/.test(digits(r.model)))continue;const k=r.brand+'|'+r.model+'|'+r.trim;if(!latest.has(k)||r.year>latest.get(k).year)latest.set(k,r);}
  return [...latest.values()].filter(r=>r.price<=cap).sort((a,b)=>a.price-b.price).slice(0,30);
 }
 function date(rows){const n=Math.min(...rows.map(r=>Date.parse(r.updatedAt)));return new Intl.DateTimeFormat('fa-IR',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Tehran'}).format(n);}
