@@ -23,7 +23,7 @@ async function load(){const request=++revision;$('fields').disabled=true;$('refr
  if(request!==revision)return;
  const total=data.rows.length;data.rows=data.rows.filter(r=>isFresh(r));if(!data.rows.length)throw Error('قیمت‌های ذخیره‌شده قدیمی‌اند؛ محاسبه تا دریافت قیمت تازه متوقف است.');
  const earliest=Math.min(...data.rows.map(r=>Date.parse(r.updatedAt)));const date=new Intl.DateTimeFormat('fa-IR',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Tehran'}).format(earliest);
- $('market-status').textContent=`قیمت مبنا: همراه‌مکانیک • آخرین به‌روزرسانی منبع: ${date} • ${fmt(data.rows.length)} ترکیب تیپ و سال${fallback?' • نسخه ذخیره‌شده؛ دریافت زنده موفق نبود':''}${total>data.rows.length?' • قیمت‌های قدیمی کنار گذاشته شدند':''}`;
+ $('market-status').textContent=`آخرین به‌روزرسانی قیمت‌ها: ${date} • ${fmt(data.rows.length)} ترکیب تیپ و سال${fallback?' • نسخه ذخیره‌شده؛ دریافت زنده موفق نبود':''}${total>data.rows.length?' • قیمت‌های قدیمی کنار گذاشته شدند':''}`;
  $('fields').disabled=false;searchBrands();
  }catch(e){$('market-status').textContent=e.message==='Unavailable'?'قیمت تازه در دسترس نیست؛ کمی بعد دوباره تلاش کن.':e.message;}finally{if(request===revision)$('refresh').disabled=false;}
 }
