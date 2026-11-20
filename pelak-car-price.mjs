@@ -25,6 +25,11 @@ async function load(){const request=++revision;$('fields').disabled=true;$('refr
  const earliest=Math.min(...data.rows.map(r=>Date.parse(r.updatedAt)));const date=new Intl.DateTimeFormat('fa-IR',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Tehran'}).format(earliest);
  $('market-status').textContent=`آخرین به‌روزرسانی قیمت‌ها: ${date} • ${fmt(data.rows.length)} ترکیب تیپ و سال${fallback?' • نسخه ذخیره‌شده؛ دریافت زنده موفق نبود':''}${total>data.rows.length?' • قیمت‌های قدیمی کنار گذاشته شدند':''}`;
  $('fields').disabled=false;searchBrands();
+ const params=new URLSearchParams(location.search),ref=params.get('ref'),model=params.get('model');
+ const chosen=ref?data.rows.find(r=>r.id===ref):null;
+ if(chosen){$('brand-search').value=chosen.model;searchBrands();$('brand').value=chosen.brand;resetModels();$('model').value=chosen.model;$('model').dispatchEvent(new Event('change'));$('trim').value=chosen.trim;$('trim').dispatchEvent(new Event('change'));$('base').value=chosen.id;setYears();}
+ else if(model&&model.length<=80){$('brand-search').value=model;searchBrands();const exact=[...$('model').options].find(o=>o.value===model);if(exact){$('model').value=exact.value;$('model').dispatchEvent(new Event('change'));}}
+
  }catch(e){$('market-status').textContent=e.message==='Unavailable'?'قیمت تازه در دسترس نیست؛ کمی بعد دوباره تلاش کن.':e.message;}finally{if(request===revision)$('refresh').disabled=false;}
 }
 $('refresh').addEventListener('click',load);

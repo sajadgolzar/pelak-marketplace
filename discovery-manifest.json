@@ -1,0 +1,29 @@
+{
+  "pages": [
+    "/prices/peugeot-207/",
+    "/prices/tara/",
+    "/prices/dena-plus/",
+    "/prices/runna-plus/",
+    "/prices/soren-plus/",
+    "/prices/shahin/",
+    "/prices/quick/",
+    "/prices/saina/",
+    "/prices/atlas/",
+    "/prices/sahand/",
+    "/comparisons/tara-vs-dena/",
+    "/comparisons/207-vs-runna/",
+    "/comparisons/tara-vs-shahin/",
+    "/comparisons/quick-vs-saina/",
+    "/comparisons/atlas-vs-quick/",
+    "/buying-guides/budget-1-billion/",
+    "/buying-guides/budget-2-billion/",
+    "/buying-guides/budget-3-billion/",
+    "/prices/",
+    "/comparisons/",
+    "/buying-guides/",
+    "/car-guide/"
+  ],
+  "pricePages": 10,
+  "comparisonPages": 5,
+  "budgetPages": 3
+}

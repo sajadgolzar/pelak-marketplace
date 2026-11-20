@@ -1,0 +1,64 @@
+"""Build crawlable PELAK discovery pages. No external dependencies or price snapshots in HTML."""
+import json,pathlib,html,urllib.parse
+ROOT=pathlib.Path(__file__).resolve().parents[1]
+DATA=json.loads((ROOT/'discovery-content.json').read_text())
+BASE='https://pelakauto.ir'
+E=lambda s:html.escape(str(s),quote=True)
+MODELS={m['slug']:m for m in DATA['models']}
+COMPS={c['slug']:c for c in DATA['comparisons']}
+paths=[]
+def link(path,text,cls=''):
+ return f'<a href="{E(path)}"'+(f' class="{cls}"' if cls else '')+f'>{E(text)}</a>'
+def actions(query=None,ref=None):
+ qs='?model='+urllib.parse.quote(query) if query else ''
+ find='?q='+urllib.parse.quote(query) if query else ''
+ return '<div class="actions">'+link('/car-price.html'+qs,'تخمین قیمت خودرو','button')+link('/'+find,'مشاهده آگهی‌ها در پلاک','button secondary')+'</div>'
+def cards(items):
+ return '<div class="cards">'+''.join(f'<a class="card" href="{E(p)}"><h3>{E(t)}</h3><p>{E(d)}</p></a>' for p,t,d in items)+'</div>'
+def write(path,title,description,body,parent=None,article=False):
+ url=BASE+path;crumb=[('پلاک','/'),('قیمت و راهنمای خرید','/car-guide/')]
+ if path=='/car-guide/':crumb=[('پلاک','/')]
+ if parent:crumb.append(parent)
+ trail='<nav class="crumbs" aria-label="مسیر صفحه"><ol>'+''.join('<li>'+link(p,t)+'</li>' for t,p in crumb)+f'<li aria-current="page">{E(title)}</li></ol></nav>'
+ graph=[{'@type':'BreadcrumbList','itemListElement':[{'@type':'ListItem','position':i+1,'name':t,'item':BASE+p} for i,(t,p) in enumerate(crumb+[(title,path)])]}]
+ if article:graph.append({'@type':'Article','headline':title,'description':description,'inLanguage':'fa-IR','datePublished':DATA['reviewed'],'dateModified':DATA['reviewed'],'author':{'@type':'Organization','name':'پلاک'},'publisher':{'@type':'Organization','name':'پلاک'},'mainEntityOfPage':{'@type':'WebPage','@id':url}})
+ structured=json.dumps({'@context':'https://schema.org','@graph':graph},ensure_ascii=False).replace('</','<\\/')
+ doc=f'''<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{E(title)} | پلاک</title><meta name="description" content="{E(description)}"><link rel="canonical" href="{url}"><meta property="og:type" content="{'article' if article else 'website'}"><meta property="og:title" content="{E(title)} | پلاک"><meta property="og:description" content="{E(description)}"><meta property="og:url" content="{url}"><meta name="theme-color" content="#172d43"><link rel="stylesheet" href="/discovery.css?v=1"><script type="module" src="/discovery.mjs?v=1"></script><script type="application/ld+json">{structured}</script></head><body><header><div>{link('/','PEL<span>A</span>K | پلاک','brand').replace('PEL&lt;span&gt;A&lt;/span&gt;K','PEL<span>A</span>K')}<nav class="topnav" aria-label="منوی راهنما">{link('/prices/','قیمت روز')}{link('/comparisons/','مقایسه خودرو')}{link('/buying-guides/','خرید با بودجه')}{link('/car-price.html','تخمین قیمت')}</nav></div></header><main>{trail}{body}</main><footer>{link('/','بازگشت به پلاک')} · {link('/car-guide/','قیمت و راهنمای خرید خودرو')}<p>خودروی بعدی تو، اینجاست.</p></footer></body></html>'''
+ target=ROOT/path.strip('/')/'index.html';target.parent.mkdir(parents=True,exist_ok=True);target.write_text(doc);paths.append(path)
+def market(kind,key):
+ return f'<section class="panel" aria-labelledby="market-heading"><h2 id="market-heading">'+('قیمت روز تیپ‌ها' if kind=='price' else 'کدام خودروهای صفر داخل این بودجه‌اند؟')+f'</h2><div id="market-content" data-kind="{kind}" data-key="{key}" aria-live="polite"><!--MARKET_START--><p>جدول قیمت تازه در حال دریافت است. اگر جدول نمایش داده نشد، دریافت مجدد قیمت را بزن یا محاسبه‌گر را باز کن.</p><!--MARKET_END--></div><button id="market-refresh" type="button">دریافت مجدد قیمت‌ها</button><noscript><p>برای تازه‌سازی خودکار جدول و استفاده از محاسبه‌گر، جاوااسکریپت را فعال کن. راهنمای متنی این صفحه بدون آن هم قابل خواندن است.</p></noscript></section>'
+def sections(items):return ''.join(f'<section><h2>{E(h)}</h2><p>{E(p)}</p></section>' for h,p in items)
+for m in DATA['models']:
+ title='قیمت روز '+m['name']+'؛ صفر و راهنمای قیمت کارکرده'
+ body=f'<p class="kicker">قیمت خودرو</p><h1>{E(title)}</h1><p class="lead">{E(m["intro"])}</p>'+actions(m['query'])+market('price',m['slug'])
+ body+=sections([('قبل از مقایسه قیمت، تیپ را مشخص کن',m['trim']),('در بازدید چه چیزهایی را بررسی کنیم؟',m['inspect']),('چطور از قیمت روز به تصمیم خرید برسیم؟',m['decision'])])
+ body+='<section class="panel"><h2>قیمت '+E(m['name'])+' کارکرده چگونه برآورد می‌شود؟</h2><p>در جدول، «تخمین همین تیپ» را انتخاب کن. مدل و تیپ به محاسبه‌گر منتقل می‌شود؛ سپس سال ساخت، کارکرد و وضعیت بدنه را تکمیل کن. قیمت صفرِ جدول، قیمت یک خودروی کارکرده با شرایط نامعلوم نیست. برای آسیب شاسی، سقف، ستون یا ایراد فنی جدی، ارزیابی حضوری لازم است.</p><p>اگر تیپ یا نسل خودروی تو در داده‌های موجود نیست، از نام نزدیک به جای آن استفاده نکن. در این حالت آگهی‌های واقعاً مشابه و گزارش کارشناسی، مبنای بهتری برای مذاکره‌اند.</p></section>'
+ body+='<section><h2>پرسش‌های قیمت '+E(m['name'])+'</h2><details><summary>آیا این مبلغ، قیمت فروش قطعی یا موجودی پلاک است؟</summary><p>خیر. جدول، قیمت برآوردی بازار برای خودرو صفر است. مبلغ نهایی، تحویل و موجودی باید در معامله واقعی تأیید شود.</p></details><details><summary>چرا دو خودروی هم‌سال قیمت متفاوت دارند؟</summary><p>تیپ، موتور، گیربکس، کارکرد، رنگ، سابقه تعمیر و شرایط معامله می‌توانند متفاوت باشند. ابتدا مشخصات دو نمونه را یکسان و روشن کن.</p></details><details><summary>آیا قیمت فردا یا نمودار گذشته هم وجود دارد؟</summary><p>در این بخش پیش‌بینی قیمت یا نمودار تاریخی ارائه نمی‌شود. زمان ثبت قیمت‌های موجود کنار جدول نوشته شده است.</p></details></section>'
+ if m['compare']:body+='<section><h2>مقایسه‌های مرتبط</h2>'+cards([('/comparisons/'+s+'/',COMPS[s]['title'],COMPS[s]['scope']) for s in m['compare']])+'</section>'
+ body+='<section><h2>انتخاب بر اساس بودجه</h2>'+cards([('/buying-guides/'+b['slug']+'/', 'با '+b['label']+' چه ماشینی بخریم؟','گزینه‌های صفر داخل بودجه و راهنمای بررسی کارکرده') for b in DATA['budgets']])+'</section>'
+ write('/prices/'+m['slug']+'/',title,'قیمت روز '+m['name']+' به تفکیک تیپ و سال، تخمین کارکرده و نکات مقایسه آگهی‌ها در پلاک.',body,('قیمت روز خودرو','/prices/'))
+for c in DATA['comparisons']:
+ body=f'<p class="kicker">مقایسه برای تصمیم خرید</p><h1>{E(c["title"])}</h1><p class="lead">{E(c["intro"])}</p><p class="note">دامنه مقایسه: {E(c["scope"])}</p><section class="panel"><h2>تفاوت‌های مشخص و قابل بررسی</h2><div class="table-wrap" tabindex="0" role="region" aria-label="جدول مقایسه"><table><thead><tr><th scope="col">معیار</th>'+''.join('<th scope="col">'+E(v)+'</th>' for v in c['columns'])+'</tr></thead><tbody>'+''.join('<tr><th scope="row">'+E(r[0])+'</th>'+''.join('<td>'+E(v)+'</td>' for v in r[1:])+'</tr>' for r in c['facts'])+'</tbody></table></div><p class="hint">اعداد و مشخصات این جدول مربوط به نسخه‌های ذکرشده در اسناد مبنا هستند؛ تجهیزات سال و کد کلاس دیگر را جدا بررسی کن.</p></section>'
+ body+=sections(c['sections'])
+ body+='<section class="panel"><h2>قبل از تصمیم، این چهار پاسخ را ثبت کن</h2><ul><li>نسخه دقیق و سال هر دو گزینه چیست؟</li><li>بعد از خرید، چقدر بودجه سرویس و تعمیر باقی می‌ماند؟</li><li>کدام تجهیزات برای استفاده خودت ضروری‌اند؟</li><li>گزارش مستقل بدنه و فنی چه تفاوتی بین دو نمونه نشان می‌دهد؟</li></ul><p>این راهنما تجربه تست رانندگی یا رتبه‌بندی ایمنی آزمایشگاهی ارائه نمی‌کند. نتیجه انتخاب به نیاز تو و وضعیت همان دو خودروی مورد معامله وابسته است.</p></section>'
+ body+='<section><h2>قیمت روز و آگهی‌های مرتبط</h2>'+cards([('/prices/'+s+'/', 'قیمت روز '+MODELS[s]['name'],'جدول تیپ‌ها و اتصال به تخمین قیمت کارکرده') for s in c['models']])+actions()+'</section>'
+ body+='<details class="sources"><summary>اسناد فنی این مقایسه</summary><ul>'+''.join('<li>'+link(url,title)+'</li>' for title,url in c['sources'])+'</ul><p>بازبینی محتوای راهنما: ۳۰ آبان ۱۴۰۵. نسخه‌های قدیمی اسناد، جای مشخصات همان کد محصول مورد معامله را نمی‌گیرند.</p></details>'
+ write('/comparisons/'+c['slug']+'/',c['title'],c['scope']+'؛ بررسی تفاوت‌ها، نیاز خریدار و قیمت روز در پلاک.',body,('مقایسه خودرو','/comparisons/'),True)
+for b in DATA['budgets']:
+ title='با '+b['label']+' چه ماشینی بخریم؟'
+ body='<p class="kicker">راهنمای خرید بر اساس بودجه</p><h1>'+E(title)+'</h1><p class="lead">'+E(b['intro'])+'</p>'+market('budget',b['slug'])+sections(b['sections'])
+ body+=f'''<section class="panel"><h2>سقف واقعی خرید خودت را حساب کن</h2><p>هزینه‌ها را با مبلغ واقعی یا برآورد خودت وارد کن؛ هیچ نرخ قانونی یا هزینه ثابتی در این فرم فرض نشده است.</p><form id="ownership-form" class="filter"><label>کل بودجه (تومان)<input id="total-budget" inputmode="numeric" value="{b['cap']}" required></label><label>جمع هزینه‌های کنارگذاشته‌شده (تومان)<input id="ownership-costs" inputmode="numeric" value="0" required></label><button type="submit">محاسبه سقف خرید</button></form><p class="hint">کارشناسی، بیمه، هزینه‌های معامله و سرویس اولیه را طبق وضعیت واقعی خودت جمع کن. این محاسبه، قیمت خودرو یا مبلغ الزامی هزینه‌ها را تعیین نمی‌کند.</p><p id="ownership-result" role="status"></p></section>'''
+ body+='<section><h2>مسیر بررسی آگهی کارکرده</h2><ol><li>تیپ، سال، کارکرد و وضعیت بدنه را از فروشنده بخواه.</li><li>چند آگهی واقعاً مشابه را کنار هم بگذار؛ قیمت درخواستی را با قیمت معامله قطعی یکی ندان.</li><li>قبل از تصمیم نهایی، گزارش کارشناسی مستقل و هزینه رفع ایرادها را بگیر.</li></ol>'+actions()+'</section><section><h2>مقایسه‌هایی که به انتخاب کمک می‌کنند</h2>'+cards([('/comparisons/'+c['slug']+'/',c['title'],'مقایسه کاربرد و نسخه مشخص؛ قرارگرفتن در بودجه را با جدول تازه بررسی کن') for c in DATA['comparisons'][:4]])+'</section>'
+ write('/buying-guides/'+b['slug']+'/',title,'گزینه‌های صفر تا '+b['label']+' بر اساس قیمت تازه، راهنمای بررسی کارکرده و محاسبه سقف هزینه خرید.',body,('راهنمای خرید با بودجه','/buying-guides/'),True)
+pricecards=[('/prices/'+m['slug']+'/', 'قیمت '+m['name'],m['intro']) for m in DATA['models']]
+compcards=[('/comparisons/'+c['slug']+'/',c['title'],c['scope']) for c in DATA['comparisons']]
+budgetcards=[('/buying-guides/'+b['slug']+'/', 'خرید خودرو با '+b['label'],'گزینه‌های صفر داخل بودجه، راهنمای کارکرده و سقف هزینه خرید') for b in DATA['budgets']]
+write('/prices/','قیمت روز خودروهای صفر و راهنمای قیمت کارکرده','قیمت ده مدل خودرو به تفکیک تیپ و سال و اتصال به تخمین قیمت کارکرده در پلاک.','<h1>قیمت روز خودرو</h1><p class="lead">مدل را انتخاب کن تا قیمت تازه تیپ‌های آن و مسیر تخمین کارکرده را ببینی.</p><label>جست‌وجوی نام خودرو<input id="model-search" type="search" placeholder="مثلاً ۲۰۷ یا شاهین"></label>'+cards(pricecards).replace('class="card"','class="card" data-model-card')+'<p id="search-empty" hidden role="status">مدلی پیدا نشد؛ نام دیگری را امتحان کن.</p>')
+write('/comparisons/','مقایسه خودرو؛ انتخاب مناسب نیاز و بودجه','پنج مقایسه کاربردی خودرو با تفکیک نسخه، تفاوت‌های مستند و اتصال به قیمت روز در پلاک.','<h1>مقایسه خودرو</h1><p class="lead">ابتدا نسخه دقیق را مشخص کن، بعد تفاوت‌ها را با نیاز واقعی خودت بسنج.</p>'+cards(compcards))
+write('/buying-guides/','راهنمای خرید خودرو بر اساس بودجه','راهنمای خرید خودرو تا یک، دو و سه میلیارد تومان با گزینه‌های قیمت تازه و بررسی هزینه کل خرید.','<h1>با بودجه تو چه خودرویی مناسب است؟</h1><p class="lead">بودجه را انتخاب کن؛ گزینه‌های صفر و مسیر بررسی کارکرده جدا نشان داده می‌شوند.</p>'+cards(budgetcards))
+write('/car-guide/','قیمت روز، مقایسه و راهنمای خرید خودرو','قیمت ده مدل خودرو، پنج مقایسه کاربردی و سه راهنمای بودجه؛ از بررسی قیمت تا مشاهده آگهی در پلاک.','<p class="kicker">پیش از خرید، انتخابت را روشن کن</p><h1>از قیمت امروز تا انتخاب خودروی بعدی</h1><p class="lead">قیمت تیپ دقیق را ببین، دو گزینه را مقایسه کن و هزینه خرید را با بودجه‌ات بسنج.</p><nav class="toc" aria-label="بخش‌های راهنما"><a href="#price-models">قیمت روز مدل‌ها</a><a href="#compare-models">مقایسه خودرو</a><a href="#budget-guides">انتخاب با بودجه</a></nav><section id="price-models"><h2>قیمت روز خودروها</h2>'+cards(pricecards)+'</section><section id="compare-models"><h2>کدام خودرو برای تو مناسب‌تر است؟</h2>'+cards(compcards)+'</section><section id="budget-guides"><h2>بودجه تو، فهرست انتخاب تو</h2>'+cards(budgetcards)+'</section>'+actions())
+urls=['/','/car-price']+sorted(paths)
+(ROOT/'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+''.join('<url><loc>'+BASE+p+'</loc></url>' for p in urls)+'</urlset>\n')
+(ROOT/'robots.txt').write_text('User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://pelakauto.ir/sitemap.xml\n')
+(ROOT/'discovery-manifest.json').write_text(json.dumps({'pages':paths,'pricePages':10,'comparisonPages':5,'budgetPages':3},ensure_ascii=False,indent=2))
+print('Built',len(paths),'pages and',len(urls),'sitemap entries')
