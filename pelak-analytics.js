@@ -29,18 +29,18 @@
   const grid=$('adminListings');if(!grid?.parentNode)return;
   const panel=el('section','pelak-analytics-panel');panel.id='pelakAnalyticsPanel';panel.hidden=true;
   panel.innerHTML=[
-    '<div class="pa-head"><h3>📊 آمار بازدید پلاک</h3><p>شمارش تقریبی نشست‌های بازدید؛ فقط برای مدیر اصلی</p></div>',
+    '<div class="pa-head"><h3>📊 آمار پلاک</h3><p>آمار بازدید و دریافت برنامه؛ فقط برای مدیر اصلی</p></div>',
     '<div class="pa-actions"><label>بازه آماری <select id="paDays"><option value="7">۷ روز</option><option value="30" selected>۳۰ روز</option><option value="90">۹۰ روز</option><option value="365">یک سال</option><option value="730">دو سال</option><option value="1825">پنج سال</option><option value="3650">ده سال</option></select></label>',
     '<button type="button" id="paReload" class="btn outline mini">به‌روزرسانی آمار</button></div>',
     '<p id="paMsg" role="status">در حال دریافت آمار…</p>',
-    '<div class="pa-metrics"><div>بازدید سایت<strong id="paSite">—</strong></div><div>بازدید جزئیات آگهی‌ها<strong id="paListing">—</strong></div></div>',
+    '<div class="pa-metrics"><div>بازدید سایت<strong id="paSite">—</strong></div><div>بازدید جزئیات آگهی‌ها<strong id="paListing">—</strong></div><div>کلیک دانلود اندروید<strong id="paAndroidClicks">—</strong></div></div>',
     '<h4>روند روزانه (۱۴ روز آخر بازه)</h4><div id="paDaily" class="pa-daily"></div>',
     '<div class="pa-search"><h4>تعداد بازدید هر آگهی</h4><input id="paSearch" type="search" placeholder="جست‌وجوی برند، مدل یا عنوان…" maxlength="80"></div>',
     '<div class="pa-overflow"><table><thead><tr><th>آگهی</th><th>وضعیت</th><th>بازدید</th></tr></thead><tbody id="paRows"></tbody></table></div>',
     '<div id="paPager" class="pa-pager"></div>',
-    '<p class="pa-note">شمارش از زمان نصب SQL شروع می‌شود. هر نشست مرورگر حداکثر یک‌بار در روز برای سایت و یک‌بار برای هر آگهی محاسبه می‌شود. آمار، افراد یکتای واقعی نیست و احتمال بازدید ربات وجود دارد.</p>'
+    '<p class="pa-note">کلیک دانلود APK از زمان فعال‌شدن شمارش ثبت می‌شود؛ هر نشست مرورگر حداکثر یک کلیک در روز. این عدد تکمیل دانلود یا نصب را نشان نمی‌دهد. هر نشست مرورگر حداکثر یک‌بار در روز برای سایت و یک‌بار برای هر آگهی محاسبه می‌شود. آمار، افراد یکتای واقعی نیست و احتمال بازدید ربات وجود دارد.</p>'
   ].join('');
-  const toggle=el('button','btn outline','📊 نمایش آمار بازدید');
+  const toggle=el('button','btn outline','📊 نمایش آمار');
   toggle.type='button';toggle.id='pelakAnalyticsToggle';toggle.hidden=true;
   toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls',panel.id);
   toggle.style.cssText='margin:14px 0 8px;max-width:100%;width:fit-content;';
@@ -59,6 +59,15 @@
     const id=++token;$('paMsg').textContent='در حال دریافت آمار…';
     try{
       const c=await client();if(!c)throw Error('اتصال Supabase برقرار نیست.');
+      $('paAndroidClicks').textContent='—';
+      void (async () => {
+        try {
+          const result = await c.rpc('pelak_android_download_click_count', {p_days:Number(days.value)});
+          if (id === token && !panel.hidden && !result.error) $('paAndroidClicks').textContent=num(result.data);
+        } catch (_) {
+          // Download analytics can fail independently of visit analytics.
+        }
+      })();
       const r=await c.rpc('pelak_analytics_report',{p_days:Number(days.value),p_page:page,p_search:search.value.trim()});
       if(r.error)throw r.error;if(id!==token||panel.hidden)return;
       const data=r.data||{};
@@ -89,13 +98,13 @@
   }
   function setRole(role){
     const owner=role==='super_admin';toggle.hidden=!owner;panel.hidden=!owner;
-    if(!owner){panel.classList.add('pa-collapsed');toggle.setAttribute('aria-expanded','false');toggle.textContent='📊 نمایش آمار بازدید';}
+    if(!owner){panel.classList.add('pa-collapsed');toggle.setAttribute('aria-expanded','false');toggle.textContent='📊 نمایش آمار';}
   }
   toggle.onclick=()=>{
     const opening=panel.classList.contains('pa-collapsed');
     panel.classList.toggle('pa-collapsed',!opening);
     toggle.setAttribute('aria-expanded',String(opening));
-    toggle.textContent=opening?'📊 بستن آمار بازدید':'📊 نمایش آمار بازدید';
+    toggle.textContent=opening?'📊 بستن آمار':'📊 نمایش آمار';
     if(opening)void refresh();
   };
   window.addEventListener('pelak:admin-role',e=>setRole(e.detail?.role));
