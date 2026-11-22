@@ -1,0 +1,42 @@
+name: Verify PELAK Android signing recovery
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/verify-android-signing.yml']
+  workflow_dispatch:
+permissions: {}
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Recover and test the original signing key
+        env:
+          ENCRYPTED_KEYSTORE: ${{ secrets.PELAK_ANDROID_ENCRYPTED_KEYSTORE_B64 }}
+          BACKUP_PASSWORD: ${{ secrets.PELAK_ANDROID_BACKUP_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.PELAK_ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.PELAK_ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.PELAK_ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          for name in ENCRYPTED_KEYSTORE BACKUP_PASSWORD STORE_PASSWORD KEY_PASSWORD KEY_ALIAS; do
+            if [[ -z "${!name}" ]]; then echo "::error::Missing signing input: $name"; exit 1; fi
+          done
+          work=$(mktemp -d)
+          trap 'rm -rf "$work"' EXIT
+          printf '%s' "$ENCRYPTED_KEYSTORE" | tr -d '[:space:]' | base64 --decode > "$work/key.enc"
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in "$work/key.enc" -out "$work/key.jks" -pass env:BACKUP_PASSWORD
+          expected=023d6082c50c0e1da26a3853719e149ad814bee75d575af8d5e57e1c49390ef0
+          actual=$(keytool -exportcert -keystore "$work/key.jks" -storepass:env STORE_PASSWORD -alias "$KEY_ALIAS" | sha256sum | cut -d ' ' -f 1)
+          if [[ "$expected" != "$actual" ]]; then echo '::error::Certificate differs from published APK'; exit 1; fi
+          printf 'PELAK signing recovery check\n' > "$work/probe.txt"
+          jar --create --file "$work/probe.jar" -C "$work" probe.txt
+          jarsigner -keystore "$work/key.jks" -storepass:env STORE_PASSWORD -keypass:env KEY_PASSWORD "$work/probe.jar" "$KEY_ALIAS" > "$work/sign.log" 2>&1 || { echo '::error::Test signing failed'; exit 1; }
+          jarsigner -verify "$work/probe.jar" > "$work/verify.log" 2>&1
+          grep -Fq 'jar verified.' "$work/verify.log"
+          echo 'Original certificate matched and test signing succeeded.'
