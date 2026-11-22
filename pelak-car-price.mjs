@@ -47,7 +47,11 @@ async function load(){const request=++revision;$('fields').disabled=true;$('refr
 $('refresh').addEventListener('click',load);
 $('price-form').addEventListener('submit',e=>{e.preventDefault();hideResult();try{
  const row=data.rows.find(r=>r.id===$('base').value),input=Object.fromEntries(ids.map(id=>[id,$(id).value]));input.structural=$('structural').checked;
- const out=estimate(row,input);const low=document.createElement('bdi'),high=document.createElement('bdi'),to=document.createElement('span');low.dir=high.dir='ltr';low.textContent=fmt(out.low);high.textContent=fmt(out.high);to.textContent='تا';$('range').replaceChildren(low,to,high);$('result-model').textContent=`${row.brand} ${row.model} ${row.trim} • سال ${fmt(input.year)} • ${fmt(number(input.km))} کیلومتر`;
+ const out=estimate(row,input);
+ const listingsUrl=new URL('./',location.href);
+ listingsUrl.searchParams.set('q',row.brand+' '+row.model);
+ $('related-listings').href=listingsUrl.href;
+ const low=document.createElement('bdi'),high=document.createElement('bdi'),to=document.createElement('span');low.dir=high.dir='ltr';low.textContent=fmt(out.low);high.textContent=fmt(out.high);to.textContent='تا';$('range').replaceChildren(low,to,high);$('result-model').textContent=`${row.brand} ${row.model} ${row.trim} • سال ${fmt(input.year)} • ${fmt(number(input.km))} کیلومتر`;
  const rows=[['قیمت صفر مبنا ('+fmt(row.year)+')',fmt(row.price)+' تومان'],['افت سن و استفاده',fmt(Math.round(out.ageDrop*10)/10)+'٪'],['افت کارکرد مازاد',fmt(Math.round(out.kmDrop*10)/10)+'٪'],['افت رنگ و تعویض قطعات',fmt(out.bodyDrop)+'٪'],['هزینه تعمیر کسرشده',fmt(out.repairs)+' تومان'],['ارزش بیمه افزوده‌شده',fmt(out.insurance)+' تومان']];
  $('breakdown').replaceChildren();for(const [k,v]of rows){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;$('breakdown').append(dt,dd);}
  $('insurance-summary').textContent=`بیمه: ${fmt(input.months)} ماه اعتبار، ${fmt(input.discount)}٪ تخفیف اعلامی. اثر عددی بیمه فقط بر اساس مبلغ قابل احتساب واردشده توسط شماست.`;
