@@ -19,9 +19,21 @@ for(const id of ids)$(id).addEventListener('input',hideResult);
 function validDataset(d){return d?.schema===1&&d.currency==='TOMAN'&&Array.isArray(d.rows)&&d.rows.length>0&&d.rows.every(r=>typeof r.id==='string'&&typeof r.brand==='string'&&typeof r.model==='string'&&typeof r.trim==='string'&&Number.isInteger(r.year)&&Number.isSafeInteger(r.price)&&r.price>0&&Number.isFinite(Date.parse(r.updatedAt)));}
 async function getJson(url){const c=new AbortController(),t=setTimeout(()=>c.abort(),15000);try{const r=await fetch(url,{signal:c.signal,cache:'no-store'});if(!r.ok)throw Error('Unavailable');const d=await r.json();if(!validDataset(d))throw Error('Invalid data');return d;}finally{clearTimeout(t);}}
 async function load(){const request=++revision;$('fields').disabled=true;$('refresh').disabled=true;hideResult();$('market-status').textContent='در حال دریافت قیمت‌های پایه…';let fallback=false;
- try{try{data=await getJson('https://pelakauto.ir/api/car-prices');}catch{data=await getJson('./pelak-market-snapshot.json');fallback=true;}
+ try{
+ let dataset, freshRows;
+ try {
+   dataset=await getJson('https://pelakauto.ir/api/car-prices');
+   freshRows=dataset.rows.filter(r=>isFresh(r));
+   if(!freshRows.length)throw Error('Live prices expired');
+ } catch {
+   dataset=await getJson('./pelak-market-snapshot.json');
+   freshRows=dataset.rows.filter(r=>isFresh(r));
+   fallback=true;
+ }
  if(request!==revision)return;
- const total=data.rows.length;data.rows=data.rows.filter(r=>isFresh(r));if(!data.rows.length)throw Error('قیمت‌های ذخیره‌شده قدیمی‌اند؛ محاسبه تا دریافت قیمت تازه متوقف است.');
+ if(!freshRows.length)throw Error('قیمت‌های ذخیره‌شده قدیمی‌اند؛ محاسبه تا دریافت قیمت تازه متوقف است.');
+ const total=dataset.rows.length;
+ data={...dataset,rows:freshRows};
  const earliest=Math.min(...data.rows.map(r=>Date.parse(r.updatedAt)));const date=new Intl.DateTimeFormat('fa-IR',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Tehran'}).format(earliest);
  $('market-status').textContent=`آخرین به‌روزرسانی قیمت‌ها: ${date} • ${fmt(data.rows.length)} ترکیب تیپ و سال${fallback?' • نسخه ذخیره‌شده؛ دریافت زنده موفق نبود':''}${total>data.rows.length?' • قیمت‌های قدیمی کنار گذاشته شدند':''}`;
  $('fields').disabled=false;searchBrands();
