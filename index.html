@@ -3579,7 +3579,7 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
  const imgPaths=r=>Array.isArray(r.image_paths)?r.image_paths.filter(p=>typeof p==='string'&&p.trim()):[];
  function lookupRow(card){let r=null;const id=card.dataset.listingId;if(!id)return null;
   try{r=(card.closest('#carsGrid')?publicRows:myRows).find(x=>String(x.id)===String(id));}catch(_){}return r;}
- function shareUrl(id){const url=new URL(window.location.href);url.searchParams.set('listing',String(id));url.hash='';return url.toString();}
+ function shareUrl(id){const url=new URL(window.location.href);url.searchParams.set('listing',String(id));url.searchParams.set('src','share');url.hash='';return url.toString();}
  async function pelakCopyLink(url){try{await navigator.clipboard.writeText(url);alert('لینک همین آگهی کپی شد.');}catch(_){prompt('لینک را کپی کن:',url);}}
  async function nativeShare(row){const url=shareUrl(row.id);try{if(navigator.share){await navigator.share({title:row.title||'آگهی پلاک',text:'این آگهی خودرو را در پلاک ببین:',url});return;}}catch(e){if(e?.name==='AbortError')return;}
   await pelakCopyLink(url);
@@ -3850,7 +3850,7 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
   else n.textContent='✓ علاقه‌مندی‌ها به حساب پلاک متصل‌اند و روی دستگاه‌های دیگر نیز قابل دسترسی‌اند.';
   const retry=$('pelakFavSyncRetry');if(retry)retry.hidden=(!activeAccount||syncing||syncReady);
  }
- function shareLink(id){const u=new URL(location.href);u.searchParams.set('listing',id);u.hash='';return u.href;}
+ function shareLink(id){const u=new URL(location.href);u.searchParams.set('listing',id);u.searchParams.set('src','share');u.hash='';return u.href;}
  function priceText(r){try{return typeof pelakReadablePrice==='function'?pelakReadablePrice(r.price,r.currency,r.price_negotiable):r.price_negotiable?'توافقی':digits(r.price)+' '+(r.currency||'');}catch(_){return r.price_negotiable?'توافقی':digits(r.price)+' '+(r.currency||'');}}
  function yearText(r){try{return window.pelakModelYearText(r.year)}catch(_){return r.year||'—'}}
  function toast(msg){let t=$('pelakFavToast');if(!t){t=document.createElement('div');t.id='pelakFavToast';t.className='pelak-fav-toast';t.setAttribute('role','status');document.body.append(t);}t.textContent=msg;t.hidden=false;clearTimeout(toast._timeout);toast._timeout=setTimeout(()=>t.hidden=true,2600);}

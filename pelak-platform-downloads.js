@@ -163,7 +163,7 @@
       const type = choice.getAttribute('data-pelak-platform');
       closeMenu();
       if (type === 'web') { event.preventDefault(); openWebGuide(); }
-      else if (type === 'ios') { event.preventDefault(); openIosGuide(); }
+      else if (type === 'ios') { event.preventDefault(); openIosGuide(); window.pelakTrackIosGuide?.(); }
       /* Android: keep the normal download link; no WebView APK or fake app-store link. */
     });
   }

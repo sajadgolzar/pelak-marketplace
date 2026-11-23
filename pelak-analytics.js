@@ -20,10 +20,42 @@
       await c.rpc('pelak_analytics_record',{p_visitor_key:sid,p_listing_id:listingId});
     }catch(_){/* Never block the site due to analytics. */}
   }
+  const source = new URLSearchParams(location.search);
+  let growthId;
+  async function growth(event) {
+    try {
+      const c = await client();
+      if (!c || !growthId) return false;
+      const { error } = await c.rpc('pelak_growth_record', { p_event:event, p_visitor:growthId });
+      return !error;
+    } catch (_) { return false; }
+  }
+  try {
+    const key = 'pelak_growth_browser_v1';
+    growthId = localStorage.getItem(key) || crypto.randomUUID();
+    localStorage.setItem(key, growthId);
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Tehran' }).format(new Date());
+    const sharedDay = localStorage.getItem('pelak_growth_share_day');
+    if (sharedDay && sharedDay !== today) void growth('share_return');
+    const ios = /iPhone|iPod|iPad/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (ios && (navigator.standalone || matchMedia('(display-mode: standalone)').matches) &&
+        !localStorage.getItem('pelak_growth_ios_seen')) {
+      void growth('ios_launch').then(ok => { if (ok) localStorage.setItem('pelak_growth_ios_seen','1'); }).catch(() => {});
+    }
+    window.pelakTrackIosGuide = () => { if (ios) void growth('ios_guide'); };
+    window.pelakTrackSharedOpen = row => {
+      if (source.get('src') !== 'share' || source.get('listing') !== String(row.id)) return;
+      void growth('share_open').then(ok => {
+        if (ok && !localStorage.getItem('pelak_growth_share_day')) localStorage.setItem('pelak_growth_share_day', today);
+      }).catch(() => {});
+    };
+  } catch (_) { /* Analytics remains optional when browser storage is unavailable. */ }
   void record();
   window.pelakTrackListingView=function(row){
     if(!row?.id||row.listing_status!=='published')return;
     if(typeof user!=='undefined'&&user?.id===row.user_id)return;
+    window.pelakTrackSharedOpen?.(row);
     void record(row.id);
   };
   const grid=$('adminListings');if(!grid?.parentNode)return;
@@ -34,6 +66,7 @@
     '<button type="button" id="paReload" class="btn outline mini">به‌روزرسانی آمار</button></div>',
     '<p id="paMsg" role="status">در حال دریافت آمار…</p>',
     '<div class="pa-metrics"><div>بازدید سایت<strong id="paSite">—</strong></div><div>بازدید جزئیات آگهی‌ها<strong id="paListing">—</strong></div><div>کلیک دانلود اندروید<strong id="paAndroidClicks">—</strong></div></div>',
+    '<p id="paGrowth" class="pa-note"></p>',
     '<h4>روند روزانه (۱۴ روز آخر بازه)</h4><div id="paDaily" class="pa-daily"></div>',
     '<div class="pa-search"><h4>تعداد بازدید هر آگهی</h4><input id="paSearch" type="search" placeholder="جست‌وجوی برند، مدل یا عنوان…" maxlength="80"></div>',
     '<div class="pa-overflow"><table><thead><tr><th>آگهی</th><th>وضعیت</th><th>بازدید</th></tr></thead><tbody id="paRows"></tbody></table></div>',
@@ -60,6 +93,15 @@
     try{
       const c=await client();if(!c)throw Error('اتصال Supabase برقرار نیست.');
       $('paAndroidClicks').textContent='—';
+      $('paGrowth').textContent='';
+      void c.rpc('pelak_growth_counts').then(({data:g,error}) => {
+        if(error || !g || id!==token || panel.hidden) return;
+        const rate = g.share_cohort ? num(Math.round(100*g.share_returned/g.share_cohort))+'٪' : 'داده کافی نیست';
+        $('paGrowth').textContent = '۳۰ روز اخیر • آیفون: '+num(g.ios_guide)+' مرورگر بازکنندهٔ راهنما، '
+          +num(g.ios_launch)+' اولین اجرای ثبت‌شدهٔ وب‌اپ • اشتراک: '+num(g.share_open)
+          +' مرورگر ورودی • بازگشت هفت‌روزهٔ گروه‌های کامل: '+rate;
+      }).catch(() => {});
+
       void (async () => {
         try {
           const result = await c.rpc('pelak_android_download_click_count', {p_days:Number(days.value)});
