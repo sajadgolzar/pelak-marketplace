@@ -228,3 +228,99 @@
     };
   }
 })();
+
+(() => {
+  'use strict';
+
+  const pageSize = 50;
+  let refreshRole;
+
+  window.addEventListener('pelak:admin-role', ({ detail }) => {
+    refreshRole?.(detail?.role);
+  });
+
+  const owner = document.getElementById('adminOwnerTools');
+  if (!owner) return;
+
+  const section = document.createElement('details');
+  section.hidden = true;
+  const summary = document.createElement('summary');
+  summary.textContent = 'کاربران ثبت‌نام‌شده';
+  const status = document.createElement('p');
+  status.setAttribute('role', 'status');
+  const list = document.createElement('ul');
+
+  const button = (label, action) => {
+    const element = document.createElement('button');
+    element.type = 'button';
+    element.className = 'btn outline mini';
+    element.textContent = label;
+    element.onclick = action;
+    return element;
+  };
+
+  let offset = 0;
+  let revision = 0;
+  const previous = button('صفحهٔ قبل', () => load(offset - pageSize));
+  const next = button('صفحهٔ بعد', () => load(offset + pageSize));
+  const refresh = button('به‌روزرسانی', () => load(offset));
+  const dates = new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium' });
+
+  async function load(start) {
+    if (section.hidden || !section.open) return;
+    const request = ++revision;
+    status.textContent = 'در حال دریافت کاربران…';
+    list.replaceChildren();
+    previous.disabled = next.disabled = refresh.disabled = true;
+
+    try {
+      const { data, error } = await db.rpc('pelak_owner_registered_users', { p_offset: start });
+      if (request !== revision) return;
+      if (error) throw error;
+      offset = start;
+      for (const user of data.slice(0, pageSize)) {
+        const item = document.createElement('li');
+        const listing = user.has_draft ? 'دارای پیش‌نویس' : user.has_listing ? 'دارای آگهی' : 'بدون آگهی';
+        item.style.overflowWrap = 'anywhere';
+        item.textContent = [
+          user.email || 'ایمیل ثبت نشده',
+          user.phone || 'شماره ثبت نشده',
+          user.registered_at ? dates.format(new Date(user.registered_at)) : 'تاریخ نامشخص',
+          listing,
+        ].join(' • ');
+        list.append(item);
+      }
+      status.textContent = data.length ? 'صفحهٔ ' + new Intl.NumberFormat('fa-IR').format(offset / pageSize + 1) : 'کاربری در این صفحه وجود ندارد.';
+      previous.disabled = offset === 0;
+      next.disabled = data.length <= pageSize;
+    } catch {
+      if (request === revision) {
+        status.textContent = 'دریافت فهرست ممکن نشد. دوباره امتحان کنید.';
+        previous.disabled = offset === 0;
+      }
+    } finally {
+      if (request === revision) refresh.disabled = false;
+    }
+  }
+
+  refreshRole = (role) => {
+    const allowed = role === 'super_admin';
+    section.hidden = !allowed;
+    if (!allowed) {
+      revision++;
+      offset = 0;
+      section.open = false;
+      status.textContent = '';
+      list.replaceChildren();
+    }
+  };
+  section.addEventListener('toggle', () => {
+    if (section.open) load(0);
+    else {
+      revision++;
+      list.replaceChildren();
+    }
+  });
+  section.append(summary, status, list, previous, next, refresh);
+  owner.prepend(section);
+})();
