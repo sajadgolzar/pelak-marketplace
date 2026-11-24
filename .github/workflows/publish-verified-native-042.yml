@@ -1,0 +1,53 @@
+name: Publish verified Android 0.4.2
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-verified-native-042.yml']
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: pelak-native-signed-qa-apk
+          run-id: 45357678014
+          github-token: ${{ github.token }}
+          path: verified
+      - name: Verify and publish the tested APK
+        run: |
+          set -euo pipefail
+          apk=verified/PELAK-Native-v0.4.1-preview.apk
+          tools="$ANDROID_HOME/build-tools/35.0.0"
+          if [[ ! -x "$tools/apksigner" ]]; then sdkmanager 'build-tools;35.0.0'; fi
+          digest() { "$tools/apksigner" verify --print-certs "$1" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p'; }
+          expected=$(digest downloads/PELAK-Native-v0.4.1-preview.apk)
+          test -n "$expected"
+          test "$expected" = "$(digest "$apk")"
+          "$tools/aapt" dump badging "$apk" > /tmp/pelak-badging
+          grep -F "package: name='com.pelakauto.nativepreview' versionCode='9' versionName='0.4.2-native-preview'" /tmp/pelak-badging
+          ! grep -q '^application-debuggable' /tmp/pelak-badging
+          cp "$apk" downloads/PELAK-Native-v0.4.2-preview.apk
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('pelak-release.json')
+          release = json.loads(p.read_text())
+          assert release['android']['versionCode'] == 8
+          release['android'].update(versionCode=9, versionName='0.4.2-native-preview',
+              apkUrl='https://pelakauto.ir/downloads/PELAK-Native-v0.4.2-preview.apk',
+              notes='ادامهٔ آخرین جست‌وجو از صفحهٔ آگهی‌ها.')
+          p.write_text(json.dumps(release, ensure_ascii=False, indent=2) + '\n')
+          p = Path('android.html')
+          html = p.read_text()
+          assert 'PELAK-Native-v0.4.1-preview.apk' in html
+          p.write_text(html.replace('PELAK-Native-v0.4.1-preview.apk', 'PELAK-Native-v0.4.2-preview.apk').replace('۰٫۴٫۱', '۰٫۴٫۲'))
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads/PELAK-Native-v0.4.2-preview.apk pelak-release.json android.html
+          git commit -m 'Publish signed Android 0.4.2 with resume search'
+          git push origin HEAD:main
