@@ -3,11 +3,14 @@ function showSavedModel(){
  try {
   const model=localStorage.getItem('pelak_saved_model_search');
   const input=document.getElementById('pelakQuickQuery');
-  if(!model||!input||document.getElementById('pelakSavedModel'))return;
-  const link=document.createElement('a');link.id='pelakSavedModel';link.className='btn outline';
+  if(!model||!input)return;
+  let link=document.getElementById('pelakSavedModel');
+  if(!link){
+   link=document.createElement('a');link.id='pelakSavedModel';link.className='btn outline';
+   (input.closest('form')||input.parentElement).after(link);
+  }
   const url=new URL('/',location.origin);url.searchParams.set('q',model);
   link.href=url.href;link.textContent='جست‌وجوی ذخیره‌شده: '+model;
-  (input.closest('form')||input.parentElement).after(link);
  } catch (_) {}
 }
 window.pelakShowSavedModel=showSavedModel;
