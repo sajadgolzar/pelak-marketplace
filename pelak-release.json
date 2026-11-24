@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "android": {
-    "versionCode": 8,
-    "versionName": "0.4.1-native-preview",
-    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.4.1-preview.apk",
+    "versionCode": 9,
+    "versionName": "0.4.2-native-preview",
+    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.4.2-preview.apk",
     "minimumVersionCode": 1,
-    "notes": "اصلاح فضای فرم هنگام بازشدن کیبورد و پیمایش مراحل ثبت آگهی."
+    "notes": "ادامهٔ آخرین جست‌وجو از صفحهٔ آگهی‌ها."
   },
   "web": {
     "version": "2026-11-15.1",
