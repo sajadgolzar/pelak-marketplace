@@ -1,5 +1,6 @@
 import {estimate,isFresh,normalize,digits,number} from './pelak-price-core.mjs';
 const $=id=>document.getElementById(id),fmt=v=>new Intl.NumberFormat('fa-IR').format(v);
+const formatYear = new Intl.NumberFormat('fa-IR', { useGrouping: false }).format;
 let data,revision=0;const ids=['brand','model','trim','base','year','km','paint','replaced','technical','repairs','structural','discount','months','insurance'];
 function hideResult(){$('result').hidden=true;$('error').hidden=true;}
 function options(id,items,placeholder){const s=$(id);s.replaceChildren();if(placeholder)s.add(new Option(placeholder,''));for(const [value,label]of items)s.add(new Option(label,value));}
@@ -10,10 +11,10 @@ function modelRows(){return brandRows().filter(r=>r.model===$('model').value);}
 function trimRows(){return modelRows().filter(r=>r.trim===$('trim').value);}
 function resetModels(){options('model',unique(brandRows().filter(r=>matchedRows().includes(r)).map(r=>r.model)).map(v=>[v,v]),'انتخاب مدل');options('trim',[],'ابتدا مدل را انتخاب کن');options('base',[],'انتخاب مدل و تیپ');options('year',[],'انتخاب مدل و تیپ');}
 function searchBrands(){const prev=$('brand').value;const all=unique(matchedRows().map(r=>r.brand));options('brand',all.map(v=>[v,v]),all.length?'انتخاب برند':'برندی پیدا نشد');if(all.includes(prev))$('brand').value=prev;else if(all.length===1)$('brand').value=all[0];resetModels();hideResult();}
-function setYears(){const row=data.rows.find(r=>r.id===$('base').value);if(!row)return;options('year',Array.from({length:6},(_,i)=>[String(row.year-i),fmt(row.year-i)+(row.year<1700?' شمسی':' میلادی')]));hideResult();}
+function setYears(){const row=data.rows.find(r=>r.id===$('base').value);if(!row)return;options('year',Array.from({length:6},(_,i)=>[String(row.year-i),formatYear(row.year-i)+(row.year<1700?' شمسی':' میلادی')]));hideResult();}
 $('brand').addEventListener('change',()=>{resetModels();hideResult();});
 $('model').addEventListener('change',()=>{options('trim',unique(modelRows().map(r=>r.trim)).map(v=>[v,v]),'انتخاب تیپ');options('base',[],'انتخاب تیپ');options('year',[],'انتخاب تیپ');hideResult();});
-$('trim').addEventListener('change',()=>{const rows=trimRows().sort((a,b)=>b.year-a.year);options('base',rows.map(r=>[r.id,fmt(r.year)+(r.year<1700?' شمسی':' میلادی')+' — '+fmt(r.price)+' تومان']));setYears();});
+$('trim').addEventListener('change',()=>{const rows=trimRows().sort((a,b)=>b.year-a.year);options('base',rows.map(r=>[r.id,formatYear(r.year)+(r.year<1700?' شمسی':' میلادی')+' — '+fmt(r.price)+' تومان']));setYears();});
 $('base').addEventListener('change',setYears);$('brand-search').addEventListener('input',searchBrands);
 for(const id of ids)$(id).addEventListener('input',hideResult);
 function validDataset(d){return d?.schema===1&&d.currency==='TOMAN'&&Array.isArray(d.rows)&&d.rows.length>0&&d.rows.every(r=>typeof r.id==='string'&&typeof r.brand==='string'&&typeof r.model==='string'&&typeof r.trim==='string'&&Number.isInteger(r.year)&&Number.isSafeInteger(r.price)&&r.price>0&&Number.isFinite(Date.parse(r.updatedAt)));}
@@ -51,8 +52,8 @@ $('price-form').addEventListener('submit',e=>{e.preventDefault();hideResult();tr
  const listingsUrl=new URL('./',location.href);
  listingsUrl.searchParams.set('q',row.brand+' '+row.model);
  $('related-listings').href=listingsUrl.href;
- const low=document.createElement('bdi'),high=document.createElement('bdi'),to=document.createElement('span');low.dir=high.dir='ltr';low.textContent=fmt(out.low);high.textContent=fmt(out.high);to.textContent='تا';$('range').replaceChildren(low,to,high);$('result-model').textContent=`${row.brand} ${row.model} ${row.trim} • سال ${fmt(input.year)} • ${fmt(number(input.km))} کیلومتر`;
- const rows=[['قیمت صفر مبنا ('+fmt(row.year)+')',fmt(row.price)+' تومان'],['افت سن و استفاده',fmt(Math.round(out.ageDrop*10)/10)+'٪'],['افت کارکرد مازاد',fmt(Math.round(out.kmDrop*10)/10)+'٪'],['افت رنگ و تعویض قطعات',fmt(out.bodyDrop)+'٪'],['هزینه تعمیر کسرشده',fmt(out.repairs)+' تومان'],['ارزش بیمه افزوده‌شده',fmt(out.insurance)+' تومان']];
+ const low=document.createElement('bdi'),high=document.createElement('bdi'),to=document.createElement('span');low.dir=high.dir='ltr';low.textContent=fmt(out.low);high.textContent=fmt(out.high);to.textContent='تا';$('range').replaceChildren(low,to,high);$('result-model').textContent=`${row.brand} ${row.model} ${row.trim} • سال ${formatYear(input.year)} • ${fmt(number(input.km))} کیلومتر`;
+ const rows=[['قیمت صفر مبنا ('+formatYear(row.year)+')',fmt(row.price)+' تومان'],['افت سن و استفاده',fmt(Math.round(out.ageDrop*10)/10)+'٪'],['افت کارکرد مازاد',fmt(Math.round(out.kmDrop*10)/10)+'٪'],['افت رنگ و تعویض قطعات',fmt(out.bodyDrop)+'٪'],['هزینه تعمیر کسرشده',fmt(out.repairs)+' تومان'],['ارزش بیمه افزوده‌شده',fmt(out.insurance)+' تومان']];
  $('breakdown').replaceChildren();for(const [k,v]of rows){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;$('breakdown').append(dt,dd);}
  $('insurance-summary').textContent=`بیمه: ${fmt(input.months)} ماه اعتبار، ${fmt(input.discount)}٪ تخفیف اعلامی. اثر عددی بیمه فقط بر اساس مبلغ قابل احتساب واردشده توسط شماست.`;
  if (!$('price-install')) {
