@@ -17,6 +17,29 @@ $('model').addEventListener('change',()=>{options('trim',unique(modelRows().map(
 $('trim').addEventListener('change',()=>{const rows=trimRows().sort((a,b)=>b.year-a.year);options('base',rows.map(r=>[r.id,formatYear(r.year)+(r.year<1700?' شمسی':' میلادی')+' — '+fmt(r.price)+' تومان']));setYears();});
 $('base').addEventListener('change',setYears);$('brand-search').addEventListener('input',searchBrands);
 for(const id of ids)$(id).addEventListener('input',hideResult);
+for (const id of ['km', 'repairs', 'insurance']) {
+ const input = $(id);
+ input.addEventListener('input', event => {
+  if (event.isComposing) return;
+  const value = digits(input.value);
+  const cursor = input.selectionStart ?? value.length;
+  const digitsOnly = value.replace(/[^0-9]/g, '');
+  const numeric = digitsOnly.replace(/^0+(?=[0-9])/, '');
+  const digitsBefore = Math.max(0, value.slice(0, cursor).replace(/[^0-9]/g, '').length
+    - (digitsOnly.length - numeric.length));
+  const formatted = numeric.replace(/\B(?=(?:[0-9]{3})+(?![0-9]))/g, '٬')
+    .replace(/[0-9]/g, digit => '۰۱۲۳۴۵۶۷۸۹'[digit]);
+  if (input.value === formatted) return;
+  input.value = formatted;
+  let position = 0, seen = 0;
+  while (position < formatted.length && seen < digitsBefore) {
+   if (formatted[position] !== '٬') seen++;
+   position++;
+  }
+  input.setSelectionRange(position, position);
+ });
+}
+
 function validDataset(d){return d?.schema===1&&d.currency==='TOMAN'&&Array.isArray(d.rows)&&d.rows.length>0&&d.rows.every(r=>typeof r.id==='string'&&typeof r.brand==='string'&&typeof r.model==='string'&&typeof r.trim==='string'&&Number.isInteger(r.year)&&Number.isSafeInteger(r.price)&&r.price>0&&Number.isFinite(Date.parse(r.updatedAt)));}
 async function getJson(url){const c=new AbortController(),t=setTimeout(()=>c.abort(),15000);try{const r=await fetch(url,{signal:c.signal,cache:'no-store'});if(!r.ok)throw Error('Unavailable');const d=await r.json();if(!validDataset(d))throw Error('Invalid data');return d;}finally{clearTimeout(t);}}
 async function load(){const request=++revision;$('fields').disabled=true;$('refresh').disabled=true;hideResult();$('market-status').textContent='در حال دریافت قیمت‌های پایه…';let fallback=false;
