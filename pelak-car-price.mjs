@@ -55,6 +55,29 @@ $('price-form').addEventListener('submit',e=>{e.preventDefault();hideResult();tr
  const rows=[['قیمت صفر مبنا ('+fmt(row.year)+')',fmt(row.price)+' تومان'],['افت سن و استفاده',fmt(Math.round(out.ageDrop*10)/10)+'٪'],['افت کارکرد مازاد',fmt(Math.round(out.kmDrop*10)/10)+'٪'],['افت رنگ و تعویض قطعات',fmt(out.bodyDrop)+'٪'],['هزینه تعمیر کسرشده',fmt(out.repairs)+' تومان'],['ارزش بیمه افزوده‌شده',fmt(out.insurance)+' تومان']];
  $('breakdown').replaceChildren();for(const [k,v]of rows){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;$('breakdown').append(dt,dd);}
  $('insurance-summary').textContent=`بیمه: ${fmt(input.months)} ماه اعتبار، ${fmt(input.discount)}٪ تخفیف اعلامی. اثر عددی بیمه فقط بر اساس مبلغ قابل احتساب واردشده توسط شماست.`;
+ if (!$('price-install')) {
+   const ios = /iPhone|iPod|iPad/.test(navigator.userAgent) ||
+     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+   const android = /Android/i.test(navigator.userAgent);
+   if ((ios || android) && !navigator.standalone && !matchMedia('(display-mode: standalone)').matches) {
+     const offer = document.createElement('details');
+     offer.id = 'price-install';
+     const label = document.createElement('summary');
+     label.textContent = ios ? 'نصب وب‌اپ روی آیفون' : 'دریافت اپ اندروید';
+     offer.append(label);
+     if (ios) {
+       const guide = document.createElement('p');
+       guide.textContent = 'در Safari دکمهٔ اشتراک‌گذاری را بزن و افزودن به صفحهٔ اصلی (Add to Home Screen) را انتخاب کن.';
+       offer.append(guide);
+     } else {
+       const download = document.createElement('a');
+       download.href = './android.html';
+       download.textContent = 'رفتن به صفحهٔ دانلود APK';
+       offer.append(download);
+     }
+     $('related-listings').after(offer);
+   }
+ }
  $('result').hidden=false;$('result').focus();$('result').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
  }catch(err){$('error').textContent=err.message;$('error').hidden=false;}
 });load();

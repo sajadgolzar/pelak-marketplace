@@ -3579,9 +3579,9 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
  const imgPaths=r=>Array.isArray(r.image_paths)?r.image_paths.filter(p=>typeof p==='string'&&p.trim()):[];
  function lookupRow(card){let r=null;const id=card.dataset.listingId;if(!id)return null;
   try{r=(card.closest('#carsGrid')?publicRows:myRows).find(x=>String(x.id)===String(id));}catch(_){}return r;}
- function shareUrl(id){const url=new URL(window.location.href);url.searchParams.set('listing',String(id));url.searchParams.set('src','share');url.hash='';return url.toString();}
+ function shareUrl(row){const url=new URL('/',location.origin);url.searchParams.set('listing',String(row.id));const model=[row.make,row.model].filter(Boolean).join(' ').trim();if(model&&model.length<=80)url.searchParams.set('model',model);url.searchParams.set('src','share');url.hash='';return url.toString();}
  async function pelakCopyLink(url){try{await navigator.clipboard.writeText(url);alert('لینک همین آگهی کپی شد.');}catch(_){prompt('لینک را کپی کن:',url);}}
- async function nativeShare(row){const url=shareUrl(row.id);try{if(navigator.share){await navigator.share({title:row.title||'آگهی پلاک',text:'این آگهی خودرو را در پلاک ببین:',url});return;}}catch(e){if(e?.name==='AbortError')return;}
+ async function nativeShare(row){const url=shareUrl(row);try{if(navigator.share){await navigator.share({title:row.title||'آگهی پلاک',text:'این آگهی خودرو را در پلاک ببین:',url});return;}}catch(e){if(e?.name==='AbortError')return;}
   await pelakCopyLink(url);
  }
  function publishLabel(r){const raw=r.published_at||null, fallback=r.created_at;const date=new Date(raw||fallback||'');if(!Number.isFinite(date.valueOf()))return 'تاریخ نامشخص';
@@ -3633,10 +3633,10 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
  function addShareToolbar(card,row){if(!row.id)return;const bar=document.createElement('div');bar.className='pelak-share-actions card-actions';
   function button(text,cb,extra=''){const b=document.createElement('button');b.type='button';b.className=extra;b.textContent=text;b.addEventListener('click',e=>{e.stopPropagation();cb();});bar.append(b);return b;}
   button('↗ اشتراک‌گذاری',()=>nativeShare(row));
-  button('✉️ ارسال لینک با پیامک',()=>{const body='آگهی خودرو در پلاک: '+(row.title||'')+'\n'+shareUrl(row.id);
+  button('✉️ ارسال لینک با پیامک',()=>{const body='آگهی خودرو در پلاک: '+(row.title||'')+'\n'+shareUrl(row);
     const onIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);window.location.href=(onIOS?'sms:&body=':'sms:?body=')+encodeURIComponent(body);
   });
-  button('🔗 کپی لینک',()=>pelakCopyLink(shareUrl(row.id)));
+  button('🔗 کپی لینک',()=>pelakCopyLink(shareUrl(row)));
   if(!card.closest('#myGrid'))button('🏬 صفحه فروشنده',()=>viewShowroom(row.user_id));
   if(adminRole==='super_admin'&&card.closest('#carsGrid')){
    button('🗑 حذف دائمی — مدیر',()=>deleteListingAsOwner(row.id),'pelak-owner-remove-admin');
@@ -3674,7 +3674,23 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
   if(!db)return;checkDeepLink.done=true;
   try{let row=publicRows.find(r=>r.id===id);
    if(!row){const {data,error}=await db.from('listings').select('*').eq('id',id).eq('listing_status','published').maybeSingle();if(error)throw error;row=data;}
-   if(!row){alert('این آگهی حذف شده، غیرفعال است یا در دسترس نیست.');return;}
+   if(!row){
+    window.pelakNavigate?.('listings');
+    const model=(new URLSearchParams(location.search).get('model')||'').trim().slice(0,80);
+    const url=new URL('/',location.origin);
+    if(model)url.searchParams.set('q',model);
+    const notice=document.createElement('aside');notice.className='panel';
+    const message=document.createElement('p');message.textContent='این آگهی دیگر در دسترس نیست.';
+    const link=document.createElement('a');link.className='btn outline';link.href=url.href;
+    link.textContent=model?'دیدن آگهی‌های مشابه':'دیدن آگهی‌های فعال';
+    notice.append(message,link);
+    if(model){
+     const save=document.createElement('button');save.type='button';save.className='btn outline';save.textContent='ذخیرهٔ جست‌وجو';
+     save.onclick=()=>{try{localStorage.setItem('pelak_saved_model_search',model);save.textContent='جست‌وجو در این مرورگر ذخیره شد';save.disabled=true;window.pelakShowSavedModel?.();}catch{save.textContent='ذخیره ممکن نشد';}};
+     notice.append(save);
+    }
+    document.getElementById('carsGrid')?.before(notice);notice.scrollIntoView({block:'nearest'});return;
+   }
    if(typeof window.pelakNavigate==='function')window.pelakNavigate('listings',{scroll:false});
    if(typeof window.pelakOpenDetails==='function')window.pelakOpenDetails(row,{admin:false});
   }catch(e){console.warn('اشتراک‌گذاری آگهی:',e.message);alert('باز کردن لینک آگهی ناموفق بود. اینترنت را بررسی کن.');}
