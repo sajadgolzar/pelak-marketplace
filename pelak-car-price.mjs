@@ -1,6 +1,7 @@
 import {estimate,isFresh,normalize,digits,number} from './pelak-price-core.mjs';
 const $=id=>document.getElementById(id),fmt=v=>new Intl.NumberFormat('fa-IR').format(v);
-const formatYear = new Intl.NumberFormat('fa-IR', { useGrouping: false }).format;
+const formatSolarYear = new Intl.NumberFormat('fa-IR', { useGrouping: false }).format;
+const formatYear = year => Number(year) >= 1700 ? String(year) : formatSolarYear(year);
 let data,revision=0;const ids=['brand','model','trim','base','year','km','paint','replaced','technical','repairs','structural','discount','months','insurance'];
 function hideResult(){$('result').hidden=true;$('error').hidden=true;}
 function options(id,items,placeholder){const s=$(id);s.replaceChildren();if(placeholder)s.add(new Option(placeholder,''));for(const [value,label]of items)s.add(new Option(label,value));}

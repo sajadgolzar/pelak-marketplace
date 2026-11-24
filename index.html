@@ -1064,8 +1064,7 @@ html[dir="ltr"] body .section,html[dir="ltr"] body main,html[dir="ltr"] body .pe
  window.pelakModelYearText=function(value){
   const year=Number(value);
   if(!Number.isInteger(year)||year<1950||year>2100)return String(value??'—');
-  const latin=String(year)+'-'+String(year-621);
-  return latin.replace(/[0-9]/g,ch=>persianDigits.charAt(Number(ch)));
+  return String(year)+'-'+String(year-621).replace(/[0-9]/g,ch=>persianDigits.charAt(Number(ch)));
  };
 })();
 </script>
