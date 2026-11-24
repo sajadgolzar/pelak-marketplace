@@ -379,6 +379,9 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
                         error = if (tab == 0) error else searchError,
                         search = search,
                         searching = tab == 1,
+                        onResumeSearch = searchHistory.firstOrNull()?.takeIf { tab == 0 }?.let { query ->
+                            { search = query; tab = 1 }
+                        },
                         serverFiltered = true,
                         onFiltersChanged = { publicFilters = it },
                         searchHistory = if (tab == 1) searchHistory else emptyList(),
@@ -832,6 +835,7 @@ private fun ListingsPanel(
     onLoadMore: () -> Unit = {},
     onSearchChange: (String) -> Unit,
     onOpenSearch: () -> Unit = {},
+    onResumeSearch: (() -> Unit)? = null,
     onRefresh: () -> Unit,
     onSelect: (Car) -> Unit,
     onPost: () -> Unit,
@@ -908,6 +912,9 @@ private fun ListingsPanel(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
                 Text("⌕ جست‌وجوی برند، مدل، تیپ یا شهر")
             }
+        }
+        if (onResumeSearch != null) {
+            TextButton(onClick = onResumeSearch) { Text("ادامهٔ آخرین جست‌وجو") }
         }
         if (searching) {
             if (searchHistory.isNotEmpty()) {
