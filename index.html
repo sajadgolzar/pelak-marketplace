@@ -3621,10 +3621,12 @@ window.pelakAdminEditPlate=async function({listingId,photoPath},afterSave){
   function updateCounter(){if(countText)countText.textContent=pnum(current+1)+' از '+pnum(count);}
   function change(by){current=(current+by+count)%count;show();}
   async function show(){const n=++req;photo.classList.add('pelak-image-waiting');updateCounter();
-   try{const url=await imageUrl(row,current);if(req!==n)return;img.onload=()=>{if(req===n){photo.classList.remove('pelak-image-waiting');photo.querySelector('svg')?.remove();}};
+   try{const url=await imageUrl(row,current);if(req!==n)return;
+    const markLoaded=()=>{if(req!==n)return;photo.classList.remove('pelak-image-waiting');photo.querySelector('svg')?.remove();photo.querySelector('.pelak-photo-absent')?.remove();};
+    img.onload=markLoaded;
     img.onerror=()=>{if(req===n)markError('عکس موجود نیست');};
     img.src=url;
-    if(img.complete&&img.naturalWidth){photo.classList.remove('pelak-image-waiting');photo.querySelector('svg')?.remove();}
+    if(img.complete&&img.naturalWidth)markLoaded();
    }catch(_){if(req===n)markError('عکس در دسترس نیست');}
   }
   function markError(txt){photo.classList.remove('pelak-image-waiting');let n=photo.querySelector('.pelak-photo-absent');if(!n){n=document.createElement('span');n.className='pelak-photo-absent';photo.append(n);}n.textContent=txt;}
