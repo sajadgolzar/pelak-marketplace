@@ -1833,12 +1833,12 @@ document.querySelectorAll('.brand-tile').forEach(tile=>tile.addEventListener('cl
    }
  }
  // Include models and trims from published ads even when absent from the
- // static catalogue. Rebuild only after loadPublic replaces its array.
- let indexedPublicRows=null,listingRows=[];
+ // static catalogue. Refresh when listings are replaced or another page is appended.
+ let indexedPublicRows=null,indexedPublicLength=0,listingRows=[];
  function searchableRows(){
    const published=typeof publicRows!=='undefined'&&Array.isArray(publicRows)?publicRows:[];
-   if(published!==indexedPublicRows){
-     indexedPublicRows=published;listingRows=[];
+   if(published!==indexedPublicRows||published.length!==indexedPublicLength){
+     indexedPublicRows=published;indexedPublicLength=published.length;listingRows=[];
      const known=new Set(rows.map(r=>normalize([r.make,r.model,r.trim,r.kind].join('|'))));
      for(const ad of published){
        const make=String(ad.make||'').trim(),model=String(ad.model||'').trim(),trim=String(ad.trim||'').trim();
