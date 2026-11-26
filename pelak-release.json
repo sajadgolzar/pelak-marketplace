@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "android": {
-    "versionCode": 9,
-    "versionName": "0.4.2-native-preview",
-    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.4.2-preview.apk",
+    "versionCode": 10,
+    "versionName": "0.4.3-native-preview",
+    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.4.3-preview.apk",
     "minimumVersionCode": 1,
-    "notes": "ادامهٔ آخرین جست‌وجو از صفحهٔ آگهی‌ها."
+    "notes": "انتخاب سال، نمایش قیمت و انتخاب چند عکس در فرم آگهی بهبود یافت."
   },
   "web": {
     "version": "2026-11-15.1",
