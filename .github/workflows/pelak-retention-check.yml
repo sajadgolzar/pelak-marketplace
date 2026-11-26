@@ -1,0 +1,23 @@
+name: PELAK retention worker check
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/pelak-media-cleanup/**'
+      - '.github/workflows/pelak-retention-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check retention Edge Function
+        run: deno check --no-config supabase/functions/pelak-media-cleanup/index.ts

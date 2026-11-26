@@ -13,6 +13,9 @@ import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /** The public Firebase client identifiers are not a service-account key. */
 internal object PelakPush {
@@ -63,7 +66,14 @@ class PelakMessagingService : FirebaseMessagingService() {
         super.onNewToken(token)
         getSharedPreferences("pelak_native_push", Context.MODE_PRIVATE)
             .edit().putString("last_token", token).apply()
-        // Registration happens only in an authenticated foreground session.
+        // FCM may rotate tokens while the app is backgrounded. Register the new
+        // token for the currently signed-in account instead of waiting for a login.
+        val session = PelakSessionStore(this).load() ?: return
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching { PelakApi().registerPush(session, token) }
+            // If the session has expired or the network is down, foreground login
+            // registration will retry when the access token changes.
+        }
     }
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
@@ -83,6 +93,8 @@ class PelakMessagingService : FirebaseMessagingService() {
         val body = if (updateNotice) "برای دریافت نسخه جدید، وارد پلاک شو و بررسی به‌روزرسانی را بزن."
             else message.notification?.body ?: "برای بررسی پیام جدید به پلاک برگرد."
         val launch = Intent(this, MainActivity::class.java)
+            .putExtra("pelak_kind", message.data["kind"].orEmpty())
+            .putExtra("pelak_source", message.data["source_id"].orEmpty())
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or
             if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0

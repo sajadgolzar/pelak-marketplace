@@ -66,7 +66,8 @@ internal class PelakApi {
         route: String,
         method: String = "GET",
         data: JSONObject? = null,
-        jwt: String? = null
+        jwt: String? = null,
+        prefer: String = "return=representation"
     ): String {
         val connection = URL(PelakConfig.API_ROOT + route).openConnection() as HttpURLConnection
         try {
@@ -79,7 +80,7 @@ internal class PelakApi {
             if (data != null) {
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                connection.setRequestProperty("Prefer", "return=representation")
+                connection.setRequestProperty("Prefer", prefer)
                 connection.outputStream.use { it.write(data.toString().toByteArray(StandardCharsets.UTF_8)) }
             }
             val code = connection.responseCode
@@ -120,7 +121,8 @@ internal class PelakApi {
         }
     }
     // Server-side search sees the entire published catalogue, not only the first page.
-    suspend fun published(query: String = "", offset: Int = 0, pageSize: Int = 100): List<Car> =
+    suspend fun published(query: String = "", offset: Int = 0, pageSize: Int = 100,
+        filters: ListingFilters = ListingFilters()): List<Car> =
         withContext(Dispatchers.IO) {
             val clean = query.replace(Regex("[^\\p{L}\\p{N} \\-]"), "").trim().take(60)
             val condition = if (clean.isEmpty()) "" else {
@@ -131,7 +133,7 @@ internal class PelakApi {
             }
             parseCars(perform("/rest/v1/listings?select=" + carFields +
                 "&listing_status=eq.published" + condition +
-                "&order=created_at.desc&limit=" + pageSize.coerceIn(1,100) +
+                filters.parameters() + "&limit=" + pageSize.coerceIn(1,100) +
                 "&offset=" + offset.coerceAtLeast(0)))
         }
     suspend fun mine(session: PelakSession, offset: Int = 0, pageSize: Int = 100): List<Car> = withContext(Dispatchers.IO) {
@@ -141,18 +143,107 @@ internal class PelakApi {
             jwt = session.accessToken))
     }
     // The Storage API returns /object/sign/... on some versions and /storage/v1/object/sign/... on others.
+    companion object {
+        private data class SignedPhoto(val url: String, val expires: Long)
+        private val photoUrls = java.util.concurrent.ConcurrentHashMap<String, SignedPhoto>()
+        private val photoLocks = Array(16) { kotlinx.coroutines.sync.Mutex() }
+    }
+
     suspend fun signedPhoto(path: String, jwt: String? = null): String? = withContext(Dispatchers.IO) {
+        val key = photoCacheKey(path, jwt)
+        val lock = photoLocks[(key.hashCode() and Int.MAX_VALUE) % photoLocks.size]
+        lock.lock()
         try {
+            photoUrls[key]?.takeIf { it.expires > System.currentTimeMillis() }?.let { return@withContext it.url }
             val response = perform("/storage/v1/object/sign/car-images/" + Uri.encode(path, "/"),
                 "POST", JSONObject().put("expiresIn", 900), jwt)
             val signed = JSONObject(response).optString("signedURL")
-            when {
+            val url = when {
                 signed.startsWith("/storage/v1/") -> PelakConfig.API_ROOT + signed
                 signed.startsWith("/object/sign/") -> PelakConfig.API_ROOT + "/storage/v1" + signed
                 signed.startsWith("https://" + Uri.parse(PelakConfig.API_ROOT).host + "/storage/v1/") -> signed
-                else -> null
+                else -> return@withContext null
             }
-        } catch (_: Exception) { null }
+            if (photoUrls.size > 500) photoUrls.clear()
+            photoUrls[key] = SignedPhoto(url, System.currentTimeMillis() + 12 * 60 * 1000)
+            url
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            null
+        } finally { lock.unlock() }
+    }
+
+    suspend fun publishedByIds(ids: List<String>): List<Car> = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext emptyList()
+        val valid = ids.filter { it.matches(Regex("[0-9a-fA-F-]{36}")) }.distinct().take(50)
+        if (valid.isEmpty()) return@withContext emptyList()
+        val rows = parseCars(perform("/rest/v1/listings?select=" + carFields +
+            "&listing_status=eq.published&id=in.(" + valid.joinToString(",") + ")"))
+        val order = valid.withIndex().associate { it.value to it.index }
+        rows.sortedBy { order[it.id] ?: Int.MAX_VALUE }
+    }
+
+    // Favorites are stored in the existing RLS-protected pelak_favorites table.
+    suspend fun favoriteIds(session: PelakSession): Set<String> = withContext(Dispatchers.IO) {
+        val rows = JSONArray(perform("/rest/v1/pelak_favorites?select=listing_id&user_id=eq." +
+            Uri.encode(session.userId) + "&limit=1000", jwt = session.accessToken))
+        (0 until rows.length()).map { rows.getJSONObject(it).getString("listing_id") }.toSet()
+    }
+
+    suspend fun setFavorite(session: PelakSession, listingId: String, saved: Boolean) =
+        withContext(Dispatchers.IO) {
+            if (saved) {
+                perform("/rest/v1/pelak_favorites", "POST", JSONObject()
+                    .put("user_id", session.userId).put("listing_id", listingId), session.accessToken)
+            } else {
+                perform("/rest/v1/pelak_favorites?user_id=eq." + Uri.encode(session.userId) +
+                    "&listing_id=eq." + Uri.encode(listingId), "DELETE", jwt = session.accessToken)
+            }
+            Unit
+        }
+
+    suspend fun favoriteCars(session: PelakSession): List<Car> = withContext(Dispatchers.IO) {
+        val ids = favoriteIds(session)
+        if (ids.isEmpty()) return@withContext emptyList()
+        val all = mutableListOf<Car>()
+        ids.chunked(50).forEach { chunk ->
+            val filter = chunk.joinToString(",")
+            all += parseCars(perform("/rest/v1/listings?select=" + carFields +
+                "&listing_status=eq.published&id=in.(" + filter + ")", jwt = session.accessToken))
+        }
+        all
+    }
+
+    suspend fun signInWithPassword(email: String, password: String): PelakSession = withContext(Dispatchers.IO) {
+        val raw = JSONObject(perform("/auth/v1/token?grant_type=password", "POST",
+            JSONObject().put("email", email.trim()).put("password", password)))
+        newSession(raw, email.trim())
+    }
+    suspend fun createAccount(email: String, password: String): PelakSession? = withContext(Dispatchers.IO) {
+        val response = JSONObject(perform("/auth/v1/signup", "POST",
+            JSONObject().put("email", email).put("password", password)))
+        if (response.optString("access_token").isNotBlank()) newSession(response, email) else null
+    }
+
+    suspend fun requestPasswordReset(email: String): Unit = withContext(Dispatchers.IO) {
+        perform("/auth/v1/recover", "POST", JSONObject().put("email", email))
+    }
+
+    suspend fun resendSignupCode(email: String): Unit = withContext(Dispatchers.IO) {
+        perform("/auth/v1/resend", "POST", JSONObject().put("email", email).put("type", "signup"))
+    }
+
+    suspend fun verifyAccountCode(email: String, code: String, recovery: Boolean): PelakSession =
+        withContext(Dispatchers.IO) {
+            val type = if (recovery) "recovery" else "email"
+            val response = JSONObject(perform("/auth/v1/verify", "POST",
+                JSONObject().put("email", email).put("token", code).put("type", type)))
+            newSession(response, email)
+        }
+
+    suspend fun updatePassword(session: PelakSession, password: String): Unit = withContext(Dispatchers.IO) {
+        perform("/auth/v1/user", "PUT", JSONObject().put("password", password), session.accessToken)
     }
 
     suspend fun sendOtp(email: String) = withContext(Dispatchers.IO) {
@@ -182,20 +273,26 @@ internal class PelakApi {
 
     private fun listingPayload(
         title: String, make: String, model: String, year: Int, priceRials: String?,
-        country: String, city: String, phone: String
+        country: String, city: String, phone: String, trim: String = "", mileageKm: Int? = null,
+        description: String = "", vehicleStatus: String = "ready"
     ): JSONObject = JSONObject()
         .put("title", title.trim()).put("make", make.trim()).put("model", model.trim())
         .put("year", year).put("currency", "IRR")
+        .put("trim", trim.trim()).put("mileage_km", mileageKm ?: JSONObject.NULL)
+        .put("description", description.trim())
         .put("country", country.trim()).put("city", city.trim())
-        .put("vehicle_status", "ready").put("seller_phone", phone.trim())
+        .put("vehicle_status", vehicleStatus).put("seller_phone", phone.trim())
         .put("seller_contact_consent", true)
         .put("price_negotiable", priceRials == null)
         .put("price", if (priceRials == null) JSONObject.NULL else BigDecimal(priceRials))
     suspend fun createDraft(
         session: PelakSession, title: String, make: String, model: String,
-        year: Int, priceRials: String?, country: String, city: String, phone: String
+        year: Int, priceRials: String?, country: String, city: String, phone: String,
+        trim: String = "", mileageKm: Int? = null, description: String = "",
+        vehicleStatus: String = "ready"
     ): String = withContext(Dispatchers.IO) {
-        val payload = listingPayload(title, make, model, year, priceRials, country, city, phone)
+        val payload = listingPayload(title, make, model, year, priceRials, country, city, phone,
+            trim, mileageKm, description, vehicleStatus)
             .put("user_id", session.userId).put("listing_status", "draft")
         val row = JSONArray(perform("/rest/v1/listings", "POST", payload, session.accessToken))
         if (row.length() == 0) throw IllegalStateException("پیش‌نویس ذخیره نشد")
@@ -203,9 +300,12 @@ internal class PelakApi {
     }
     suspend fun updateDraft(
         session: PelakSession, id: String, title: String, make: String,
-        model: String, year: Int, priceRials: String?, country: String, city: String, phone: String
+        model: String, year: Int, priceRials: String?, country: String, city: String, phone: String,
+        trim: String = "", mileageKm: Int? = null, description: String = "",
+        vehicleStatus: String = "ready"
     ) = withContext(Dispatchers.IO) {
-        val payload = listingPayload(title, make, model, year, priceRials, country, city, phone)
+        val payload = listingPayload(title, make, model, year, priceRials, country, city, phone,
+            trim, mileageKm, description, vehicleStatus)
         val result = JSONArray(perform("/rest/v1/listings?id=eq." + Uri.encode(id) +
             "&user_id=eq." + session.userId + "&listing_status=eq.draft",
             "PATCH", payload, session.accessToken))
@@ -214,47 +314,69 @@ internal class PelakApi {
     }
     suspend fun attachPhotos(session: PelakSession, id: String, paths: List<String>) =
         withContext(Dispatchers.IO) {
+            require(paths.size <= 8 && paths.distinct().size == paths.size) {
+                "حداکثر ۸ عکس غیرتکراری برای هر آگهی مجاز است"
+            }
             val arr = JSONArray()
             paths.forEach { arr.put(it) }
-            val result = JSONArray(perform("/rest/v1/listings?id=eq." + Uri.encode(id) +
-                "&user_id=eq." + session.userId + "&listing_status=eq.draft",
-                "PATCH", JSONObject().put("image_paths", arr), session.accessToken))
-            if (result.length() != 1) throw IllegalStateException("اتصال عکس‌ها به آگهی انجام نشد")
+            try {
+                val result = JSONArray(perform("/rest/v1/listings?id=eq." + Uri.encode(id) +
+                    "&user_id=eq." + session.userId + "&listing_status=eq.draft",
+                    "PATCH", JSONObject().put("image_paths", arr), session.accessToken))
+                check(result.length() == 1) { "اتصال عکس‌ها به آگهی انجام نشد" }
+            } catch (failure: Exception) {
+                if (failure is kotlinx.coroutines.CancellationException) throw failure
+                val actual = JSONArray(perform("/rest/v1/listings?select=image_paths&id=eq." + Uri.encode(id) +
+                    "&user_id=eq." + session.userId, jwt = session.accessToken))
+                val stored = actual.optJSONObject(0)?.optJSONArray("image_paths")
+                val matches = stored != null && stored.length() == paths.size &&
+                    paths.indices.all { stored.getString(it) == paths[it] }
+                if (!matches) throw failure
+            }
             Unit
         }
-    suspend fun uploadPhoto(session: PelakSession, resolver: ContentResolver, image: Uri): String =
+    suspend fun uploadPhoto(session: PelakSession, resolver: ContentResolver, image: Uri,
+        photoId: String = UUID.randomUUID().toString(), rotation: Int = 0): String =
         withContext(Dispatchers.IO) {
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            val boundsStream = resolver.openInputStream(image)
-                ?: throw IllegalStateException("عکس قابل خواندن نیست")
-            boundsStream.use { BitmapFactory.decodeStream(it, null, bounds) }
-            // decodeStream returns null deliberately when inJustDecodeBounds is true.
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IllegalStateException("تصویر نامعتبر")
-            var sample = 1
-            while (bounds.outWidth / sample > 1700 || bounds.outHeight / sample > 1700) sample *= 2
-            val opts = BitmapFactory.Options().apply { inSampleSize = sample; inPreferredConfig = Bitmap.Config.RGB_565 }
-            val bitmap = resolver.openInputStream(image)?.use { BitmapFactory.decodeStream(it, null, opts) }
-                ?: throw IllegalStateException("بازکردن عکس ممکن نیست")
-            val buffer = ByteArrayOutputStream()
-            try { bitmap.compress(Bitmap.CompressFormat.JPEG, 82, buffer) }
-            finally { bitmap.recycle() }
-            val bytes = buffer.toByteArray()
-            if (bytes.isEmpty() || bytes.size > 6 * 1024 * 1024) throw IllegalStateException("اندازه عکس مجاز نیست")
-            val path = session.userId + "/" + UUID.randomUUID().toString() + ".jpg"
-            val conn = URL(PelakConfig.API_ROOT + "/storage/v1/object/car-images/" +
-                Uri.encode(path, "/")).openConnection() as HttpURLConnection
-            try {
-                conn.requestMethod = "POST"
-                conn.connectTimeout = 15000; conn.readTimeout = 30000
-                conn.setRequestProperty("apikey", PelakConfig.PUBLIC_KEY)
-                conn.setRequestProperty("Authorization", "Bearer " + session.accessToken)
-                conn.setRequestProperty("Content-Type", "image/jpeg")
-                conn.setRequestProperty("x-upsert", "false")
-                conn.doOutput = true
-                conn.outputStream.use { it.write(bytes) }
-                if (conn.responseCode !in 200..299) throw IllegalStateException("آپلود عکس ناموفق: " + conn.responseCode)
-            } finally { conn.disconnect() }
-            path
+            require(photoId.matches(Regex("[a-fA-F0-9-]{36}")))
+            val bytes = preparePhoto(resolver, image, rotation)
+            val path = session.userId + "/" + photoId + ".jpg"
+            var lastError: Exception? = null
+            for (attempt in 0..2) {
+                val conn = URL(PelakConfig.API_ROOT + "/storage/v1/object/car-images/" +
+                    Uri.encode(path, "/")).openConnection() as HttpURLConnection
+                try {
+                    conn.requestMethod = "POST"
+                    conn.connectTimeout = 20000
+                    conn.readTimeout = 60000
+                    conn.setRequestProperty("apikey", PelakConfig.PUBLIC_KEY)
+                    conn.setRequestProperty("Authorization", "Bearer " + session.accessToken)
+                    conn.setRequestProperty("Content-Type", "image/jpeg")
+                    conn.setRequestProperty("x-upsert", "false")
+                    conn.setFixedLengthStreamingMode(bytes.size)
+                    conn.doOutput = true
+                    conn.outputStream.use { it.write(bytes) }
+                    val status = conn.responseCode
+                    if (status in 200..299) return@withContext path
+                    // A response may be lost after Storage has saved this exact photo ID.
+                    if (status == 409 || status == 400) {
+                        val error = conn.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                        if (error.contains("Duplicate", true) || error.contains("already exists", true)) {
+                            return@withContext path
+                        }
+                    }
+                    if (status in listOf(400, 401, 403, 413)) throw IllegalArgumentException("آپلود عکس پذیرفته نشد ($status)")
+                    throw java.io.IOException("آپلود عکس ناموفق بود ($status)")
+                } catch (cancel: kotlinx.coroutines.CancellationException) {
+                    throw cancel
+                } catch (failure: IllegalArgumentException) {
+                    throw failure
+                } catch (failure: Exception) {
+                    lastError = failure
+                } finally { conn.disconnect() }
+                if (attempt < 2) kotlinx.coroutines.delay(1000L * (attempt + 1))
+            }
+            throw lastError ?: IllegalStateException("آپلود عکس انجام نشد")
         }
 
     suspend fun removeUnattachedPhoto(session: PelakSession, path: String) =
@@ -311,6 +433,119 @@ internal class PelakApi {
                     .put("p_details", details.trim()), session.accessToken)
             Unit
         }
+    data class RevisionNotice(val reason: String, val deleteAfter: String?)
+
+    suspend fun myRevisionReasons(session: PelakSession): Map<String, RevisionNotice> =
+        withContext(Dispatchers.IO) {
+            val rows = JSONArray(perform(
+                "/rest/v1/pelak_listing_rejections?select=listing_id,reason,review_state,delete_after" +
+                    "&owner_id=eq." + Uri.encode(session.userId) +
+                    "&review_state=eq.needs_revision",
+                jwt = session.accessToken
+            ))
+            (0 until rows.length()).associate { index ->
+                val item = rows.getJSONObject(index)
+                item.getString("listing_id") to RevisionNotice(
+                    item.optString("reason", "نیازمند اصلاح"),
+                    item.optString("delete_after").takeUnless { it.isBlank() || it == "null" }
+                )
+            }
+        }
+
+    suspend fun cancelMyListing(session: PelakSession, listingId: String) =
+        withContext(Dispatchers.IO) {
+            val result = perform("/rest/v1/rpc/pelak_cancel_my_listing", "POST",
+                JSONObject().put("p_listing_id", listingId), session.accessToken)
+            if (result.trim() != "true") throw IllegalStateException("لغو آگهی تأیید نشد")
+            Unit
+        }
+
+    suspend fun renewMyListing(session: PelakSession, listingId: String) =
+        withContext(Dispatchers.IO) {
+            val result = perform("/rest/v1/rpc/pelak_renew_my_listing", "POST",
+                JSONObject().put("p_listing_id", listingId), session.accessToken)
+            if (result.isBlank() || result.trim() == "null")
+                throw IllegalStateException("تمدید آگهی تأیید نشد")
+            Unit
+        }
+
+    suspend fun resubmitMyListing(session: PelakSession, listingId: String) =
+        withContext(Dispatchers.IO) {
+            val result = perform("/rest/v1/rpc/pelak_resubmit_rejected_listing", "POST",
+                JSONObject().put("p_listing_id", listingId), session.accessToken)
+            if (result.isBlank() || result.trim() == "null")
+                throw IllegalStateException("ارسال مجدد آگهی تأیید نشد")
+            Unit
+        }
+
+    suspend fun messageById(session: PelakSession, id: String): ChatMessage? = withContext(Dispatchers.IO) {
+        if (!id.matches(Regex("[a-fA-F0-9-]{36}"))) return@withContext null
+        parseMessages(perform("/rest/v1/pelak_listing_messages?select=id,listing_id,sender_id,recipient_id,body,created_at&id=eq.$id",
+            jwt = session.accessToken)).firstOrNull()
+    }
+
+    suspend fun supportThreadForMessage(session: PelakSession, id: String): SupportThread? = withContext(Dispatchers.IO) {
+        if (!id.matches(Regex("[a-fA-F0-9-]{36}"))) return@withContext null
+        val rows = JSONArray(perform("/rest/v1/pelak_support_messages?select=thread_id&id=eq.$id", jwt = session.accessToken))
+        val threadId = rows.optJSONObject(0)?.optString("thread_id") ?: return@withContext null
+        supportThreads(session).firstOrNull { it.id == threadId }
+    }
+
+    suspend fun supportThreads(session: PelakSession): List<SupportThread> = withContext(Dispatchers.IO) {
+        val rows = JSONArray(perform("/rest/v1/pelak_support_threads" +
+            "?select=id,subject,status&user_id=eq.${session.userId}&hidden_for_user=eq.false&order=last_message_at.desc",
+            jwt = session.accessToken))
+        List(rows.length()) { index ->
+            val row = rows.getJSONObject(index)
+            SupportThread(row.getString("id"), row.getString("subject"), row.getString("status"))
+        }
+    }
+
+    suspend fun supportMessages(session: PelakSession, thread: SupportThread): List<SupportMessage> =
+        withContext(Dispatchers.IO) {
+            val rows = JSONArray(perform("/rest/v1/pelak_support_messages" +
+                "?select=sender_id,body&thread_id=eq.${thread.id}&order=created_at.asc,id.asc", jwt = session.accessToken))
+            List(rows.length()) { index ->
+                val row = rows.getJSONObject(index)
+                SupportMessage(row.getString("sender_id") == session.userId, row.getString("body"))
+            }
+        }
+
+    suspend fun createSupportThread(session: PelakSession, thread: SupportThread): Unit =
+        withContext(Dispatchers.IO) {
+            perform("/rest/v1/pelak_support_threads", "POST", JSONObject()
+                .put("id", thread.id).put("user_id", session.userId).put("subject", thread.subject),
+                session.accessToken, "resolution=ignore-duplicates,return=minimal")
+        }
+
+    suspend fun sendSupportMessage(session: PelakSession, thread: SupportThread, id: String, body: String): Unit =
+        withContext(Dispatchers.IO) {
+            perform("/rest/v1/pelak_support_messages", "POST", JSONObject().put("id", id)
+                .put("thread_id", thread.id).put("sender_id", session.userId).put("body", body),
+                session.accessToken, "resolution=ignore-duplicates,return=minimal")
+        }
+
+    suspend fun myShowroom(session: PelakSession): ShowroomProfile? = withContext(Dispatchers.IO) {
+        val body = perform("/rest/v1/rpc/pelak_free_showroom_me", "POST", JSONObject(), session.accessToken)
+        if (body.trim() == "null") return@withContext null
+        val row = JSONObject(body)
+        ShowroomProfile(row.optString("business_name"), row.optString("city"),
+            if (row.isNull("public_phone")) "" else row.optString("public_phone"),
+            if (row.isNull("bio")) "" else row.optString("bio"), row.optString("status"))
+    }
+
+    suspend fun saveShowroom(session: PelakSession, profile: ShowroomProfile): Unit =
+        withContext(Dispatchers.IO) {
+            perform("/rest/v1/rpc/pelak_free_showroom_save", "POST", JSONObject()
+                .put("p_business_name", profile.name).put("p_city", profile.city)
+                .put("p_public_phone", profile.phone).put("p_bio", profile.bio), session.accessToken)
+        }
+
+    suspend fun submitDraft(session: PelakSession, id: String): Unit = withContext(Dispatchers.IO) {
+        perform("/rest/v1/rpc/pelak_submit_draft_for_review", "POST",
+            JSONObject().put("p_listing_id", id), session.accessToken)
+    }
+
     suspend fun registerPush(session: PelakSession, token: String) = withContext(Dispatchers.IO) {
         perform("/rest/v1/rpc/pelak_register_android_push", "POST",
             JSONObject().put("p_token", token), session.accessToken)
@@ -322,3 +557,4 @@ internal class PelakApi {
         Unit
     }
 }
+
