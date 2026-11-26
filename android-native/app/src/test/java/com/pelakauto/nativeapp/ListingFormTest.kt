@@ -1,6 +1,7 @@
 package com.pelakauto.nativeapp
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,5 +38,18 @@ class ListingFormTest {
         assertEquals(listOf("تویوتا"), matchingBrands("camry", brands))
         assertEquals(listOf("مزدا"), matchingBrands("grand touring", brands))
         assertTrue(matchingBrands(" ", brands).isEmpty())
+    }
+    @Test fun listingPriceSupportsPastedDigitsAndStorageLimit() {
+        assertEquals("1234567.5", normalizeListingPrice("۱٬۲۳۴٬۵۶۷٫۵"))
+        assertNull(normalizeListingPrice("1e12"))
+        assertTrue(listingPriceExceedsStorage("1200000000000".toBigDecimal()))
+        assertTrue(listingPriceExceedsStorage("99999999999.9999".toBigDecimal()))
+        assertFalse(listingPriceExceedsStorage("99999999999.999".toBigDecimal()))
+        val price = ListingPriceGrouping.filter(androidx.compose.ui.text.AnnotatedString("1234567.5"))
+        assertEquals("1,234,567.5", price.text.text)
+        for (offset in 0..9) {
+            assertEquals(offset, price.offsetMapping.transformedToOriginal(
+                price.offsetMapping.originalToTransformed(offset)))
+        }
     }
 }

@@ -43,6 +43,18 @@ internal data class DraftPhoto(
     val rotation: Int = 0
 )
 
+internal val DraftPhotoListSaver = androidx.compose.runtime.saveable.listSaver<List<DraftPhoto>, String>(
+    save = { photos ->
+        photos.flatMap { listOf(it.id, it.uri?.toString().orEmpty(), it.path.orEmpty(), it.rotation.toString()) }
+    },
+    restore = { values ->
+        values.chunked(4).map { (id, uri, path, rotation) ->
+            DraftPhoto(id, uri.takeIf(String::isNotEmpty)?.let(Uri::parse),
+                path.takeIf(String::isNotEmpty), rotation.toInt())
+        }
+    }
+)
+
 internal fun orientationMatrix(orientation: Int, extraRotation: Int = 0): Matrix = Matrix().apply {
     when (orientation) {
         ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> setScale(-1f, 1f)
