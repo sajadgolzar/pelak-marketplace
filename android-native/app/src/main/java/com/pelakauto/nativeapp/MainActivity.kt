@@ -32,6 +32,8 @@ import androidx.compose.material3.*
 import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -1236,6 +1238,7 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
     val keyboardVisible = WindowInsets.isImeVisible
     val formScroll = androidx.compose.foundation.lazy.rememberLazyListState()
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     var title by rememberSaveable(editing?.id) { mutableStateOf(editing?.title.orEmpty()) }
     var make by rememberSaveable(editing?.id) { mutableStateOf(editing?.make.orEmpty()) }
@@ -1262,11 +1265,11 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
         )
     }
     var negotiable by rememberSaveable(editing?.id) { mutableStateOf(editing?.priceNegotiable ?: false) }
-    var photos by remember(editing?.id) {
+    var photos by rememberSaveable(editing?.id, stateSaver = DraftPhotoListSaver) {
         mutableStateOf(editing?.imagePaths.orEmpty().map { DraftPhoto(path = it) })
     }
     var photoErrors by remember(editing?.id) { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var draftId by remember(editing?.id) { mutableStateOf(editing?.id) }
+    var draftId by rememberSaveable(editing?.id) { mutableStateOf(editing?.id) }
     var step by rememberSaveable(editing?.id) { mutableIntStateOf(0) }
     var working by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("") }
@@ -1351,7 +1354,9 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
             }
         }
         if (!negotiable) item {
-            NativeField("قیمت به تومان", price, KeyboardType.Number) { price = it }
+            NativeField("قیمت به تومان", price, KeyboardType.Decimal, ListingPriceGrouping) {
+                normalizeListingPrice(it)?.let { normalized -> price = normalized }
+            }
         }
         }
         if (step == 2) {
@@ -1374,17 +1379,21 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                 }
                 if (step < 2) Button(onClick = {
                     val y = year.toIntOrNull()
-                    val p = price.replace(",", "").trim().toBigDecimalOrNull()
+                    val p = price.toBigDecimalOrNull()
                     info = when {
                         step == 0 && (title.isBlank() || make.isBlank() || model.isBlank() ||
                             y == null || y !in 1950..2100 || (mileage.isNotBlank() && mileage.toIntOrNull() == null)) ->
                             "عنوان، برند، مدل و سال ساخت معتبر را وارد کن."
+                        step == 1 && !negotiable && listingPriceExceedsStorage(p) -> ListingPriceLimitMessage
                         step == 1 && (country.isBlank() || city.isBlank() || normalizedPhone == null ||
                             (!negotiable && (p == null || p <= BigDecimal.ZERO))) ->
                             "کشور، شهر، شماره تماس معتبر و قیمت را وارد کن."
                         else -> ""
                     }
-                    if (info.isBlank()) step++
+                    if (info.isBlank()) {
+                        focusManager.clearFocus()
+                        step++
+                    }
                 }, enabled = !working) { Text("مرحله بعد") }
             }
         }
@@ -1394,12 +1403,15 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                 enabled = !working,
                 onClick = {
                     val y = year.toIntOrNull()
-                    val p = price.replace(",", "").trim().toBigDecimalOrNull()
-                    if (title.isBlank() || make.isBlank() || model.isBlank() ||
+                    val p = price.toBigDecimalOrNull()
+                    if (!negotiable && listingPriceExceedsStorage(p)) {
+                        info = ListingPriceLimitMessage
+                    } else if (title.isBlank() || make.isBlank() || model.isBlank() ||
                         y == null || y !in 1950..2100 || country.isBlank() || city.isBlank() ||
                         (mileage.isNotBlank() && mileage.toIntOrNull() == null) || normalizedPhone == null || (!negotiable && (p == null || p <= BigDecimal.ZERO))) {
                         info = "عنوان، برند، مدل، سال، کارکرد، کشور، شهر، شماره تماس و قیمت را درست وارد کن."
                     } else {
+                        focusManager.clearFocus()
                         scope.launch {
                             working = true; info = ""; uploadProgress = "در حال ذخیره اطلاعات آگهی…"
                             try {
@@ -1468,12 +1480,14 @@ private fun NativeField(
     label: String,
     value: String,
     keyboard: KeyboardType = KeyboardType.Text,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
     onChange: (String) -> Unit
 ) {
     OutlinedTextField(
         value = value, onValueChange = onChange,
         label = { Text(label) }, singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = keyboard),
+        visualTransformation = visualTransformation,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp)
     )

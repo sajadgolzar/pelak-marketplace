@@ -3,13 +3,13 @@ package com.pelakauto.nativeapp
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.graphicsLayer
@@ -23,17 +23,18 @@ internal fun DraftPhotoEditor(
     onChange: (List<DraftPhoto>) -> Unit
 ) {
     val context = LocalContext.current
-    var replacing by remember { mutableStateOf<String?>(null) }
+    var replacing by rememberSaveable { mutableStateOf<String?>(null) }
     var preview by remember { mutableStateOf<DraftPhoto?>(null) }
     var notice by remember { mutableStateOf("") }
     fun retain(uri: Uri) {
         runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
     }
-    val add = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { selected ->
+    val add = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(8)) { selected ->
         val unique = selected.distinct().filterNot { uri -> photos.any { it.uri == uri } }
-        unique.forEach(::retain)
         val room = (8 - photos.size).coerceAtLeast(0)
-        onChange(photos + unique.take(room).map { DraftPhoto(uri = it) })
+        val accepted = unique.take(room)
+        accepted.forEach(::retain)
+        onChange(photos + accepted.map { DraftPhoto(uri = it) })
         notice = if (unique.size > room) "حداکثر ۸ عکس؛ ${unique.size - room} عکس اضافه نشد. برای تغییر انتخاب، حذف یا جایگزینی را بزن." else ""
     }
     val replace = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -46,14 +47,15 @@ internal fun DraftPhotoEditor(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("عکس‌ها: ${photos.size} از ۸")
-        OutlinedButton(enabled = enabled && photos.size < 8, onClick = { add.launch(arrayOf("image/*")) }) {
+        Text("عکس‌ها: ${photos.size} از 8")
+        OutlinedButton(enabled = enabled && photos.size < 8, onClick = { add.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
             Text("افزودن عکس")
         }
         if (notice.isNotBlank()) Text(notice, style = MaterialTheme.typography.bodySmall)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(photos, key = { it.id }) { photo ->
-                Column(Modifier.width(165.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        photos.chunked(2).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { photo -> key(photo.id) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Box(Modifier.height(125.dp).fillMaxWidth().clickable { preview = photo }) {
                         if (photo.uri != null) AsyncImage(photo.uri, "پیش‌نمایش عکس",
                             Modifier.fillMaxSize().graphicsLayer { rotationZ = photo.rotation.toFloat() },
@@ -73,6 +75,8 @@ internal fun DraftPhotoEditor(
                         onChange(photos.map { if (it.id == photo.id) it.copy(rotation = (it.rotation + 90) % 360) else it })
                     }) { Text("چرخش ۹۰ درجه") }
                 }
+                } }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
         if (preview != null) Dialog(onDismissRequest = { preview = null }) {
