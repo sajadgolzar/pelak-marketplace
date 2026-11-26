@@ -1169,6 +1169,68 @@ private fun AccountPanel(
 }
 
 @OptIn(ExperimentalLayoutApi::class)
+private val IranianVehicleBrands = setOf(
+    "ایران خودرو", "سایپا", "پارس خودرو", "بهمن موتور", "کرمان موتور", "آرین پارس موتور"
+)
+private const val FirstGregorianModelYear = 1950
+private const val OlderModelYearCutoff = 1970
+private const val ModelYearCalendarOffset = 621
+
+@Composable
+private fun ListingYearPicker(selected: Int?, make: String, onSelect: (Int) -> Unit) {
+    val brand = make.trim().replace('‌', ' ').replace('ي', 'ی').replace('ك', 'ک')
+    var solar by rememberSaveable(brand) { mutableStateOf(brand in IranianVehicleBrands) }
+    var open by rememberSaveable { mutableStateOf(false) }
+    var older by rememberSaveable { mutableStateOf(false) }
+    // Match the website's model-year convention and keep the stored year Gregorian.
+    fun label(year: Int): String = if (solar) {
+        (year - ModelYearCalendarOffset).toString().map { "۰۱۲۳۴۵۶۷۸۹"[it - '0'] }.joinToString("")
+    } else year.toString()
+
+    val fieldLabel = if (solar) "سال ساخت شمسی" else "سال ساخت میلادی"
+    OutlinedButton(
+        onClick = { older = false; open = true },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(selected?.let { "$fieldLabel: ${label(it)}" } ?: fieldLabel)
+    }
+    if (open) AlertDialog(
+        onDismissRequest = { open = false },
+        title = { Text(if (older) "سال دقیق خودرو" else "انتخاب سال ساخت") },
+        text = {
+            Column {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = !solar, onClick = { solar = false }, label = { Text("میلادی") })
+                    FilterChip(selected = solar, onClick = { solar = true }, label = { Text("شمسی") })
+                }
+                key(solar, older) {
+                    val years = if (older) (OlderModelYearCutoff - 1) downTo FirstGregorianModelYear
+                        else 2027 downTo OlderModelYearCutoff
+                    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+                        items(years.toList(), key = { it }) { year ->
+                            TextButton(
+                                onClick = { onSelect(year); open = false },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(label(year), fontWeight = if (year == selected) FontWeight.Bold else FontWeight.Normal)
+                            }
+                        }
+                        if (!older) item {
+                            TextButton(onClick = { older = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text("پایین‌تر از ${label(OlderModelYearCutoff)}")
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (older) TextButton(onClick = { older = false }) { Text("مرحله قبل") }
+        },
+        dismissButton = { TextButton(onClick = { open = false }) { Text("انصراف") } }
+    )
+}
+
 @Composable
 private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSaved: () -> Unit) {
     val keyboardVisible = WindowInsets.isImeVisible
@@ -1238,7 +1300,9 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
         item { VehicleDetailField(model, make, null, "مدل خودرو") { if (it != model) trim = ""; model = it } }
         item { VehicleDetailField(trim, make, model, "تیپ خودرو") { trim = it } }
         item { NativeField("کارکرد (کیلومتر)", mileage, KeyboardType.Number) { mileage = it.filter(Char::isDigit) } }
-        item { NativeField("سال ساخت میلادی", year, KeyboardType.Number) { year = it } }
+        item {
+            ListingYearPicker(year.toIntOrNull(), make) { year = it.toString() }
+        }
         }
         if (step == 1) {
         item {
