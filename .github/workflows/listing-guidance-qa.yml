@@ -1,0 +1,36 @@
+name: PELAK listing guidance QA
+on:
+  push:
+    branches: [fix/listing-field-guidance-20261128, main]
+    paths: ['index.html','tests/listing-guidance.test.mjs','.github/workflows/listing-guidance-qa.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/listing-guidance.test.mjs
+      - name: Validate inline JavaScript syntax
+        run: |
+          python3 - <<'PY'
+          import re, pathlib
+          from html.parser import HTMLParser
+          class Scripts(HTMLParser):
+              def __init__(self): super().__init__(); self.active=False; self.data=[]; self.scripts=[]
+              def handle_starttag(self,tag,attrs):
+                  if tag=='script':
+                      a=dict(attrs); self.active=not a.get('src') and a.get('type','') in ('','text/javascript','application/javascript','module'); self.data=[]
+              def handle_data(self,data):
+                  if self.active: self.data.append(data)
+              def handle_endtag(self,tag):
+                  if tag=='script' and self.active: self.scripts.append(''.join(self.data)); self.active=False
+          p=Scripts();p.feed(pathlib.Path('index.html').read_text())
+          import subprocess,tempfile
+          for i,s in enumerate(p.scripts):
+              with tempfile.NamedTemporaryFile(suffix='.mjs',mode='w',encoding='utf-8') as f:
+                  f.write(s);f.flush();subprocess.run(['node','--check',f.name],check=True)
+          PY
