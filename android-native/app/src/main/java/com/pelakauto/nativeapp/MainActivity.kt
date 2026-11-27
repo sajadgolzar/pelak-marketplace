@@ -1433,14 +1433,32 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                                 uploadPhotoBatch(pending,
                                     onProgress = { index, count -> uploadProgress = "در حال آماده‌سازی عکس \u2066$index\u2069 از \u2066$count\u2069…" },
                                     upload = { photo ->
-                                        val path = api.uploadPhoto(session, context.contentResolver,
-                                            photo.uri ?: error("فایل عکس در دسترس نیست"), photo.id, photo.rotation)
-                                        val next = photos.map { if (it.id == photo.id) it.copy(path = path) else it }
-                                        uploadProgress = "در حال اتصال عکس به آگهی…"
-                                        api.attachPhotos(session, id, next.mapNotNull { it.path })
-                                        photos = next
+                                        var phase = "آماده‌سازی و ارسال"
+                                        try {
+                                            val path = api.uploadPhoto(session, context.contentResolver,
+                                                photo.uri ?: error("فایل عکس در دسترس نیست"), photo.id, photo.rotation)
+                                            val next = photos.map { if (it.id == photo.id) it.copy(path = path) else it }
+                                            phase = "اتصال به آگهی"
+                                            uploadProgress = "در حال اتصال عکس به آگهی…"
+                                            api.attachPhotos(session, id, next.mapNotNull { it.path })
+                                            photos = next
+                                        } catch (cancel: kotlinx.coroutines.CancellationException) {
+                                            throw cancel
+                                        } catch (failure: Exception) {
+                                            val detail = when (failure) {
+                                                is java.net.SocketTimeoutException -> "پایان مهلت ارتباط"
+                                                is java.io.IOException -> "ارتباط ناموفق"
+                                                is SecurityException -> "عدم دسترسی به فایل"
+                                                is IllegalArgumentException -> "تصویر یا درخواست نامعتبر"
+                                                else -> "عملیات کامل نشد"
+                                            }
+                                            photoErrors = photoErrors + (photo.id to "$phase: $detail؛ دوباره تلاش کن")
+                                            throw failure
+                                        }
                                     },
-                                    onFailure = { photo -> photoErrors = photoErrors + (photo.id to "ارسال ناموفق؛ دوباره تلاش کن یا عکس را جایگزین کن") }
+                                    onFailure = { photo -> if (!photoErrors.containsKey(photo.id)) {
+                                        photoErrors = photoErrors + (photo.id to "ارسال ناموفق؛ دوباره تلاش کن")
+                                    } }
                                 )
                                 // One final reconciliation covers an attachment whose first response was lost.
                                 api.attachPhotos(session, id, photos.mapNotNull { it.path })
