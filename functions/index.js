@@ -45,7 +45,14 @@ export async function onRequestGet({ request, next }) {
     }
     const page = await next();
     if (!page.ok || !page.headers.get("content-type")?.includes("text/html")) return page;
-    const result = new HTMLRewriter().on("head", {
+    // The homepage now has default Open Graph tags. Replace those on listing links.
+    const rewriter = new HTMLRewriter();
+    for (const [key] of tags) {
+      rewriter.on('meta[property="' + key + '"]', { element(meta) { meta.remove(); } });
+    }
+    const result = rewriter.on("link[rel=canonical]", {
+      element(link) { link.setAttribute("href", "https://pelakauto.ir/?listing=" + id); }
+    }).on("head", {
       element(head) {
         head.prepend(tags.map(([key, value]) =>
           '<meta property="' + key + '" content="' + escapeHtml(value) + '">'
