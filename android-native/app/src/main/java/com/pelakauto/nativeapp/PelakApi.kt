@@ -16,6 +16,9 @@ import java.nio.charset.StandardCharsets
 import java.text.NumberFormat
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.TimeUnit
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 
 internal data class Car(
     val id: String,
@@ -62,6 +65,14 @@ internal data class ChatMessage(
 )
 
 internal class PelakApi {
+    private val photoUploadClient = okhttp3.OkHttpClient.Builder()
+        .connectTimeout(12, TimeUnit.SECONDS)
+        .writeTimeout(18, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .callTimeout(35, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(false)
+        .build()
+
     private fun perform(
         route: String,
         method: String = "GET",
@@ -339,42 +350,39 @@ internal class PelakApi {
         photoId: String = UUID.randomUUID().toString(), rotation: Int = 0): String =
         withContext(Dispatchers.IO) {
             require(photoId.matches(Regex("[a-fA-F0-9-]{36}")))
-            val bytes = preparePhoto(resolver, image, rotation)
+            val bytes = preparePhotoBounded(resolver, image, rotation)
             val path = session.userId + "/" + photoId + ".jpg"
             var lastError: Exception? = null
-            for (attempt in 0..2) {
-                val conn = URL(PelakConfig.API_ROOT + "/storage/v1/object/car-images/" +
-                    Uri.encode(path, "/")).openConnection() as HttpURLConnection
+            for (attempt in 0..1) {
+                val request = okhttp3.Request.Builder()
+                    .url(PelakConfig.API_ROOT + "/storage/v1/object/car-images/" + Uri.encode(path, "/"))
+                    .header("apikey", PelakConfig.PUBLIC_KEY)
+                    .header("Authorization", "Bearer " + session.accessToken)
+                    .header("x-upsert", "false")
+                    .post(bytes.toRequestBody("image/jpeg".toMediaType()))
+                    .build()
                 try {
-                    conn.requestMethod = "POST"
-                    conn.connectTimeout = 20000
-                    conn.readTimeout = 60000
-                    conn.setRequestProperty("apikey", PelakConfig.PUBLIC_KEY)
-                    conn.setRequestProperty("Authorization", "Bearer " + session.accessToken)
-                    conn.setRequestProperty("Content-Type", "image/jpeg")
-                    conn.setRequestProperty("x-upsert", "false")
-                    conn.setFixedLengthStreamingMode(bytes.size)
-                    conn.doOutput = true
-                    conn.outputStream.use { it.write(bytes) }
-                    val status = conn.responseCode
-                    if (status in 200..299) return@withContext path
-                    // A response may be lost after Storage has saved this exact photo ID.
-                    if (status == 409 || status == 400) {
-                        val error = conn.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                        if (error.contains("Duplicate", true) || error.contains("already exists", true)) {
-                            return@withContext path
+                    photoUploadClient.newCall(request).execute().use { response ->
+                        val status = response.code
+                        if (response.isSuccessful) return@withContext path
+                        // A retry can receive Duplicate after the same stable photo ID was saved.
+                        if (status == 409 || status == 400) {
+                            val error = response.peekBody(8192L).string()
+                            if (error.contains("Duplicate", true) || error.contains("already exists", true)) {
+                                return@withContext path
+                            }
                         }
+                        if (status in listOf(400, 401, 403, 413)) throw IllegalArgumentException("آپلود عکس پذیرفته نشد ($status)")
+                        throw java.io.IOException("آپلود عکس ناموفق بود ($status)")
                     }
-                    if (status in listOf(400, 401, 403, 413)) throw IllegalArgumentException("آپلود عکس پذیرفته نشد ($status)")
-                    throw java.io.IOException("آپلود عکس ناموفق بود ($status)")
                 } catch (cancel: kotlinx.coroutines.CancellationException) {
                     throw cancel
                 } catch (failure: IllegalArgumentException) {
                     throw failure
                 } catch (failure: Exception) {
                     lastError = failure
-                } finally { conn.disconnect() }
-                if (attempt < 2) kotlinx.coroutines.delay(1000L * (attempt + 1))
+                }
+                if (attempt == 0) kotlinx.coroutines.delay(750L)
             }
             throw lastError ?: IllegalStateException("آپلود عکس انجام نشد")
         }
