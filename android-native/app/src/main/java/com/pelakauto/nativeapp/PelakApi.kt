@@ -68,7 +68,7 @@ internal fun matchesUploadedPhoto(body: String, filename: String, bytes: Int): B
     val rows = JSONArray(body)
     (0 until rows.length()).any { i ->
         val item = rows.optJSONObject(i)
-        item?.optString("name") == filename &&
+        item != null && item.optString("name") == filename &&
             item.optJSONObject("metadata")?.optLong("size", -1L) == bytes.toLong()
     }
 }.getOrDefault(false)
