@@ -1,0 +1,24 @@
+name: PELAK discovery and import calculator QA
+on:
+  push:
+    branches: [fix/discovery-import-budget-20261128, main]
+    paths: ['.github/workflows/discovery-import-qa.yml','pelak-import-cost*.mjs','pelak-market-view.mjs','scripts/build_discovery.py','import-cost/**']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/discovery.test.mjs tests/car-price.test.mjs tests/import-cost.test.mjs
+      - run: node --check pelak-import-cost.mjs && node --check pelak-car-price.mjs && node --check discovery.mjs
+      - run: |
+          python scripts/build_discovery.py
+          git diff --exit-code -- car-guide prices comparisons buying-guides sitemap.xml discovery-manifest.json robots.txt
+      - run: |
+          test -s import-cost/index.html
+          grep -Fq 'https://pelakauto.ir/import-cost/' sitemap.xml
+          grep -Fq 'href="/import-cost/"' index.html
