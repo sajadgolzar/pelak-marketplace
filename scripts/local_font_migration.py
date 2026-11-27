@@ -26,7 +26,7 @@ def price(s):
     assert n==1
     return s.replace('pelak-car-price.css?v=3','pelak-car-price.css?v=4')
 edit('car-price.html',price)
-edit('discovery.css',lambda s:'@import url("/pelak-font.css?v=1");\n'+exact(s,'font:16px/1.95 Tahoma,Arial,sans-serif','font:16px/1.95 var(--pelak-persian-font)'))
+edit('discovery.css',lambda s:exact(s,'font:16px/1.95 Tahoma,Arial,sans-serif','font:16px/1.95 var(--pelak-persian-font)'))
 edit('pelak-car-price.css',lambda s:exact(s,'font:16px/1.9 Vazirmatn,-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial,sans-serif','font:16px/1.9 var(--pelak-persian-font)'))
 for p in ['admin.html','android.html']:
     edit(p,lambda s:exact(s,'</head>',font_link+'</head>').replace('font-family:Tahoma,Arial,sans-serif','font-family:var(--pelak-persian-font)'))
@@ -35,8 +35,8 @@ for name in ['about','ads','buying-guides','car-guide','comparisons','guides','i
     pages.extend(Path(name).rglob('index.html'))
 assert len(pages)==27, len(pages)
 for p in pages:
-    edit(p,lambda s:exact(s,'/discovery.css?v=1','/discovery.css?v=2'))
+    edit(p,lambda s:exact(s,'<link rel="stylesheet" href="/discovery.css?v=1">',font_link+'<link rel="stylesheet" href="/discovery.css?v=2">'))
 for p in ['scripts/build_discovery.py','pelak-public-ads.mjs']:
-    edit(p,lambda s:exact(s,'/discovery.css?v=1','/discovery.css?v=2'))
+    edit(p,lambda s:exact(s,'<link rel="stylesheet" href="/discovery.css?v=1">',font_link+'<link rel="stylesheet" href="/discovery.css?v=2">'))
 edit('pelak-sw.js',lambda s:exact(s,"'pelak-public-shell-v2'","'pelak-public-shell-v3'").replace("'/pelak-icon-192.png', '/pelak-icon-512.png'","'/pelak-icon-192.png', '/pelak-icon-512.png',\n  '/pelak-font.css', '/fonts/Vazirmatn-variable.woff2', '/discovery.css', '/pelak-car-price.css'"))
 print(f'Updated {len(pages)+4} live HTML pages, generator, dynamic ads, styles and public-only cache.')

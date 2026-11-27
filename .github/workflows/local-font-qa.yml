@@ -35,7 +35,7 @@ jobs:
           for p in paths:
               s=p.read_text()
               assert 'fonts.googleapis.com' not in s and 'fonts.gstatic.com' not in s, p
-              assert '/pelak-font.css?v=1' in s or '/discovery.css?v=2' in s, p
+              assert '/pelak-font.css?v=1' in s, p
           assert 'var(--pelak-persian-font)' in Path('discovery.css').read_text()
           assert 'font-weight: 100 900' in Path('pelak-font.css').read_text()
           print(len(paths), 'live HTML pages verified')
@@ -48,26 +48,43 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/pelak-font-test" playwright
           "$RUNNER_TEMP/pelak-font-test/node_modules/.bin/playwright" install --with-deps webkit
           python3 -m http.server 8765 > "$RUNNER_TEMP/font-server.log" 2>&1 &
+          for attempt in 1 2 3 4 5; do curl -fsS http://127.0.0.1:8765/pelak-font.css >/dev/null && break; sleep 1; done
           NODE_PATH="$RUNNER_TEMP/pelak-font-test/node_modules" node <<'JS'
           const {webkit}=require('playwright');
           (async()=>{
             const browser=await webkit.launch();
             try {
-              const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
-              await page.route('**/*',route=>route.request().url().startsWith('http://127.0.0.1:8765/')?route.continue():route.abort());
-              for(const path of ['/car-guide/','/prices/peugeot-207/','/comparisons/tara-vs-dena/','/buying-guides/','/import-cost/','/guides/used-car-checklist/','/about/','/android.html','/car-price.html','/admin.html','/']){
-                await page.goto('http://127.0.0.1:8765'+path,{waitUntil:'domcontentloaded'});
-                const check=await page.evaluate(async()=>{
-                  await document.fonts.load('400 16px Vazirmatn','پلاک');
-                  await document.fonts.load('700 26px Vazirmatn','پلاک');
-                  return {family:getComputedStyle(document.body).fontFamily,loaded:[...document.fonts].some(f=>f.family.includes('Vazirmatn')&&f.status==='loaded')};
-                });
-                if(!check.loaded||!check.family.includes('Vazirmatn'))throw Error(path+' '+JSON.stringify(check));
-                console.log(path,check.family,'loaded');
+              const fs=require('node:fs');
+              const paths=['/','/admin.html','/android.html','/car-price.html'];
+              for(const dir of ['about','ads','buying-guides','car-guide','comparisons','guides','import-cost','prices']){
+                for(const file of fs.readdirSync(dir,{recursive:true}).map(String)){
+                  if(file==='index.html'||file.endsWith('/index.html')) paths.push('/'+dir+'/'+file.replace(/index\.html$/,''));
+                }
+              }
+              if(paths.length!==31)throw Error('Incorrect page count: '+paths.length);
+              for(const path of paths){
+                const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
+                try{
+                  await page.route('**/*',route=>route.request().url().startsWith('http://127.0.0.1:8765/')?route.continue():route.abort());
+                  const response=await page.goto('http://127.0.0.1:8765'+path,{waitUntil:'load'});
+                  if(!response?.ok()) throw Error(path+' HTTP '+response?.status());
+                  await page.waitForFunction(()=>getComputedStyle(document.body).fontFamily.includes('Vazirmatn'),{},{timeout:10000});
+                  const check=await page.evaluate(async()=>{
+                    const regular=await document.fonts.load('400 16px Vazirmatn','پلاک');
+                    const bold=await document.fonts.load('700 26px Vazirmatn','پلاک');
+                    await document.fonts.ready;
+                    return {family:getComputedStyle(document.body).fontFamily,loaded:regular.length>0&&bold.length>0&&regular.every(f=>f.status==='loaded')&&bold.every(f=>f.status==='loaded')};
+                  });
+                  if(!check.loaded||!check.family.includes('Vazirmatn'))throw Error(path+' '+JSON.stringify(check));
+                  console.log(path,check.family,'loaded');
+                }finally{await page.close()}
               }
             }finally{await browser.close()}
           })().catch(e=>{console.error(e);process.exit(1)});
           JS
+      - name: Show local server diagnostics on failure
+        if: failure()
+        run: cat "$RUNNER_TEMP/font-server.log" || true
       - name: Commit verified assets on isolated branch
         run: |
           set -euo pipefail
