@@ -65,7 +65,10 @@ async function load(){const request=++revision;$('fields').disabled=true;$('refr
  const params=new URLSearchParams(location.search),ref=params.get('ref'),model=params.get('model');
  const chosen=ref?data.rows.find(r=>r.id===ref):null;
  if(chosen){$('brand-search').value=chosen.model;searchBrands();$('brand').value=chosen.brand;resetModels();$('model').value=chosen.model;$('model').dispatchEvent(new Event('change'));$('trim').value=chosen.trim;$('trim').dispatchEvent(new Event('change'));$('base').value=chosen.id;setYears();}
- else if(model&&model.length<=80){$('brand-search').value=model;searchBrands();const exact=[...$('model').options].find(o=>o.value===model);if(exact){$('model').value=exact.value;$('model').dispatchEvent(new Event('change'));}}
+ else if(model&&model.length<=80){$('brand-search').value=model;searchBrands();
+  const exactBrands=unique(data.rows.filter(r=>r.model===model).map(r=>r.brand));
+  if(exactBrands.length===1){$('brand').value=exactBrands[0];resetModels();}
+  const exact=[...$('model').options].find(o=>o.value===model);if(exact){$('model').value=exact.value;$('model').dispatchEvent(new Event('change'));}}
 
  }catch(e){$('market-status').textContent=e.message==='Unavailable'?'قیمت تازه در دسترس نیست؛ کمی بعد دوباره تلاش کن.':e.message;}finally{if(request===revision)$('refresh').disabled=false;}
 }
