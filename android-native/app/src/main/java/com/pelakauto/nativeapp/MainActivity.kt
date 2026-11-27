@@ -693,7 +693,7 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
                                 "قیمت: ${car.priceLabel()}",
                                 "موقعیت: ${car.city}، ${car.country}",
                                 "شناسه آگهی: ${car.id}",
-                                "پلاک: https://pelakauto.com/"
+                                "پلاک: https://pelakauto.ir/?listing=${Uri.encode(car.id)}&src=share"
                             ).filter { it.isNotBlank() }.joinToString("\n")
                             try {
                                 context.startActivity(Intent.createChooser(
@@ -1111,7 +1111,7 @@ private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
                         val message = listOf(car.title, details, "سال ساخت: ${car.year}",
                             car.mileageKm?.let { "کارکرد: $it کیلومتر" }.orEmpty(),
                             "قیمت: ${car.priceLabel()}", "موقعیت: ${car.city}، ${car.country}",
-                            "شناسه آگهی: ${car.id}", "https://pelakauto.com/")
+                            "شناسه آگهی: ${car.id}", "https://pelakauto.ir/?listing=${Uri.encode(car.id)}&src=share")
                             .filter { it.isNotBlank() }.joinToString("\n")
                         try {
                             context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
