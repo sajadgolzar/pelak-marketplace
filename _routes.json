@@ -1,1 +1,1 @@
-{"version":1,"include":["/","/api/car-prices","/prices/*","/buying-guides/*"],"exclude":[]}
+{"version":1,"include":["/","/api/car-prices","/prices/*","/buying-guides/*","/api/native-photo-upload"],"exclude":[]}
