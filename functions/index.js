@@ -12,13 +12,13 @@ export async function onRequestGet({ request, next }) {
     const endpoint = new URL("/rest/v1/listings", supabase);
     endpoint.search = new URLSearchParams({
       id: "eq." + id, listing_status: "eq.published",
-      select: "make,model,city,image_paths", limit: "1",
+      select: "make,model,city,image_paths,expires_at", limit: "1",
     });
     const headers = { apikey: publicKey };
     const response = await fetch(endpoint, { headers, signal: AbortSignal.timeout(2500) });
     if (!response.ok) return next();
     const [listing] = await response.json();
-    if (!listing) return next();
+    if (!listing || (listing.expires_at && Date.parse(listing.expires_at) <= Date.now())) return next();
 
     const title = [listing.make, listing.model].filter(Boolean).join(" ") || "آگهی خودرو";
     const tags = [
@@ -51,7 +51,7 @@ export async function onRequestGet({ request, next }) {
       rewriter.on('meta[property="' + key + '"]', { element(meta) { meta.remove(); } });
     }
     const result = rewriter.on("link[rel=canonical]", {
-      element(link) { link.setAttribute("href", "https://pelakauto.ir/?listing=" + id); }
+      element(link) { link.setAttribute("href", "https://pelakauto.ir/ads/" + id.toLowerCase() + "/"); }
     }).on("head", {
       element(head) {
         head.prepend(tags.map(([key, value]) =>

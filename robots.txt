@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /api/
 Sitemap: https://pelakauto.ir/sitemap.xml
+Sitemap: https://pelakauto.ir/sitemap-listings.xml

@@ -1,0 +1,19 @@
+name: PELAK public listing SEO QA
+on:
+  push:
+    branches: [fix/public-listing-seo-20261128, main]
+    paths: ['pelak-public-ads.mjs','functions/ads/**','functions/sitemap-listings.xml.js','tests/public-ads.test.mjs','.github/workflows/public-ads-qa.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/public-ads.test.mjs tests/discovery.test.mjs tests/car-price.test.mjs tests/import-cost.test.mjs
+      - run: |
+          python scripts/build_discovery.py
+          git diff --exit-code -- sitemap.xml robots.txt car-guide prices comparisons buying-guides

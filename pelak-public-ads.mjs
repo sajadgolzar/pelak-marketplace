@@ -1,0 +1,36 @@
+const API="https://wzhnkciopeqdbnbknwun.supabase.co", KEY="sb_publishable_e-2nFIThVyoQPcNivWiPRg_qZjnVY3d", SITE='https://pelakauto.ir';
+const UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+const FIELDS='id,make,model,trim,year,mileage_km,price,currency,city,country,vehicle_status,listing_status,price_negotiable,expires_at';
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clean=v=>String(v??'').replace(/[\u0000-\u001f\u007f]/g,' ').trim().slice(0,100);
+const fmt=new Intl.NumberFormat('fa-IR');
+export function isPublic(row,now=Date.now()){return !!row&&UUID.test(row.id??'')&&row.listing_status==='published'&&(row.expires_at==null||(Number.isFinite(Date.parse(row.expires_at))&&Date.parse(row.expires_at)>now));}
+const pathFor=id=>'/ads/'+id.toLowerCase()+'/';
+const titleFor=r=>[clean(r.make),clean(r.model),clean(r.trim),Number.isInteger(r.year)?String(r.year):''].filter(Boolean).join(' ')||'آگهی خودرو';
+function priceFor(r){if(r.price_negotiable)return 'توافقی';if(r.price==null||r.price===''||!Number.isFinite(Number(r.price))||Number(r.price)<0)return 'اعلام نشده';const units={IRR:'تومان',USD:'دلار',EUR:'یورو',AED:'درهم',OMR:'ریال عمان',GEL:'لاری'};return units[r.currency]?fmt.format(Number(r.price)/(r.currency==='IRR'?10:1))+' '+units[r.currency]:'اعلام نشده';}
+async function query(params,fetcher,now){const u=new URL(API+'/rest/v1/listings');u.search=new URLSearchParams({select:FIELDS,listing_status:'eq.published',or:'(expires_at.is.null,expires_at.gt.'+new Date(now).toISOString()+')',...params});const r=await fetcher(u.toString(),{headers:{apikey:KEY,Accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(6000)});if(!r.ok)throw Error('listing source unavailable');const rows=await r.json();if(!Array.isArray(rows))throw Error('invalid listing response');return rows.filter(r=>isPublic(r,now));}
+function shell(title,description,canonical,body,{status=200,index=true}={}){return new Response('<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'+esc(title)+'</title><meta name="description" content="'+esc(description)+'">'+(index?'<link rel="canonical" href="'+esc(canonical)+'">':'<meta name="robots" content="noindex,follow">')+'<meta property="og:site_name" content="پلاک | PELAK"><meta property="og:title" content="'+esc(title)+'"><meta property="og:description" content="'+esc(description)+'"><meta property="og:url" content="'+esc(canonical)+'"><meta property="og:image" content="'+SITE+'/pelak-icon-512.png"><link rel="icon" href="/pelak-icon-512.png"><link rel="stylesheet" href="/discovery.css?v=1"></head><body><header><div><a class="brand" href="/">PEL<span>A</span>K | پلاک</a><nav class="topnav" aria-label="راهنما"><a href="/ads/">آگهی‌ها</a><a href="/car-price.html">تخمین قیمت</a><a href="/car-guide/">راهنمای خرید</a></nav></div></header><main>'+body+'</main><footer><a href="/">بازگشت به پلاک</a> · <a href="/about/">درباره پلاک</a></footer></body></html>',{status,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...(index?{}:{'X-Robots-Tag':'noindex, follow'}),...(status===503?{'Retry-After':'60'}:{})}});}
+function unavailable(status){return shell(status===404?'آگهی در دسترس نیست | پلاک':'دسترسی موقتاً ممکن نیست | پلاک','به بازار خودرو پلاک بازگردید.',SITE+'/ads/','<h1>'+(status===404?'این آگهی در دسترس نیست':'دریافت آگهی‌ها موقتاً ممکن نیست')+'</h1><p>برای مشاهده سایر آگهی‌ها به پلاک برگرد.</p><a class="button" href="/">بازگشت به پلاک</a>',{status,index:false});}
+export async function detail(request,id,fetcher=fetch,now=Date.now()){
+ if(!UUID.test(id??''))return unavailable(404);
+ try{const rows=await query({id:'eq.'+id.toLowerCase(),limit:'1'},fetcher,now),r=rows.find(x=>x.id.toLowerCase()===id.toLowerCase());if(!r)return unavailable(404);
+ const canonical=SITE+pathFor(r.id),title=titleFor(r),location=[clean(r.city),clean(r.country)].filter(Boolean).join('، '),price=priceFor(r),status={ready:'آماده تحویل',abroad:'خارج از کشور',in_transit:'در مسیر',customs:'گمرک'}[r.vehicle_status]||'اعلام نشده';
+ const desc=['آگهی فروش '+title,location,price].filter(Boolean).join(' | ');
+ const facts=[['برند',clean(r.make)],['مدل',clean(r.model)],['تیپ',clean(r.trim)],['سال ساخت',Number.isInteger(r.year)?String(r.year):''],['کارکرد',Number.isInteger(r.mileage_km)&&r.mileage_km>=0?fmt.format(r.mileage_km)+' کیلومتر':''],['موقعیت',location],['وضعیت خودرو',status],['قیمت اعلامی فروشنده',price]];
+ const body='<nav class="crumbs" aria-label="مسیر صفحه"><a href="/">پلاک</a> / <a href="/ads/">آگهی‌ها</a></nav><h1>'+esc(title)+'</h1><p class="lead">آگهی فروش خودرو در بازار آنلاین پلاک</p><section class="panel"><h2>مشخصات خودرو</h2><dl>'+facts.filter(x=>x[1]).map(([k,v])=>'<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>').join('')+'</dl><div class="actions"><a class="button" href="/?listing='+esc(r.id)+'">مشاهده تصاویر، جزئیات و ارتباط با فروشنده</a><a class="button secondary" href="/?q='+encodeURIComponent(clean(r.model))+'">جست‌وجوی آگهی‌های همین مدل</a></div><p class="hint">قیمت و مشخصات توسط فروشنده اعلام شده‌اند؛ پیش از معامله آن‌ها را مستقلاً بررسی کن.</p></section>';
+ return shell(title+' | خرید خودرو در پلاک',desc,canonical,body);
+ }catch{return unavailable(503);}
+}
+export async function directory(request,fetcher=fetch,now=Date.now()){
+ const u=new URL(request.url),after=u.searchParams.get('after');if(after&&!UUID.test(after))return unavailable(404);
+ try{const rows=await query({order:'id.asc',limit:'25',...(after?{id:'gt.'+after}:{})},fetcher,now);
+ const cards=rows.slice(0,24).map(r=>'<a class="card" href="'+pathFor(r.id)+'"><h2>'+esc(titleFor(r))+'</h2><p>'+esc(priceFor(r))+' · '+esc(clean(r.city))+'</p></a>').join('');
+ const body='<h1>آگهی‌های فروش خودرو در پلاک</h1><p class="lead">فقط آگهی‌های منتشرشده و دارای اعتبار نمایش داده می‌شوند.</p>'+(cards?'<div class="cards">'+cards+'</div>':'<p class="note">در حال حاضر آگهی فعالی برای نمایش وجود ندارد.</p>')+(rows.length>24?'<p><a class="button secondary" href="/ads/?after='+rows[23].id+'">صفحه بعد</a></p>':'')+'<div class="actions"><a class="button" href="/">جست‌وجو و ثبت آگهی در پلاک</a></div>';
+ return shell('آگهی‌های خرید و فروش خودرو | پلاک','آگهی‌های فعال خودرو در پلاک',SITE+'/ads/'+(after?'?after='+after:''),body);
+ }catch{return unavailable(503);}
+}
+export async function sitemap(fetcher=fetch,now=Date.now()){
+ try{const ids=[];let last='';for(let i=0;i<10;i++){const rows=await query({select:'id,listing_status,expires_at',order:'id.asc',limit:'1000',...(last?{id:'gt.'+last}:{})},fetcher,now);if(!rows.length)break;for(const r of rows){if(last&&r.id<=last)throw Error('pagination order');ids.push(r.id);last=r.id;}if(rows.length<1000)break;}
+ return new Response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+ids.map(id=>'<url><loc>'+SITE+pathFor(id)+'</loc></url>').join('')+'</urlset>',{headers:{'Content-Type':'application/xml; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+ }catch{return new Response('Temporarily unavailable',{status:503,headers:{'Cache-Control':'no-store','Retry-After':'60'}});}
+}
