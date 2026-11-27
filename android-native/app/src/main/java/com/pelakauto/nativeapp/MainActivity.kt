@@ -19,6 +19,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.painterResource
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -54,6 +63,93 @@ private val Navy = Color(0xFF10233F)
 private val Gold = Color(0xFFC9A158)
 private val Pale = Color(0xFFF6F8FB)
 private val Ink = Color(0xFF172940)
+private val ListingMuted = Color(0xFF52647A)
+
+internal fun listingStatusLabel(status: String, needsRevision: Boolean = false): String =
+    if (needsRevision) "نیازمند اصلاح" else when (status) {
+        "draft" -> "پیش‌نویس"
+        "published" -> "منتشرشده"
+        "archived" -> "بایگانی‌شده"
+        "sold" -> "فروخته‌شده"
+        "needs_revision" -> "نیازمند اصلاح"
+        "pending", "pending_review", "submitted" -> "در انتظار بررسی"
+        "cancelled", "canceled" -> "لغوشده"
+        "expired" -> "منقضی‌شده"
+        else -> "وضعیت نامشخص"
+    }
+
+internal fun listingMileageLabel(km: Int): String =
+    java.text.NumberFormat.getIntegerInstance(java.util.Locale.US).format(km) + " کیلومتر"
+
+@Composable
+private fun ListingClose(onClose: () -> Unit, light: Boolean = false) {
+    IconButton(onClick = onClose, modifier = Modifier.semantics { contentDescription = "بستن" }) {
+        Text("×", fontSize = 30.sp, color = if (light) Color.White else Navy)
+    }
+}
+
+@Composable
+private fun ListingPhotoCount(index: Int, count: Int, modifier: Modifier = Modifier) {
+    if (count > 0) Box(modifier.background(Color(0xD910233F), RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
+        Text("\u2066${index + 1}/$count\u2069", color = Color.White, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun ListingGallery(paths: List<String>, title: String, jwt: String?, onOpen: (Int) -> Unit) {
+    if (paths.isEmpty()) return
+    val pager = rememberPagerState(pageCount = { paths.size })
+    Box(Modifier.fillMaxWidth().aspectRatio(1.5f).clip(RoundedCornerShape(12.dp)).background(Pale)) {
+        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+            CarPhoto(paths.getOrNull(page), title, jwt, Modifier.fillMaxSize().clickable { onOpen(page) },
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+        }
+        ListingPhotoCount(pager.currentPage, paths.size, Modifier.align(Alignment.BottomEnd).padding(10.dp))
+    }
+}
+
+@Composable
+private fun ListingPhotoViewer(car: Car, initial: Int, jwt: String?, onClose: () -> Unit) {
+    var page by remember(car.id, initial) { mutableIntStateOf(initial.coerceIn(0, (car.imagePaths.size - 1).coerceAtLeast(0))) }
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(Modifier.fillMaxSize().background(Color(0xFF101722)).systemBarsPadding().padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(car.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f))
+                ListingClose(onClose, light = true)
+            }
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                val widthPx = constraints.maxWidth.toFloat()
+                val heightPx = constraints.maxHeight.toFloat()
+                var scale by remember(page) { mutableStateOf(1f) }
+                var offset by remember(page) { mutableStateOf(Offset.Zero) }
+                CarPhoto(car.imagePaths.getOrNull(page), car.title, jwt,
+                    Modifier.fillMaxSize().pointerInput(page, widthPx, heightPx) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            val next = (scale * zoom).coerceIn(1f, 4f)
+                            val maxX = widthPx * (next - 1f) / 2f
+                            val maxY = heightPx * (next - 1f) / 2f
+                            offset = if (next == 1f) Offset.Zero else Offset(
+                                (offset.x + pan.x).coerceIn(-maxX, maxX),
+                                (offset.y + pan.y).coerceIn(-maxY, maxY))
+                            scale = next
+                        }
+                    }.graphicsLayer {
+                        scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y
+                    }, contentScale = androidx.compose.ui.layout.ContentScale.Fit, highResolution = true)
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton(enabled = page > 0, onClick = { page-- }) { Text("عکس قبل", color = if (page > 0) Color.White else Color.Gray) }
+                ListingPhotoCount(page, car.imagePaths.size)
+                TextButton(enabled = page < car.imagePaths.lastIndex, onClick = { page++ }) {
+                    Text("عکس بعد", color = if (page < car.imagePaths.lastIndex) Color.White else Color.Gray)
+                }
+            }
+            Text("برای بزرگ‌نمایی از دو انگشت استفاده کنید.", color = Color(0xFFD8E1ED), fontSize = 12.sp)
+        }
+    }
+}
 
 internal data class NotificationRoute(val kind: String, val sourceId: String, val event: Long)
 
@@ -532,39 +628,33 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
         }
     }
 
-    expandedPhoto?.let { (photoCar, photoIndex) ->
-        Dialog(onDismissRequest = { expandedPhoto = null }) {
-            Column(Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(18.dp)).padding(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(photoCar.title, fontWeight = FontWeight.Bold, color = Navy)
-                PhotoGallery(photoCar.imagePaths, photoCar.title,
-                    if (photoCar.userId == session?.userId) session?.accessToken else null, photoIndex)
-                TextButton(onClick = { expandedPhoto = null }) { Text("بستن") }
-            }
-        }
-    }
     selected?.let { car ->
         val context = LocalContext.current
-        AlertDialog(
-            onDismissRequest = { selected = null },
-            title = { Text(car.title, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (car.imagePaths.isNotEmpty()) Row(
-                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        car.imagePaths.forEachIndexed { index, path ->
-                            CarPhoto(path, car.title, if (car.userId == session?.userId) session?.accessToken else null,
-                                Modifier.size(width = 210.dp, height = 140.dp)
-                                    .clickable { expandedPhoto = car to index })
-                        }
+        Dialog(onDismissRequest = { selected = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            Surface(modifier = Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.90f),
+                shape = RoundedCornerShape(20.dp), color = Color.White) {
+                Column(Modifier.fillMaxSize().padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(car.title, fontWeight = FontWeight.Bold, fontSize = 20.sp,
+                            color = Navy, modifier = Modifier.weight(1f))
+                        ListingClose(onClose = { selected = null })
                     }
-                    Text(car.make + "  " + car.model + "  " + car.trim)
-                    Text("سال ساخت: " + car.year + "  •  " + car.country + "، " + car.city)
-                    car.mileageKm?.let { Text("کارکرد: " + it + " کیلومتر") }
+                    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ListingGallery(car.imagePaths, car.title,
+                        session?.takeIf { it.userId == car.userId }?.accessToken) { expandedPhoto = car to it }
+                    val vehicleName = listOf(car.make, car.model, car.trim).filter { it.isNotBlank() }.joinToString(" ")
+                    if (vehicleName.isNotBlank()) Text(vehicleName, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+                    Text(car.priceLabel(), color = Navy, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                    if (car.listingStatus != "published")
+                        Text(listingStatusLabel(car.listingStatus, car.id in revisionReasons),
+                            color = Navy, fontWeight = FontWeight.Medium,
+                            modifier = Modifier.background(Pale, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 5.dp))
+                    HorizontalDivider(color = Color(0xFFE2E8F0))
+                    Text("سال ساخت: ${car.year}", color = Ink, fontSize = 14.sp)
+                    car.mileageKm?.let { Text("کارکرد: " + listingMileageLabel(it), color = Ink, fontSize = 14.sp) }
+                    Text("موقعیت: " + listOf(car.country, car.city).filter { it.isNotBlank() }.joinToString("، "), color = ListingMuted, fontSize = 14.sp)
                     if (session != null && car.listingStatus == "published") {
                         TextButton(
                             enabled = !favoriteBusy,
@@ -586,26 +676,26 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
                             }
                         ) { Text(if (car.id in favoriteIds) "★ حذف از نشان‌ها" else "☆ افزودن به نشان‌ها") }
                     }
-                    Text(car.priceLabel(), color = Navy, fontWeight = FontWeight.Bold)
-                    if (car.listingStatus != "published") Text("وضعیت: " + car.listingStatus)
-                    if (car.description.isNotBlank()) Text(car.description)
-                }
-            },
-            confirmButton = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.End) {
+                    if (car.description.isNotBlank()) {
+                        HorizontalDivider(color = Color(0xFFE2E8F0))
+                        Text("توضیحات", fontWeight = FontWeight.Bold, color = Navy)
+                        Text(car.description, color = Ink)
+                    }
+                    HorizontalDivider(color = Color(0xFFE2E8F0))
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (car.userId == session?.userId && car.listingStatus == "draft" &&
                         car.id !in revisionReasons) {
-                        Button(onClick = { editing = car; selected = null; tab = 2 }) {
+                        Button(modifier = Modifier.fillMaxWidth(), onClick = { editing = car; selected = null; tab = 2 }) {
                             Text("ویرایش پیش‌نویس")
                         }
-                        Button(enabled = car.imagePaths.isNotEmpty(), onClick = {
+                        Button(modifier = Modifier.fillMaxWidth(), enabled = car.imagePaths.isNotEmpty(), onClick = {
                             ownerActionConfirm = car to "submit"; selected = null
                         }) { Text("ارسال برای بررسی") }
                     }
                     if (car.userId == session?.userId) {
                         if (car.id in revisionReasons && car.listingStatus == "draft") {
                             val notice = revisionReasons[car.id]!!
-                            Text("علت بازگشت: " + notice.reason, color = Gold)
+                            Text("علت بازگشت: " + notice.reason, color = Navy)
                             notice.deleteAfter?.let { deadline ->
                                 val deadlineMs = revisionDeadlineMillis(deadline)
                                 if (deadlineMs != null) {
@@ -614,13 +704,13 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
                                     ).toInt()
                                     Text(if (days > 0) "مهلت اصلاح: $days روز باقی مانده" else
                                         "مهلت اصلاح به پایان رسیده؛ ارسال مجدد ممکن نیست.",
-                                        color = if (days > 0) Gold else MaterialTheme.colorScheme.error,
+                                        color = if (days > 0) Navy else MaterialTheme.colorScheme.error,
                                         fontSize = 12.sp)
                                 } else {
                                     Text("آخرین مهلت اصلاح: $deadline", fontSize = 12.sp)
                                 }
                             }
-                            TextButton(onClick = { editing = car; selected = null; tab = 2 }) {
+                            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = { editing = car; selected = null; tab = 2 }) {
                                 Text("اصلاح آگهی")
                             }
                             val deadlinePassed = revisionDeadlineMillis(notice.deleteAfter)
@@ -642,19 +732,19 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
                             }
                         }
                         if (car.listingStatus == "published" || car.listingStatus == "archived") {
-                            TextButton(onClick = { ownerActionConfirm = car to "renew"; selected = null }) {
+                            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = { ownerActionConfirm = car to "renew"; selected = null }) {
                                 Text("تمدید آگهی")
                             }
                         }
                         if (car.listingStatus in listOf("draft", "published", "archived")) {
-                            TextButton(onClick = { ownerActionConfirm = car to "cancel"; selected = null }) {
-                                Text("لغو آگهی")
+                            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = { ownerActionConfirm = car to "cancel"; selected = null }) {
+                                Text("لغو آگهی", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Medium)
                             }
                         }
                     }
                     if (car.listingStatus == "published") {
                         if (session != null && car.userId != session?.userId) {
-                            Button(onClick = {
+                            Button(modifier = Modifier.fillMaxWidth(), onClick = {
                                 chatTarget = ChatTarget(car.id, car.userId, car.title)
                                 selected = null
                             }) { Text("چت پلاک") }
@@ -690,7 +780,7 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
                                 car.title,
                                 listOf(car.make, car.model, car.trim).filter { it.isNotBlank() }.joinToString(" "),
                                 "سال ساخت: ${car.year}",
-                                car.mileageKm?.let { "کارکرد: $it کیلومتر" }.orEmpty(),
+                                car.mileageKm?.let { "کارکرد: " + listingMileageLabel(it) }.orEmpty(),
                                 "قیمت: ${car.priceLabel()}",
                                 "موقعیت: ${car.city}، ${car.country}",
                                 "شناسه آگهی: ${car.id}",
@@ -709,11 +799,14 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
                         }) { Text("اشتراک‌گذاری") }
                     }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { selected = null }) { Text("بازگشت") }
+                    }
+                }
             }
-        )
+        }
+    }
+    expandedPhoto?.let { (photoCar, photoIndex) ->
+        ListingPhotoViewer(photoCar, photoIndex,
+            if (photoCar.userId == session?.userId) session?.accessToken else null) { expandedPhoto = null }
     }
     ownerActionConfirm?.let { (car, action) ->
         val current = session
@@ -1091,10 +1184,9 @@ private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
                 if (details.isNotBlank()) Text(details, color = Ink, fontSize = 12.sp, maxLines = 2)
                 Text("سال ${car.year} • ${car.country}، ${car.city}",
                     color = Color.Gray, fontSize = 12.sp, maxLines = 2)
-                Text(car.priceLabel(), color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(car.priceLabel(), color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 car.mileageKm?.let {
-                    Text("کارکرد " + java.text.NumberFormat.getNumberInstance().format(it) +
-                        " کیلومتر", color = Color.Gray, fontSize = 12.sp)
+                    Text("کارکرد " + listingMileageLabel(it), color = ListingMuted, fontSize = 12.sp)
                 }
                 val status = when (car.vehicleStatus) {
                     "abroad" -> "خارج از کشور"
@@ -1105,12 +1197,12 @@ private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
                 }
                 if (status.isNotBlank()) Text(status, color = Color.Gray, fontSize = 11.sp)
                 if (car.listingStatus != "published")
-                    Text("وضعیت: " + car.listingStatus, color = Gold, fontSize = 11.sp)
+                    Text(listingStatusLabel(car.listingStatus), color = Navy, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 if (car.listingStatus == "published") {
                     TextButton(onClick = {
                         val details = listOf(car.make, car.model, car.trim).filter { it.isNotBlank() }.joinToString(" ")
                         val message = listOf(car.title, details, "سال ساخت: ${car.year}",
-                            car.mileageKm?.let { "کارکرد: $it کیلومتر" }.orEmpty(),
+                            car.mileageKm?.let { "کارکرد: " + listingMileageLabel(it) }.orEmpty(),
                             "قیمت: ${car.priceLabel()}", "موقعیت: ${car.city}، ${car.country}",
                             "شناسه آگهی: ${car.id}", "https://pelakauto.ir/?listing=${Uri.encode(car.id)}&src=share")
                             .filter { it.isNotBlank() }.joinToString("\n")
@@ -1542,7 +1634,8 @@ private fun NativeField(
 @Composable
 internal fun CarPhoto(
     path: String?, title: String, jwt: String?, modifier: Modifier = Modifier,
-    contentScale: androidx.compose.ui.layout.ContentScale = androidx.compose.ui.layout.ContentScale.Crop
+    contentScale: androidx.compose.ui.layout.ContentScale = androidx.compose.ui.layout.ContentScale.Crop,
+    highResolution: Boolean = false
 ) {
     val api = remember { PelakApi() }
     val context = LocalContext.current
@@ -1556,8 +1649,9 @@ internal fun CarPhoto(
         value = path?.let { api.signedPhoto(it, jwt) }
         if (path != null && value == null) failed = true
     }
-    val request = remember(url, path, jwt) {
+    val request = remember(url, path, jwt, highResolution) {
         coil.request.ImageRequest.Builder(context).data(url)
+            .apply { if (highResolution) size(1600) }
             .memoryCacheKey(path?.let { photoCacheKey(it, jwt) })
             .diskCacheKey(path?.let { photoCacheKey(it, jwt) }).crossfade(false).build()
     }
