@@ -1431,14 +1431,16 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                                 api.attachPhotos(session, id, photos.mapNotNull { it.path })
                                 val pending = photos.filter { it.path == null }
                                 uploadPhotoBatch(pending,
-                                    onProgress = { index, count -> uploadProgress = "در حال بارگذاری عکس $index از $count…" },
+                                    onProgress = { index, count -> uploadProgress = "در حال آماده‌سازی عکس \u2066$index\u2069 از \u2066$count\u2069…" },
                                     upload = { photo ->
                                         val path = api.uploadPhoto(session, context.contentResolver,
                                             photo.uri ?: error("فایل عکس در دسترس نیست"), photo.id, photo.rotation)
-                                        photos = photos.map { if (it.id == photo.id) it.copy(path = path) else it }
-                                        api.attachPhotos(session, id, photos.mapNotNull { it.path })
+                                        val next = photos.map { if (it.id == photo.id) it.copy(path = path) else it }
+                                        uploadProgress = "در حال اتصال عکس به آگهی…"
+                                        api.attachPhotos(session, id, next.mapNotNull { it.path })
+                                        photos = next
                                     },
-                                    onFailure = { photo -> photoErrors = photoErrors + (photo.id to "نیازمند تلاش دوباره") }
+                                    onFailure = { photo -> photoErrors = photoErrors + (photo.id to "ارسال ناموفق؛ دوباره تلاش کن یا عکس را جایگزین کن") }
                                 )
                                 // One final reconciliation covers an attachment whose first response was lost.
                                 api.attachPhotos(session, id, photos.mapNotNull { it.path })
