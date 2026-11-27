@@ -353,7 +353,10 @@ internal class PelakApi {
             val bytes = preparePhotoBounded(resolver, image, rotation)
             val path = session.userId + "/" + photoId + ".jpg"
             var lastError: Exception? = null
+            // A mobile connection may lose the response after Storage has committed the object.
+            // The stable UUID and an authenticated existence check recover the exact same object.
             for (attempt in 0..1) {
+                if (attempt > 0 && photoExists(session, path, bytes.size)) return@withContext path
                 val request = okhttp3.Request.Builder()
                     .url(PelakConfig.API_ROOT + "/storage/v1/object/car-images/" + Uri.encode(path, "/"))
                     .header("apikey", PelakConfig.PUBLIC_KEY)
@@ -365,15 +368,16 @@ internal class PelakApi {
                     photoUploadClient.newCall(request).execute().use { response ->
                         val status = response.code
                         if (response.isSuccessful) return@withContext path
-                        // A retry can receive Duplicate after the same stable photo ID was saved.
                         if (status == 409 || status == 400) {
                             val error = response.peekBody(8192L).string()
-                            if (error.contains("Duplicate", true) || error.contains("already exists", true)) {
-                                return@withContext path
+                            if (error.contains("Duplicate", true) || error.contains("already exists", true)
+                                || error.contains("ResourceAlreadyExists", true)) {
+                                if (photoExists(session, path, bytes.size)) return@withContext path
+                                throw java.io.IOException("وجود فایل در سرور تأیید نشد")
                             }
                         }
-                        if (status in listOf(400, 401, 403, 413)) throw IllegalArgumentException("آپلود عکس پذیرفته نشد ($status)")
-                        throw java.io.IOException("آپلود عکس ناموفق بود ($status)")
+                        if (status in listOf(400, 401, 403, 413)) throw IllegalArgumentException("پاسخ سرور: HTTP $status")
+                        throw java.io.IOException("پاسخ سرور: HTTP $status")
                     }
                 } catch (cancel: kotlinx.coroutines.CancellationException) {
                     throw cancel
@@ -381,11 +385,33 @@ internal class PelakApi {
                     throw failure
                 } catch (failure: Exception) {
                     lastError = failure
+                    if (photoExists(session, path, bytes.size)) return@withContext path
                 }
                 if (attempt == 0) kotlinx.coroutines.delay(750L)
             }
             throw lastError ?: IllegalStateException("آپلود عکس انجام نشد")
         }
+
+    private fun photoExists(session: PelakSession, path: String, expectedBytes: Int): Boolean {
+        // Only query metadata for this exact user-owned file; do not download its contents.
+        return try {
+            val request = okhttp3.Request.Builder()
+                .url(PelakConfig.API_ROOT + "/storage/v1/object/info/car-images/" + Uri.encode(path, "/"))
+                .header("apikey", PelakConfig.PUBLIC_KEY)
+                .header("Authorization", "Bearer " + session.accessToken)
+                .header("Cache-Control", "no-cache")
+                .get().build()
+            photoUploadClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) false else {
+                    val json = JSONObject(response.body?.string().orEmpty())
+                    val metadata = json.optJSONObject("metadata")
+                    val size = metadata?.optLong("size", -1L) ?: -1L
+                    val reportedSize = if (size >= 0L) size else json.optLong("size", -1L)
+                    reportedSize == expectedBytes.toLong()
+                }
+            }
+        } catch (_: Exception) { false }
+    }
 
     suspend fun removeUnattachedPhoto(session: PelakSession, path: String) =
         withContext(Dispatchers.IO) {
