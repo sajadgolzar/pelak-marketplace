@@ -1,0 +1,31 @@
+name: PELAK rounded logo regression QA (no publication)
+on:
+  push:
+    branches: [fix/native-logo-rounding-20261128]
+    paths: ['.github/workflows/native-logo-rounding-qa.yml','android-native/**']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify unchanged original logo and distinct adaptive icon
+        run: |
+          set -euo pipefail
+          test "$(git hash-object android-native/app/src/main/res/mipmap-nodpi/ic_launcher.png)" = 73b09f19a0c243e8fa9ee6aff1b18c623ef17aff
+          cmp android-native/app/src/main/res/mipmap-nodpi/ic_launcher.png android-native/app/src/main/res/mipmap-nodpi/pelak_app_icon.png
+          grep -Fq 'clip(RoundedCornerShape(10.dp))' android-native/app/src/main/java/com/pelakauto/nativeapp/MainActivity.kt
+      - name: Install Android SDK 35
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-35" "build-tools;35.0.0"'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Compile and run native regression tests
+        working-directory: android-native
+        run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon

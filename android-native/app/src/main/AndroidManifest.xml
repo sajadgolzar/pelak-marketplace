@@ -6,8 +6,8 @@
     <application
         android:allowBackup="false"
         android:label="پلاک"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher"
+        android:icon="@mipmap/pelak_app_icon"
+        android:roundIcon="@mipmap/pelak_app_icon"
         android:supportsRtl="true"
         android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">

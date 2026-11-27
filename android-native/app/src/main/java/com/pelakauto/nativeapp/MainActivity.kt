@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -343,7 +344,7 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Image(painterResource(R.mipmap.ic_launcher), contentDescription = "لوگوی PELAK",
-                        modifier = Modifier.size(48.dp))
+                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)))
                     Column {
                         Text("پلاک", color = Navy, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                         if (!keyboardVisible) Text("خودروی بعدی تو، اینجاست.", fontSize = 11.sp, color = Color.Gray)
