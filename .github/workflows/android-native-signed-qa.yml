@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
-          ref: 038ca5ea1dc872fb471388d3310ec6027dbe118b
+          ref: ef2eca6fbe98590f54e6d780f95a6b050f2d357a
           path: native-source
           persist-credentials: false
       - uses: actions/setup-java@v4
@@ -80,14 +80,14 @@ jobs:
           expected=$(sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' "$RUNNER_TEMP/pelak-signing/certificate-fingerprint.txt" | head -n1 | normalize_digest)
           actual=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pelak-signing/apk-certificate.txt" | normalize_digest)
           test -n "$expected" && test "$expected" = "$actual"
-          previous="$GITHUB_WORKSPACE/downloads/PELAK-Native-v0.4.2-preview.apk"
+          previous="$GITHUB_WORKSPACE/downloads/PELAK-Native-v0.4.3-preview.apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$previous" > "$RUNNER_TEMP/pelak-signing/previous-certificate.txt"
           previous_digest=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pelak-signing/previous-certificate.txt" | normalize_digest)
           test "$previous_digest" = "$actual"
           previous_badging=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$previous")
           grep -F "package: name='com.pelakauto.nativepreview' versionCode='9'" <<< "$previous_badging"
           badging=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk")
-          grep -F "package: name='com.pelakauto.nativepreview' versionCode='10' versionName='0.4.3-native-preview'" <<< "$badging"
+          grep -F "package: name='com.pelakauto.nativepreview' versionCode='11' versionName='0.4.4-native-preview'" <<< "$badging"
           if grep -q '^application-debuggable' <<< "$badging"; then exit 1; fi
           icon_paths=$(sed -nE "s/^application-icon-[0-9]+:'([^']+)'$/\1/p" <<< "$badging" | sort -u)
           expected_densities=(160 240 320 480 640)
@@ -101,7 +101,7 @@ jobs:
           test "${source_hashes[*]}" = "${expected_hashes[*]}"
           unzip -p "$apk" assets/pelak-vehicle-catalog.json | cmp - app/src/main/assets/pelak-vehicle-catalog.json
           unzip -t "$apk" >/dev/null
-          cp "$apk" "$RUNNER_TEMP/PELAK-Native-v0.4.3-preview.apk"
+          cp "$apk" "$RUNNER_TEMP/PELAK-Native-v0.4.4-preview.apk"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -114,13 +114,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: pelak-native-signed-qa-apk
-          path: ${{ runner.temp }}/PELAK-Native-v0.4.3-preview.apk
+          path: ${{ runner.temp }}/PELAK-Native-v0.4.4-preview.apk
           retention-days: 7
           if-no-files-found: error
       - name: Publish the verified APK and version metadata together
         run: |
           set -euo pipefail
-          apk=PELAK-Native-v0.4.3-preview.apk
+          apk=PELAK-Native-v0.4.4-preview.apk
           git fetch origin main
           git checkout --detach origin/main
           python3 - <<'PY'
@@ -129,25 +129,25 @@ jobs:
 
           release = Path('pelak-release.json')
           config = json.loads(release.read_text(encoding='utf-8'))
-          assert config['android']['versionCode'] == 9, 'Production version changed during build'
+          assert config['android']['versionCode'] == 10, 'Production version changed during build'
           config['android'].update(
-              versionCode=10,
-              versionName='0.4.3-native-preview',
-              apkUrl='https://pelakauto.ir/downloads/PELAK-Native-v0.4.3-preview.apk',
-              notes='انتخاب سال، نمایش قیمت و انتخاب چند عکس در فرم آگهی بهبود یافت.',
+              versionCode=11,
+              versionName='0.4.4-native-preview',
+              apkUrl='https://pelakauto.ir/downloads/PELAK-Native-v0.4.4-preview.apk',
+              notes='اشتراک‌گذاری، لینک مستقیم همان آگهی را ارسال می‌کند.',
           )
           release.write_text(json.dumps(config, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
           page = Path('android.html')
           html = page.read_text(encoding='utf-8')
-          assert html.count('PELAK-Native-v0.4.2-preview.apk') == 1
-          page.write_text(html.replace('PELAK-Native-v0.4.2-preview.apk', 'PELAK-Native-v0.4.3-preview.apk')
-                              .replace('۰٫۴٫۲', '۰٫۴٫۳'), encoding='utf-8')
+          assert html.count('PELAK-Native-v0.4.3-preview.apk') == 1
+          page.write_text(html.replace('PELAK-Native-v0.4.3-preview.apk', 'PELAK-Native-v0.4.4-preview.apk')
+                              .replace('۰٫۴٫۳', '۰٫۴٫۴'), encoding='utf-8')
           PY
           cp "$RUNNER_TEMP/$apk" "downloads/$apk"
           cp "$RUNNER_TEMP/$apk" downloads/PELAK-Android-Latest.apk
           cmp "downloads/$apk" downloads/PELAK-Android-Latest.apk
           sha256sum "downloads/$apk"
           git add "downloads/$apk" downloads/PELAK-Android-Latest.apk android.html pelak-release.json
-          git -c user.name=github-actions -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m "Publish signed PELAK Android 0.4.3"
+          git -c user.name=github-actions -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m "Publish signed PELAK Android 0.4.4"
           git push origin HEAD:main
