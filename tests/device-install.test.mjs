@@ -22,7 +22,7 @@ function fixture(ua,{visits=1,installed=false,busy=false,prompt=false,language='
  }
  const store=m=>({getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v)});
  const document={documentElement:{lang:language},visibilityState:'visible',readyState:'complete',
-  activeElement:node('focus'),body:{appendChild(){}},querySelector:node,querySelectorAll:()=>[],
+  activeElement:node('focus'),body:{appendChild(){}},querySelector:s=>s==='#pelakInstallLayer'?null:node(s),querySelectorAll:()=>[],
   getElementById:()=>null,createElement:()=>node('created'),addEventListener(){}};
  const location={pathname:'/',search:'',assign(v){destination=v;}};
  const window={matchMedia:()=>({matches:installed}),location,addEventListener:(e,fn)=>listeners.set(e,fn)};
