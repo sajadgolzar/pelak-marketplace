@@ -85,7 +85,7 @@ jobs:
           previous_digest=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pelak-signing/previous-certificate.txt" | normalize_digest)
           test "$previous_digest" = "$actual"
           previous_badging=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$previous")
-          grep -F "package: name='com.pelakauto.nativepreview' versionCode='9'" <<< "$previous_badging"
+          grep -F "package: name='com.pelakauto.nativepreview' versionCode='10'" <<< "$previous_badging"
           badging=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk")
           grep -F "package: name='com.pelakauto.nativepreview' versionCode='11' versionName='0.4.4-native-preview'" <<< "$badging"
           if grep -q '^application-debuggable' <<< "$badging"; then exit 1; fi
