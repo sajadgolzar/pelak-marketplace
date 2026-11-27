@@ -68,30 +68,70 @@ internal fun orientationMatrix(orientation: Int, extraRotation: Int = 0): Matrix
     postRotate(extraRotation.toFloat())
 }
 
+// A slow or remote gallery provider must not block the entire draft forever.
+private val photoPreparationWorkers = java.util.concurrent.ThreadPoolExecutor(
+    2, 2, 0L, java.util.concurrent.TimeUnit.MILLISECONDS,
+    java.util.concurrent.SynchronousQueue<Runnable>()
+)
+
+internal suspend fun preparePhotoBounded(resolver: ContentResolver, image: Uri, rotation: Int): ByteArray =
+    kotlinx.coroutines.withTimeoutOrNull(25000L) {
+        kotlinx.coroutines.suspendCancellableCoroutine<ByteArray> { continuation ->
+            val task = java.util.concurrent.FutureTask<Unit> {
+                val result = runCatching { preparePhoto(resolver, image, rotation) }
+                if (continuation.isActive) continuation.resumeWith(result)
+            }
+            continuation.invokeOnCancellation { task.cancel(true) }
+            try { photoPreparationWorkers.execute(task) }
+            catch (failure: java.util.concurrent.RejectedExecutionException) {
+                if (continuation.isActive) continuation.resumeWith(Result.failure(
+                    IllegalStateException("گالری پاسخ نمی‌دهد؛ عکس را جایگزین کن یا دوباره تلاش کن.")))
+            }
+        }
+    } ?: throw java.io.IOException("خواندن عکس بیش از حد طول کشید؛ دوباره تلاش کن.")
+
 internal fun preparePhoto(resolver: ContentResolver, image: Uri, rotation: Int): ByteArray {
-    val orientation = resolver.openInputStream(image)?.use {
-        runCatching { ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL) }
-            .getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+    // Read the provider only once; repeated opens may stall cloud-backed gallery items.
+    val raw = resolver.openInputStream(image)?.use { input ->
+        val output = ByteArrayOutputStream()
+        val chunk = ByteArray(32768)
+        while (true) {
+            if (Thread.currentThread().isInterrupted) throw java.io.InterruptedIOException()
+            val n = input.read(chunk)
+            if (n < 0) break
+            if (n == 0) continue
+            require(output.size() + n <= 32 * 1024 * 1024) { "حجم فایل عکس بیش از حد مجاز است" }
+            output.write(chunk, 0, n)
+        }
+        output.toByteArray()
     } ?: throw IllegalStateException("عکس قابل خواندن نیست")
+    val orientation = runCatching {
+        ExifInterface(java.io.ByteArrayInputStream(raw)).getAttributeInt(
+            ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+    }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    resolver.openInputStream(image)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+    BitmapFactory.decodeByteArray(raw, 0, raw.size, bounds)
     require(bounds.outWidth > 0 && bounds.outHeight > 0) { "فرمت عکس قابل خواندن نیست" }
     var sample = 1
-    while (bounds.outWidth / sample > 1920 || bounds.outHeight / sample > 1920) sample *= 2
+    while (bounds.outWidth / sample > 1600 || bounds.outHeight / sample > 1600) sample *= 2
     val options = BitmapFactory.Options().apply { inSampleSize = sample }
-    val source = resolver.openInputStream(image)?.use { BitmapFactory.decodeStream(it, null, options) }
+    val source = BitmapFactory.decodeByteArray(raw, 0, raw.size, options)
         ?: throw IllegalStateException("بازکردن عکس ممکن نیست")
-    val matrix = orientationMatrix(orientation, rotation)
     val oriented = try {
-        Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+        Bitmap.createBitmap(source, 0, 0, source.width, source.height, orientationMatrix(orientation, rotation), true)
     } catch (failure: Throwable) {
         source.recycle()
         throw failure
     }
     try {
         val stream = ByteArrayOutputStream()
-        check(oriented.compress(Bitmap.CompressFormat.JPEG, 85, stream))
-        return stream.toByteArray().also { require(it.isNotEmpty() && it.size <= 6 * 1024 * 1024) }
+        for (quality in listOf(82, 72, 60)) {
+            stream.reset()
+            check(oriented.compress(Bitmap.CompressFormat.JPEG, quality, stream))
+            if (stream.size() in 1..(1024 * 1024)) return stream.toByteArray()
+        }
+        require(stream.size() in 1..(6 * 1024 * 1024))
+        return stream.toByteArray()
     } finally {
         if (oriented !== source) oriented.recycle()
         source.recycle()
