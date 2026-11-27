@@ -13,8 +13,8 @@ android {
         applicationId 'com.pelakauto.nativepreview'
         minSdk 24
         targetSdk 35
-        versionCode 11
-        versionName '0.4.4-native-preview'
+        versionCode 12
+        versionName '0.4.5-native-preview'
         resConfigs 'fa', 'en', 'ar', 'ka'
         buildConfigField 'String', 'FIREBASE_APP_ID', '\"1:245022577031:android:8bc31b15733dba8ce58322\"'
         buildConfigField 'String', 'FIREBASE_API_KEY', '\"AIzaSyBJWadEPLZdrwcnKI9sFk64IfvDfUed8Xo\"'
@@ -51,6 +51,7 @@ android {
 }
 
 dependencies {
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'androidx.exifinterface:exifinterface:1.3.7'
     implementation 'com.googlecode.libphonenumber:libphonenumber:8.13.55'
     testImplementation 'junit:junit:4.13.2'
