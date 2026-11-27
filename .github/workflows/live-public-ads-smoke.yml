@@ -1,0 +1,33 @@
+name: PELAK live public listing SEO smoke test
+on:
+  push:
+    branches: [qa/live-listing-seo-20261128]
+    paths: ['.github/workflows/live-public-ads-smoke.yml']
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify live public routes without authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --retry 2 --max-time 20 -fsSL https://pelakauto.ir/ads/ -o /tmp/ads.html
+          curl --retry 2 --max-time 20 -fsSL https://pelakauto.ir/sitemap-listings.xml -o /tmp/ads.xml
+          curl --retry 2 --max-time 20 -fsSL https://pelakauto.com/ads/ -o /tmp/com.html
+          grep -Fq 'آگهی‌های فروش خودرو در پلاک' /tmp/ads.html
+          grep -Fq 'rel="canonical" href="https://pelakauto.ir/ads/"' /tmp/com.html
+          code=$(curl --max-time 20 -sS -D /tmp/missing.headers -o /tmp/missing.html -w '%{http_code}' https://pelakauto.ir/ads/00000000-0000-0000-0000-000000000000/)
+          test "$code" = 404
+          grep -iq 'x-robots-tag: noindex' /tmp/missing.headers
+          python - <<'PY'
+          import re, xml.etree.ElementTree as ET
+          root=ET.parse('/tmp/ads.xml').getroot()
+          ns='{http://www.sitemaps.org/schemas/sitemap/0.9}'
+          assert root.tag==ns+'urlset'
+          urls=[e.text for e in root.findall('.//'+ns+'loc')]
+          assert all(re.fullmatch(r'https://pelakauto\.ir/ads/[0-9a-f-]{36}/',u or '') for u in urls)
+          print('Public listing sitemap entries:',len(urls))
+          PY
