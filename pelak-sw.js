@@ -2,12 +2,13 @@
 self.addEventListener('install', () => self.skipWaiting());
 
 // Only cache public site assets. Never cache Supabase API, private photos or auth.
-const PELAK_CACHE = 'pelak-public-shell-v2';
+const PELAK_CACHE = 'pelak-public-shell-v3';
 const PELAK_CACHE_PREFIX = 'pelak-public-shell-';
 const PELAK_STATIC = new Set([
   '/pelak-simple.css', '/pelak-simple.js', '/pelak-android-bridge.js',
   '/pelak-logo.jpg', '/pelak-sclass-hero.webp',
-  '/pelak-icon-192.png', '/pelak-icon-512.png'
+  '/pelak-icon-192.png', '/pelak-icon-512.png',
+  '/pelak-font.css', '/fonts/Vazirmatn-variable.woff2', '/discovery.css', '/pelak-car-price.css'
 ]);
 
 self.addEventListener('activate', event => {
