@@ -123,8 +123,7 @@ private fun ListingPhotoViewer(car: Car, initial: Int, jwt: String?, onClose: ()
                 val heightPx = constraints.maxHeight.toFloat()
                 var scale by remember(page) { mutableStateOf(1f) }
                 var offset by remember(page) { mutableStateOf(Offset.Zero) }
-                CarPhoto(car.imagePaths.getOrNull(page), car.title, jwt,
-                    Modifier.fillMaxSize().pointerInput(page, widthPx, heightPx) {
+                Box(Modifier.fillMaxSize().pointerInput(page, widthPx, heightPx) {
                         detectTransformGestures { _, pan, zoom, _ ->
                             val next = (scale * zoom).coerceIn(1f, 4f)
                             val maxX = widthPx * (next - 1f) / 2f
@@ -134,9 +133,12 @@ private fun ListingPhotoViewer(car: Car, initial: Int, jwt: String?, onClose: ()
                                 (offset.y + pan.y).coerceIn(-maxY, maxY))
                             scale = next
                         }
-                    }.graphicsLayer {
-                        scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y
-                    }, contentScale = androidx.compose.ui.layout.ContentScale.Fit, highResolution = true)
+                    }) {
+                    CarPhoto(car.imagePaths.getOrNull(page), car.title, jwt,
+                        Modifier.fillMaxSize().graphicsLayer {
+                            scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y
+                        }, contentScale = androidx.compose.ui.layout.ContentScale.Fit, highResolution = true)
+                }
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween) {
@@ -632,15 +634,15 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
         val context = LocalContext.current
         Dialog(onDismissRequest = { selected = null },
             properties = DialogProperties(usePlatformDefaultWidth = false)) {
-            Surface(modifier = Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.90f),
+            Surface(modifier = Modifier.fillMaxWidth(0.94f).wrapContentHeight(),
                 shape = RoundedCornerShape(20.dp), color = Color.White) {
-                Column(Modifier.fillMaxSize().padding(16.dp)) {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(car.title, fontWeight = FontWeight.Bold, fontSize = 20.sp,
                             color = Navy, modifier = Modifier.weight(1f))
                         ListingClose(onClose = { selected = null })
                     }
-                    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                    Column(Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     ListingGallery(car.imagePaths, car.title,
                         session?.takeIf { it.userId == car.userId }?.accessToken) { expandedPhoto = car to it }
@@ -1149,7 +1151,6 @@ private fun ListingsPanel(
 @Composable
 private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
     val context = LocalContext.current
-    var photoIndex by remember(car.id) { mutableIntStateOf(0) }
     val photoCount = car.imagePaths.size
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -1157,24 +1158,20 @@ private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CarPhoto(car.imagePaths.getOrNull(photoIndex), car.title,
-                    session?.takeIf { it.userId == car.userId }?.accessToken,
-                    Modifier.size(110.dp))
-                if (photoCount > 1) {
-                    Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center) {
-                        TextButton(
-                            onClick = { photoIndex = (photoIndex - 1 + photoCount) % photoCount },
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
-                        ) { Text("‹", fontSize = 20.sp) }
-                        Text("${photoIndex + 1}/$photoCount", color = Color.Gray, fontSize = 11.sp)
-                        TextButton(
-                            onClick = { photoIndex = (photoIndex + 1) % photoCount },
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
-                        ) { Text("›", fontSize = 20.sp) }
+            if (photoCount > 0) {
+                val pager = rememberPagerState(pageCount = { photoCount })
+                Box(Modifier.size(112.dp).clip(RoundedCornerShape(11.dp)).background(Pale)) {
+                    HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+                        CarPhoto(car.imagePaths.getOrNull(page), car.title,
+                            session?.takeIf { it.userId == car.userId }?.accessToken,
+                            Modifier.fillMaxSize().clickable(onClick = onClick),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Fit)
                     }
+                    ListingPhotoCount(pager.currentPage, photoCount,
+                        Modifier.align(Alignment.BottomEnd).padding(5.dp))
                 }
+            } else {
+                CarPhoto(null, car.title, null, Modifier.size(112.dp))
             }
             Spacer(Modifier.width(11.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -1183,7 +1180,7 @@ private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
                     .joinToString(" · ")
                 if (details.isNotBlank()) Text(details, color = Ink, fontSize = 12.sp, maxLines = 2)
                 Text("سال ${car.year} • ${car.country}، ${car.city}",
-                    color = Color.Gray, fontSize = 12.sp, maxLines = 2)
+                    color = ListingMuted, fontSize = 12.sp, maxLines = 2)
                 Text(car.priceLabel(), color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 car.mileageKm?.let {
                     Text("کارکرد " + listingMileageLabel(it), color = ListingMuted, fontSize = 12.sp)
@@ -1195,7 +1192,7 @@ private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
                     "ready" -> "آماده تحویل"
                     else -> ""
                 }
-                if (status.isNotBlank()) Text(status, color = Color.Gray, fontSize = 11.sp)
+                if (status.isNotBlank()) Text(status, color = ListingMuted, fontSize = 11.sp)
                 if (car.listingStatus != "published")
                     Text(listingStatusLabel(car.listingStatus), color = Navy, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 if (car.listingStatus == "published") {

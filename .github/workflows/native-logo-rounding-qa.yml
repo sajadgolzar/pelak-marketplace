@@ -28,4 +28,10 @@ jobs:
           gradle-version: '8.11.1'
       - name: Compile and run native regression tests
         working-directory: android-native
-        run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon
+        run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon -Drobolectric.dependency.repo.url=https://repo.maven.apache.org/maven2
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: native-ui-regression-results
+          path: android-native/app/build/test-results/
+          retention-days: 3
