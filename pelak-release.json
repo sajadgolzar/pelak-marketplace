@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "android": {
-    "versionCode": 12,
-    "versionName": "0.4.5-native-preview",
-    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.4.5-preview.apk",
+    "versionCode": 13,
+    "versionName": "0.4.6-native-preview",
+    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.4.6-preview.apk",
     "minimumVersionCode": 1,
-    "notes": "رفع توقف طولانی بارگذاری عکس، بهبود پیش‌نمایش و تلاش مجدد در همان پیش‌نویس."
+    "notes": "مسیر جایگزین ارسال عکس، بازیابی ارسال ناموفق و لوگوی رسمی پلاک."
   },
   "web": {
     "version": "2026-11-15.1",
