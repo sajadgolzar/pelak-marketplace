@@ -1,0 +1,37 @@
+name: PELAK listing connectivity diagnosis
+on:
+  push:
+    branches: [qa/listing-connectivity-20261128]
+    paths: ['.github/workflows/listing-connectivity.yml']
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const source=fs.readFileSync('pelak-public-ads.mjs','utf8');
+          const api=source.match(/const API="([^"]+)"/)[1],key=source.match(/KEY="([^"]+)"/)[1];
+          const fields=source.match(/const FIELDS='([^']+)'/)[1];
+          const variants=[
+            ['minimal',{select:'id',listing_status:'eq.published',limit:'1'}],
+            ['full',{select:fields,listing_status:'eq.published',limit:'1'}],
+            ['expiry',{select:fields,listing_status:'eq.published',or:'(expires_at.is.null,expires_at.gt.'+new Date().toISOString()+')',order:'id.asc',limit:'25'}]
+          ];
+          await Promise.all(variants.map(async ([name,params])=>{
+            try{
+              const u=new URL(api+'/rest/v1/listings');u.search=new URLSearchParams(params);
+              const r=await fetch(u,{headers:{apikey:key,Accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(12000)});
+              let result;try{result=await r.json()}catch{result=null}
+              console.log(name,r.status,Array.isArray(result)?'rows='+result.length:JSON.stringify({code:result?.code,message:result?.message}).slice(0,250));
+            }catch(e){console.log(name,e.name,e.cause?.code||'');}
+          }));
+          await Promise.all(['/ads/','/sitemap-listings.xml','/','/api/car-prices'].map(async path=>{
+            try{const r=await fetch('https://pelakauto.ir'+path,{signal:AbortSignal.timeout(15000)});console.log(path,r.status,r.headers.get('content-type'),r.headers.get('cf-ray'));}
+            catch(e){console.log(path,e.name,e.cause?.code||'');}
+          }));
+          JS
