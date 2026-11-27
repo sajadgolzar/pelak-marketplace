@@ -63,6 +63,21 @@ class PhotoFlowTest {
         result.recycle()
     }
 
+    @Test fun boundedPhotoPreparationReturnsValidJpegAndReportsUnreadableFiles() = runBlocking {
+        val context = RuntimeEnvironment.getApplication() as Context
+        val bitmap = Bitmap.createBitmap(120, 80, Bitmap.Config.ARGB_8888)
+        val file = File(context.cacheDir, "bounded-input.jpg")
+        FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+        bitmap.recycle()
+        val bytes = preparePhotoBounded(context.contentResolver, Uri.fromFile(file), 90)
+        val result = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        assertEquals(80, result.width)
+        assertEquals(120, result.height)
+        result.recycle()
+        val missing = File(context.cacheDir, "missing-upload-test.jpg")
+        assertTrue(runCatching { preparePhotoBounded(context.contentResolver, Uri.fromFile(missing), 0) }.isFailure)
+    }
+
     @Test fun serverFiltersContainRangesAndStableSortBeforePagination() {
         val query = ListingFilters(minPrice = "۵۰۰۰۰۰۰۰۰", maxYear = "۲۰۲۶",
             currency = "IRR", photos = true, sort = "ارزان‌ترین").parameters()
