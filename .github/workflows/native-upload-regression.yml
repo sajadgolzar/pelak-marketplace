@@ -32,6 +32,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+      - name: Verify the exact 512px PELAK website logo is bundled
+        run: |
+          python - <<'PY'
+          import hashlib, struct
+          from pathlib import Path
+          web = Path('relay-source/pelak-icon-512.png').read_bytes()
+          app = Path('android-native/app/src/main/res/mipmap-nodpi/ic_launcher.png').read_bytes()
+          assert web == app, 'Android logo differs from original website PNG'
+          assert struct.unpack('>II', app[16:24]) == (512, 512), 'Logo source must be 512x512'
+          print('Verified exact 512px source', hashlib.sha256(app).hexdigest())
+          PY
       - name: Run Android regression tests and compile
         working-directory: android-native
         run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon
