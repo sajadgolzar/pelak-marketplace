@@ -1,1 +1,1 @@
-{"version":1,"include":["/","/api/car-prices","/prices/*","/buying-guides/*","/ads","/ads/*","/sitemap-listings.xml"],"exclude":[]}
+{"version":1,"include":["/","/api/car-prices","/prices/*","/buying-guides/*","/ads","/ads/*","/sitemap-listings.xml","/api/native-photo-upload"],"exclude":[]}
