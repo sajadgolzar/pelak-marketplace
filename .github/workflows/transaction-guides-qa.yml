@@ -1,0 +1,30 @@
+name: PELAK transaction guides QA
+on:
+  push:
+    branches: [fix/transaction-guides-20261128, main]
+    paths: ['guides/**','scripts/build_discovery.py','.github/workflows/transaction-guides-qa.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python scripts/build_discovery.py
+          git diff --exit-code -- sitemap.xml robots.txt car-guide prices comparisons buying-guides
+      - run: |
+          python - <<'PY'
+          import pathlib, json, re, xml.etree.ElementTree as ET
+          root=ET.parse('sitemap.xml').getroot()
+          urls=[e.text for e in root.findall('.//{http://www.sitemaps.org/schemas/sitemap/0.9}loc')]
+          hub=pathlib.Path('car-guide/index.html').read_text()
+          for slug in ['used-car-checklist','sell-car-checklist']:
+              p='/guides/'+slug+'/'
+              s=pathlib.Path(p.strip('/')+'/index.html').read_text()
+              assert 'https://pelakauto.ir'+p in urls
+              assert p in hub
+              assert s.count('<h1>')==1
+              assert 'rel="canonical" href="https://pelakauto.ir'+p+'"' in s
+              assert json.loads(re.search(r'<script type="application/ld\+json">(.*?)</script>',s).group(1))['@type']=='Article'
+          PY
