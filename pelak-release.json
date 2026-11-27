@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "android": {
-    "versionCode": 11,
-    "versionName": "0.4.4-native-preview",
-    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.4.4-preview.apk",
+    "versionCode": 12,
+    "versionName": "0.4.5-native-preview",
+    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.4.5-preview.apk",
     "minimumVersionCode": 1,
-    "notes": "اشتراک‌گذاری، لینک مستقیم همان آگهی را ارسال می‌کند."
+    "notes": "رفع توقف طولانی بارگذاری عکس، بهبود پیش‌نمایش و تلاش مجدد در همان پیش‌نویس."
   },
   "web": {
     "version": "2026-11-15.1",
