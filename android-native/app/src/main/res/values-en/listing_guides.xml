@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="listing_guide_title">Write a concise, accurate and distinctive title.</string>
+    <string name="listing_guide_make">Select your car’s manufacturer.</string>
+    <string name="listing_guide_model">Select the exact model.</string>
+    <string name="listing_guide_trim">Specify the trim and equipment level.</string>
+    <string name="listing_guide_mileage">Enter the actual mileage in kilometres.</string>
+    <string name="listing_guide_year">Specify the production year.</string>
+    <string name="listing_guide_country">Specify the country where the car is located.</string>
+    <string name="listing_guide_city">Enter the city where the car is located.</string>
+    <string name="listing_guide_status">Specify the car’s current delivery status.</string>
+    <string name="listing_guide_phone">A direct way for buyers to reach you.</string>
+    <string name="listing_guide_price">Enter a price that reflects the car’s condition.</string>
+    <string name="listing_guide_description">Describe the car’s real condition and features.</string>
+    <string name="listing_guide_photos">Clear, genuine photos build trust.</string>
+</resources>

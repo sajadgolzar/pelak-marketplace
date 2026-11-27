@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="listing_guide_title">کوتاه، دقیق و متمایز بنویسید.</string>
+    <string name="listing_guide_make">سازنده خودرو را از فهرست انتخاب کنید.</string>
+    <string name="listing_guide_model">مدل دقیق خودرو را مشخص کنید.</string>
+    <string name="listing_guide_trim">نسخه و سطح تجهیزات خودرو را مشخص کنید.</string>
+    <string name="listing_guide_mileage">کارکرد واقعی خودرو را به کیلومتر وارد کنید.</string>
+    <string name="listing_guide_year">سال تولید خودرو را مشخص کنید.</string>
+    <string name="listing_guide_country">کشور محل فعلی خودرو را مشخص کنید.</string>
+    <string name="listing_guide_city">شهر محل فعلی خودرو را وارد کنید.</string>
+    <string name="listing_guide_status">وضعیت فعلی خودرو برای تحویل را مشخص کنید.</string>
+    <string name="listing_guide_phone">راه ارتباط مستقیم خریداران با شما.</string>
+    <string name="listing_guide_price">قیمت متناسب با شرایط خودرو را وارد کنید.</string>
+    <string name="listing_guide_description">از ویژگی‌ها و شرایط واقعی خودرو بنویسید.</string>
+    <string name="listing_guide_photos">تصاویر واضح و واقعی، اعتماد بیشتری ایجاد می‌کنند.</string>
+</resources>

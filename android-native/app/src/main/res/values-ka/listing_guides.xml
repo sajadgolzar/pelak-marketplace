@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="listing_guide_title">დაწერეთ მოკლე, ზუსტი და გამორჩეული სათაური.</string>
+    <string name="listing_guide_make">აირჩიეთ ავტომობილის მწარმოებელი.</string>
+    <string name="listing_guide_model">მიუთითეთ ავტომობილის ზუსტი მოდელი.</string>
+    <string name="listing_guide_trim">მიუთითეთ კომპლექტაცია და აღჭურვილობის დონე.</string>
+    <string name="listing_guide_mileage">მიუთითეთ რეალური გარბენი კილომეტრებში.</string>
+    <string name="listing_guide_year">მიუთითეთ გამოშვების წელი.</string>
+    <string name="listing_guide_country">მიუთითეთ ქვეყანა, სადაც ავტომობილი იმყოფება.</string>
+    <string name="listing_guide_city">მიუთითეთ ქალაქი, სადაც ავტომობილი იმყოფება.</string>
+    <string name="listing_guide_status">მიუთითეთ ავტომობილის მიმდინარე მიწოდების სტატუსი.</string>
+    <string name="listing_guide_phone">მყიდველებთან პირდაპირი კავშირის საშუალება.</string>
+    <string name="listing_guide_price">მიუთითეთ ავტომობილის მდგომარეობის შესაბამისი ფასი.</string>
+    <string name="listing_guide_description">აღწერეთ ავტომობილის რეალური მდგომარეობა და მახასიათებლები.</string>
+    <string name="listing_guide_photos">მკაფიო და რეალური ფოტოები ნდობას ზრდის.</string>
+</resources>

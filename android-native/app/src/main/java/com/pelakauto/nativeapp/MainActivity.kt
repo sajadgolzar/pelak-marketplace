@@ -1289,7 +1289,7 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                 fontSize = 12.sp, color = Color.Gray)
         }
         item {
-            Text("مرحله ${step + 1} از ۳", fontWeight = FontWeight.Bold, color = Navy)
+            Text("مرحله \u2066${step + 1}\u2069 از \u20663\u2069", fontWeight = FontWeight.Bold, color = Navy)
             LinearProgressIndicator(progress = { (step + 1) / 3f }, modifier = Modifier.fillMaxWidth())
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 listOf("مشخصات", "قیمت و موقعیت", "عکس و ثبت").forEachIndexed { index, label ->
@@ -1299,27 +1299,28 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
             }
         }
         if (step == 0) {
-        item { NativeField("عنوان آگهی", title) { title = it } }
-        item { VehicleBrandField(make, "برند خودرو") { if (it != make) { model = ""; trim = "" }; make = it } }
-        item { VehicleDetailField(model, make, null, "مدل خودرو") { if (it != model) trim = ""; model = it } }
-        item { VehicleDetailField(trim, make, model, "تیپ خودرو") { trim = it } }
-        item { NativeField("کارکرد (کیلومتر)", mileage, KeyboardType.Number) { mileage = it.filter(Char::isDigit) } }
+        item { ListingGuide(R.string.listing_guide_title) { NativeField("عنوان آگهی", title) { title = it } } }
+        item { ListingGuide(R.string.listing_guide_make) { VehicleBrandField(make, "برند خودرو") { if (it != make) { model = ""; trim = "" }; make = it } } }
+        item { ListingGuide(R.string.listing_guide_model) { VehicleDetailField(model, make, null, "مدل خودرو") { if (it != model) trim = ""; model = it } } }
+        item { ListingGuide(R.string.listing_guide_trim) { VehicleDetailField(trim, make, model, "تیپ خودرو") { trim = it } } }
+        item { ListingGuide(R.string.listing_guide_mileage) { NativeField("کارکرد (کیلومتر)", mileage, KeyboardType.Number) { mileage = it.filter(Char::isDigit) } } }
         item {
-            ListingYearPicker(year.toIntOrNull(), make) { year = it.toString() }
+            ListingGuide(R.string.listing_guide_year) { ListingYearPicker(year.toIntOrNull(), make) { year = it.toString() } }
         }
         }
         if (step == 1) {
         item {
-            NativeField("کشور", country) { country = it }
+            ListingGuide(R.string.listing_guide_country) { NativeField("کشور", country) { country = it } }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 ListingPhone.preferredCountries.forEach { option ->
                     FilterChip(selected = country == option, onClick = { country = option }, label = { Text(option) })
                 }
             }
         }
-        item { NativeField("شهر", city) { city = it } }
+        item { ListingGuide(R.string.listing_guide_city) { NativeField("شهر", city) { city = it } } }
         item {
             Text("وضعیت خودرو", color = Navy)
+            ListingGuideText(R.string.listing_guide_status)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 listOf("آماده تحویل" to "ready", "خارج از کشور" to "abroad",
                     "در مسیر" to "in_transit", "گمرک" to "customs").forEach { (label, code) ->
@@ -1345,6 +1346,7 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                 Text("کد کشور آگهی: \u2066$countryCode\u2069 · برای شمارهٔ محلی خودکار اضافه می‌شود.",
                     fontSize = 12.sp, color = Color.Gray)
             }
+            ListingGuideText(R.string.listing_guide_phone)
             Text("شماره تماس در آگهی منتشرشده عمومی است.", fontSize = 12.sp, color = Color.Gray)
         }
         item {
@@ -1355,9 +1357,9 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
             }
         }
         if (!negotiable) item {
-            NativeField("قیمت به تومان", price, KeyboardType.Decimal, ListingPriceGrouping) {
+            ListingGuide(R.string.listing_guide_price) { NativeField("قیمت به تومان", price, KeyboardType.Decimal, ListingPriceGrouping) {
                 normalizeListingPrice(it)?.let { normalized -> price = normalized }
-            }
+            } }
         }
         }
         if (step == 2) {
@@ -1365,8 +1367,10 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
             OutlinedTextField(value = description, onValueChange = { description = it.take(4000) },
                 label = { Text("توضیحات خودرو") }, modifier = Modifier.fillMaxWidth(),
                 minLines = 3, maxLines = 6)
+            ListingGuideText(R.string.listing_guide_description)
         }
         item {
+            ListingGuideText(R.string.listing_guide_photos)
             DraftPhotoEditor(photos, photoErrors, session.accessToken, !working) {
                 photos = it
                 photoErrors = photoErrors.filterKeys { id -> it.any { photo -> photo.id == id } }
@@ -1493,6 +1497,27 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
             Text("انتشار و بازبینی عکس‌ها همچنان طبق قوانین مدیر انجام می‌شود.",
                 color = Color.Gray, fontSize = 12.sp)
         }
+    }
+}
+
+// The existing native form is Persian. Keep hints in the same language until app-wide locale selection is wired.
+@Composable
+private fun ListingGuideText(resId: Int) {
+    val context = LocalContext.current
+    val resources = remember(context) {
+        val configuration = android.content.res.Configuration(context.resources.configuration)
+        configuration.setLocale(java.util.Locale.forLanguageTag("fa"))
+        context.createConfigurationContext(configuration).resources
+    }
+    Text(resources.getString(resId), color = Color(0xFF52647A), fontSize = 12.sp,
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+}
+
+@Composable
+private fun ListingGuide(resId: Int, content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        content()
+        ListingGuideText(resId)
     }
 }
 

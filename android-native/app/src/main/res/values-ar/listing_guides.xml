@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="listing_guide_title">اكتب عنواناً موجزاً ودقيقاً ومميزاً.</string>
+    <string name="listing_guide_make">اختر الشركة المصنّعة لسيارتك.</string>
+    <string name="listing_guide_model">حدّد طراز السيارة بدقة.</string>
+    <string name="listing_guide_trim">حدّد الفئة ومستوى التجهيز.</string>
+    <string name="listing_guide_mileage">أدخل المسافة الفعلية المقطوعة بالكيلومتر.</string>
+    <string name="listing_guide_year">حدّد سنة إنتاج السيارة.</string>
+    <string name="listing_guide_country">حدّد الدولة التي توجد فيها السيارة حالياً.</string>
+    <string name="listing_guide_city">أدخل المدينة التي توجد فيها السيارة حالياً.</string>
+    <string name="listing_guide_status">حدّد حالة السيارة الحالية للتسليم.</string>
+    <string name="listing_guide_phone">وسيلة تواصل مباشرة بينك وبين المشترين.</string>
+    <string name="listing_guide_price">أدخل سعراً يناسب حالة السيارة.</string>
+    <string name="listing_guide_description">صف حالة السيارة الفعلية ومميزاتها.</string>
+    <string name="listing_guide_photos">الصور الواضحة والحقيقية تعزز الثقة.</string>
+</resources>
