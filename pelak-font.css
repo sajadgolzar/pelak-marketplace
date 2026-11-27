@@ -1,0 +1,9 @@
+/* Vazirmatn variable font, SIL OFL 1.1. License: /fonts/OFL.txt */
+@font-face {
+  font-family: "Vazirmatn";
+  src: url("/fonts/Vazirmatn-variable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+:root { --pelak-persian-font: "Vazirmatn", -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, Arial, sans-serif; }
