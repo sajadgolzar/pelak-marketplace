@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "android": {
-    "versionCode": 13,
-    "versionName": "0.4.6-native-preview",
-    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.4.6-preview.apk",
+    "versionCode": 14,
+    "versionName": "0.4.7-native-preview",
+    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.4.7-preview.apk",
     "minimumVersionCode": 1,
-    "notes": "مسیر جایگزین ارسال عکس، بازیابی ارسال ناموفق و لوگوی رسمی پلاک."
+    "notes": "گالری و بزرگ‌نمایی تصاویر، کارت آگهی خواناتر، راهنمای ثبت آگهی و لوگوی اصلاح‌شده."
   },
   "web": {
     "version": "2026-11-15.1",
