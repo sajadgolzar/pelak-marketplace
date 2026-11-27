@@ -4,6 +4,7 @@ export const BUDGETS=[['budget-1-billion',1000000000],['budget-2-billion',200000
 export const fmt=v=>new Intl.NumberFormat('fa-IR').format(v);
 export const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const calcLink=r=>'/car-price.html?ref='+encodeURIComponent(r.id);
+export const listingLink=r=>'/?q='+encodeURIComponent(r.model);
 export function usable(data,now=Date.now()){if(data?.schema!==1||data.currency!=='TOMAN'||!Array.isArray(data.rows))return [];return data.rows.filter(r=>typeof r.id==='string'&&typeof r.brand==='string'&&typeof r.model==='string'&&typeof r.trim==='string'&&Number.isInteger(r.year)&&Number.isSafeInteger(r.price)&&r.price>0&&isFresh(r,now));}
 export function modelRows(data,slug,now=Date.now()){const m=MODELS.find(v=>v[0]===slug);return m?usable(data,now).filter(r=>r.brand===m[2]&&r.model===m[3]).sort((a,b)=>b.year-a.year||a.price-b.price):[];}
 export function budgetRows(data,cap,now=Date.now()){
@@ -12,7 +13,7 @@ export function budgetRows(data,cap,now=Date.now()){
  return [...latest.values()].filter(r=>r.price<=cap).sort((a,b)=>a.price-b.price).slice(0,30);
 }
 function date(rows){const n=Math.min(...rows.map(r=>Date.parse(r.updatedAt)));return new Intl.DateTimeFormat('fa-IR',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Tehran'}).format(n);}
-function table(rows,budget=false){return `<div class="table-wrap" tabindex="0" role="region" aria-label="جدول قیمت خودرو"><table><thead><tr>${budget?'<th scope="col">خودرو</th>':''}<th scope="col">تیپ</th><th scope="col">سال</th><th scope="col">قیمت صفر (تومان)</th><th scope="col">محاسبه کارکرده</th></tr></thead><tbody>${rows.map(r=>`<tr>${budget?`<td>${esc(r.brand)} ${esc(r.model)}</td>`:''}<td>${esc(r.trim)}</td><td><bdi>${fmt(r.year)}</bdi> ${r.year<1700?'شمسی':'میلادی'}</td><td><bdi>${fmt(r.price)}</bdi></td><td><a href="${calcLink(r)}">تخمین همین تیپ</a></td></tr>`).join('')}</tbody></table></div>`;}
+function table(rows,budget=false){return `<div class="table-wrap" tabindex="0" role="region" aria-label="جدول قیمت خودرو"><table><thead><tr>${budget?'<th scope="col">خودرو</th>':''}<th scope="col">تیپ</th><th scope="col">سال</th><th scope="col">قیمت صفر (تومان)</th><th scope="col">محاسبه کارکرده</th><th scope="col">آگهی همین مدل</th></tr></thead><tbody>${rows.map(r=>`<tr>${budget?`<td>${esc(r.brand)} ${esc(r.model)}</td>`:''}<td>${esc(r.trim)}</td><td><bdi>${fmt(r.year)}</bdi> ${r.year<1700?'شمسی':'میلادی'}</td><td><bdi>${fmt(r.price)}</bdi></td><td><a href="${calcLink(r)}">تخمین همین تیپ</a></td><td><a href="${listingLink(r)}">آگهی‌های همین مدل</a></td></tr>`).join('')}</tbody></table></div>`;}
 export function renderMarket(data,kind,key,now=Date.now()){
  const rows=kind==='price'?modelRows(data,key,now):budgetRows(data,BUDGETS.find(b=>b[0]===key)?.[1],now);
  if(!rows.length)return `<p class="note">${kind==='price'?'قیمت تازه و معتبر برای این مدل در دسترس نیست.':'در قیمت‌های تازه موجود، خودروی صفر سواری داخل این بودجه پیدا نشد؛ این به معنای نبود خودروی کارکرده در بازار نیست.'}</p><a class="button secondary" href="/car-price.html">باز کردن تخمین قیمت</a>`;

@@ -1,4 +1,4 @@
-import {renderMarket,matchesQuery} from './pelak-market-view.mjs?v=2';
+import {renderMarket,matchesQuery} from './pelak-market-view.mjs?v=3';
 const target=document.getElementById('market-content');
 async function read(url){const c=new AbortController(),t=setTimeout(()=>c.abort(),15000);try{const r=await fetch(url,{signal:c.signal,cache:'no-store'});if(!r.ok)throw Error();const data=await r.json();if(data?.schema!==1||data.currency!=='TOMAN'||!Array.isArray(data.rows))throw Error();return data;}finally{clearTimeout(t);}}
 async function load(){if(!target)return;const button=document.getElementById('market-refresh');if(button)button.disabled=true;try{let data;try{data=await read('https://pelakauto.ir/api/car-prices');}catch{data=await read('/pelak-market-snapshot.json');}target.innerHTML=renderMarket(data,target.dataset.kind,target.dataset.key);}catch{if(!target.querySelector('table'))target.textContent='دریافت قیمت تازه موفق نبود؛ کمی بعد دوباره تلاش کن.';}finally{if(button)button.disabled=false;}}

@@ -77,7 +77,7 @@ $('price-form').addEventListener('submit',e=>{e.preventDefault();hideResult();tr
  const row=data.rows.find(r=>r.id===$('base').value),input=Object.fromEntries(ids.map(id=>[id,$(id).value]));input.structural=$('structural').checked;
  const out=estimate(row,input);
  const listingsUrl=new URL('./',location.href);
- listingsUrl.searchParams.set('q',row.brand+' '+row.model);
+ listingsUrl.searchParams.set('q',row.model);
  $('related-listings').href=listingsUrl.href;
  const low=document.createElement('bdi'),high=document.createElement('bdi'),to=document.createElement('span');low.dir=high.dir='ltr';low.textContent=fmt(out.low);high.textContent=fmt(out.high);to.textContent='تا';$('range').replaceChildren(low,to,high);$('result-model').textContent=`${row.brand} ${row.model} ${row.trim} • سال ${formatYear(input.year)} • ${fmt(number(input.km))} کیلومتر`;
  const rows=[['قیمت صفر مبنا ('+formatYear(row.year)+')',fmt(row.price)+' تومان'],['افت سن و استفاده',fmt(Math.round(out.ageDrop*10)/10)+'٪'],['افت کارکرد مازاد',fmt(Math.round(out.kmDrop*10)/10)+'٪'],['افت رنگ و تعویض قطعات',fmt(out.bodyDrop)+'٪'],['هزینه تعمیر کسرشده',fmt(out.repairs)+' تومان'],['ارزش بیمه افزوده‌شده',fmt(out.insurance)+' تومان']];
