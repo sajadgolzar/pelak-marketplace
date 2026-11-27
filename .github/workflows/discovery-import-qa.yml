@@ -2,7 +2,7 @@ name: PELAK discovery and import calculator QA
 on:
   push:
     branches: [fix/discovery-import-budget-20261128, main]
-    paths: ['.github/workflows/discovery-import-qa.yml','pelak-import-cost*.mjs','pelak-market-view.mjs','scripts/build_discovery.py','import-cost/**']
+    paths: ['.github/workflows/discovery-import-qa.yml','pelak-import-cost*.mjs','pelak-market-view.mjs','scripts/build_discovery.py','import-cost/**','sitemap.xml']
 permissions:
   contents: read
 jobs:
