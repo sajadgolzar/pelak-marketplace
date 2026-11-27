@@ -64,6 +64,15 @@ internal data class ChatMessage(
     val recipientId: String, val body: String, val createdAt: String
 )
 
+internal fun matchesUploadedPhoto(body: String, filename: String, bytes: Int): Boolean = runCatching {
+    val rows = JSONArray(body)
+    (0 until rows.length()).any { i ->
+        val item = rows.optJSONObject(i)
+        item?.optString("name") == filename &&
+            item.optJSONObject("metadata")?.optLong("size", -1L) == bytes.toLong()
+    }
+}.getOrDefault(false)
+
 internal class PelakApi {
     private val photoUploadClient = okhttp3.OkHttpClient.Builder()
         .connectTimeout(12, TimeUnit.SECONDS)
@@ -395,20 +404,18 @@ internal class PelakApi {
     private fun photoExists(session: PelakSession, path: String, expectedBytes: Int): Boolean {
         // Only query metadata for this exact user-owned file; do not download its contents.
         return try {
+            val filename = path.substringAfterLast('/')
+            val payload = JSONObject().put("prefix", session.userId)
+                .put("search", filename).put("limit", 20)
             val request = okhttp3.Request.Builder()
-                .url(PelakConfig.API_ROOT + "/storage/v1/object/info/car-images/" + Uri.encode(path, "/"))
+                .url(PelakConfig.API_ROOT + "/storage/v1/object/list/car-images")
                 .header("apikey", PelakConfig.PUBLIC_KEY)
                 .header("Authorization", "Bearer " + session.accessToken)
                 .header("Cache-Control", "no-cache")
-                .get().build()
+                .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                .build()
             photoUploadClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) false else {
-                    val json = JSONObject(response.body?.string().orEmpty())
-                    val metadata = json.optJSONObject("metadata")
-                    val size = metadata?.optLong("size", -1L) ?: -1L
-                    val reportedSize = if (size >= 0L) size else json.optLong("size", -1L)
-                    reportedSize == expectedBytes.toLong()
-                }
+                response.isSuccessful && matchesUploadedPhoto(response.body?.string().orEmpty(), filename, expectedBytes)
             }
         } catch (_: Exception) { false }
     }
