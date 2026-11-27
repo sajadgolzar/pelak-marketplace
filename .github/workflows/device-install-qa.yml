@@ -1,0 +1,14 @@
+name: PELAK device install offer QA
+on:
+  push:
+    branches: [fix/device-install-offer-20261128, main]
+    paths: ['index.html','pelak-platform-downloads.js','pelak-release.json','tests/device-install.test.mjs','.github/workflows/device-install-qa.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node --test tests/device-install.test.mjs tests/listing-guidance.test.mjs
+      - run: node --check pelak-platform-downloads.js

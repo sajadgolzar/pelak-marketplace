@@ -4623,12 +4623,15 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    ar:{title:'بلاك معك دائماً',subtitle:'أضف تطبيق بلاك الويب إلى الشاشة الرئيسية دون متجر التطبيقات.',install:'تثبيت بلاك',later:'لاحقاً',close:'إغلاق',installed:'بلاك يعمل بالفعل كتطبيق مثبت.',iosTitle:'التثبيت على آيفون',iosSteps:'في Safari اضغط مشاركة ثم «إضافة إلى الشاشة الرئيسية» ثم إضافة.',iosOther:'إذا كنت تستخدم متصفحاً داخل تطبيق، افتح الموقع في Safari أولاً.',androidTitle:'التثبيت على أندرويد',androidSteps:'من قائمة Chrome اختر تثبيت التطبيق أو إضافته إلى الشاشة الرئيسية.',desktopTitle:'تطبيق بلاك',desktopSteps:'افتح pelakauto.com في Safari أو Chrome على هاتفك لتثبيته.',hint:'التثبيت يسهل الوصول إلى الرسائل والإعلانات. الإشعارات اختيارية.',accepted:'تم قبول التثبيت، أكمل تعليمات المتصفح.',dismissed:'يمكنك التثبيت لاحقاً من القائمة.',actions:'تعليمات التثبيت',ready:'جاهز للتثبيت',openApp:'متابعة',fallback:'إذا لم يظهر مربع التثبيت، استخدم قائمة المتصفح.'},
    ka:{title:'PELAK ყოველთვის შენთან',subtitle:'დაამატეთ PELAK-ის ვებაპი მთავარ ეკრანზე.',install:'PELAK-ის დაყენება',later:'მოგვიანებით',close:'დახურვა',installed:'PELAK უკვე დაყენებული აპივით მუშაობს.',iosTitle:'დაყენება iPhone-ზე',iosSteps:'Safari-ში აირჩიეთ Share → Add to Home Screen → Add.',iosOther:'თუ აპის შიდა ბრაუზერში ხართ, გახსენით საიტი Safari-ში.',androidTitle:'დაყენება Android-ზე',androidSteps:'Chrome-ის მენიუში აირჩიეთ Install app ან Add to Home screen.',desktopTitle:'PELAK მობილურზე',desktopSteps:'დასაყენებლად გახსენით pelakauto.com ტელეფონის Safari-ში ან Chrome-ში.',hint:'დაყენება ამარტივებს შეტყობინებებსა და განცხადებებზე წვდომას.',accepted:'დაყენება მიღებულია; დაასრულეთ ბრაუზერის ნაბიჯები.',dismissed:'დაყენება მოგვიანებით შეგიძლიათ მენიუდან.',actions:'ინსტრუქცია',ready:'დასაყენებლად მზადაა',openApp:'გაგრძელება',fallback:'თუ მოთხოვნა არ გამოჩნდა, გამოიყენეთ ბრაუზერის მენიუ.'}
   };
-  const getWords=()=>LANG[document.documentElement.lang]||LANG.fa;
+  const OFFER={"fa":{"androidOffer":"نسخه بومی اندروید پلاک","androidDesc":"پلاک را مستقیم روی گوشی نصب کنید؛ بدون نیاز به مرورگر.","androidGet":"دریافت اپلیکیشن اندروید","androidInfo":"فایل APK رسمی پلاک از صفحه دانلود در دسترس است.","desktopOffer":"پلاک روی کامپیوتر","desktopDesc":"پلاک را در پنجره‌ای مستقل از مرورگر اجرا کنید.","desktopGet":"نصب وب‌اپ دسکتاپ","desktopInfo":"در Chrome یا Edge از منوی مرورگر گزینه نصب این سایت به‌عنوان برنامه را انتخاب کنید. در Safari مک از منوی File گزینه Add to Dock را انتخاب کنید.","iosOffer":"پلاک روی آیفون و آیپد"},"en":{"androidOffer":"Native PELAK for Android","androidDesc":"Install PELAK directly on your phone, without a browser.","androidGet":"Get the Android app","androidInfo":"The official APK is available on the download page.","desktopOffer":"PELAK on your computer","desktopDesc":"Run PELAK in its own app window.","desktopGet":"Install desktop web app","desktopInfo":"In Chrome or Edge, use the browser menu to install this site as an app. On Mac Safari, choose File → Add to Dock.","iosOffer":"PELAK on iPhone and iPad"},"ar":{"androidOffer":"تطبيق بلاك لأندرويد","androidDesc":"ثبّت بلاك مباشرة على هاتفك دون متصفح.","androidGet":"تنزيل تطبيق أندرويد","androidInfo":"ملف APK الرسمي متاح في صفحة التنزيل.","desktopOffer":"بلاك على الكمبيوتر","desktopDesc":"شغّل بلاك في نافذة تطبيق مستقلة.","desktopGet":"تثبيت تطبيق الويب للكمبيوتر","desktopInfo":"في Chrome أو Edge اختر تثبيت الموقع كتطبيق من القائمة. وفي Safari على Mac اختر File ثم Add to Dock.","iosOffer":"بلاك على آيفون وآيباد"},"ka":{"androidOffer":"PELAK Android-ისთვის","androidDesc":"დააყენეთ PELAK პირდაპირ ტელეფონზე, ბრაუზერის გარეშე.","androidGet":"Android აპის მიღება","androidInfo":"ოფიციალური APK ხელმისაწვდომია ჩამოტვირთვის გვერდზე.","desktopOffer":"PELAK კომპიუტერზე","desktopDesc":"გამოიყენეთ PELAK დამოუკიდებელ ფანჯარაში.","desktopGet":"ვებაპის დაყენება კომპიუტერზე","desktopInfo":"Chrome ან Edge-ის მენიუში აირჩიეთ საიტის აპად დაყენება. Mac Safari-ში აირჩიეთ File → Add to Dock.","iosOffer":"PELAK iPhone-სა და iPad-ზე"}};
+  const getWords=()=>({...LANG[document.documentElement.lang]||LANG.fa,...OFFER[document.documentElement.lang]||OFFER.fa});
   const isStandalone=()=>Boolean(window.matchMedia?.('(display-mode: standalone)').matches||navigator.standalone===true);
   const isIOS=()=>/iPhone|iPad|iPod/i.test(navigator.userAgent)||(/Macintosh/i.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
   const isAndroid=()=>/Android/i.test(navigator.userAgent);
-  const suppressKey='pelak-pwa-install-later-until-v1';
-  const suggestedKey='pelak-pwa-install-intro-count-v1';
+  const isDesktop=()=>!isIOS()&&!isAndroid()&&/Windows|Macintosh|Mac OS X|CrOS|Linux x86/i.test(navigator.userAgent);
+  const suppressKey='pelak-device-install-later-until-v2-'+(isIOS()?'ios':isAndroid()?'android':'desktop');
+  const suggestedKey='pelak-device-install-intro-count-v2';
+  let webOnly=false;
   let deferredPrompt=null;
   let lastFocus=null;
   let isOpen=false;
@@ -4648,14 +4651,15 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   function deviceState(){
    if(isStandalone())return 'installed';
    if(isIOS())return 'ios';
+   if(isAndroid()&&!webOnly)return 'native-android';
    if(deferredPrompt)return 'ready';
    if(isAndroid())return 'android';
    return 'desktop';
   }
   function refresh(){
    const t=getWords(),state=deviceState();
-   one('#pelakInstallTitle',layer).textContent=t.title;
-   one('#pelakInstallDesc',layer).textContent=t.subtitle;
+   one('#pelakInstallTitle',layer).textContent=state==='native-android'?t.androidOffer:state==='ios'?t.iosOffer:isDesktop()&&state!=='installed'?t.desktopOffer:t.title;
+   one('#pelakInstallDesc',layer).textContent=state==='native-android'?t.androidDesc:isDesktop()&&state!=='installed'?t.desktopDesc:t.subtitle;
    one('#pelakInstallHint',layer).textContent=t.hint;
    one('#pelakInstallClose',layer).setAttribute('aria-label',t.close);
    laterButton.textContent=t.later;
@@ -4665,20 +4669,23 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    }else if(state==='ios'){
     guideTitle.textContent=t.iosTitle;guideText.textContent=t.iosSteps;guideExtra.hidden=false;guideExtra.textContent=t.iosOther;
     doButton.textContent=t.actions;
+   }else if(state==='native-android'){
+    guideTitle.textContent=t.androidGet;guideText.textContent=t.androidInfo;doButton.textContent=t.androidGet;
    }else if(state==='android'){
     guideTitle.textContent=t.androidTitle;guideText.textContent=t.androidSteps;
     doButton.textContent=t.actions;
    }else if(state==='ready'){
-    guideTitle.textContent=t.ready;guideText.textContent=t.androidSteps;
-    doButton.textContent=t.install;
+    guideTitle.textContent=isDesktop()?t.desktopOffer:t.ready;guideText.textContent=isDesktop()?t.desktopInfo:t.androidSteps;
+    doButton.textContent=isDesktop()?t.desktopGet:t.install;
    }else{
-    guideTitle.textContent=t.desktopTitle;guideText.textContent=t.desktopSteps;
-    doButton.textContent=t.actions;
+    guideTitle.textContent=t.desktopOffer;guideText.textContent=t.desktopInfo;
+    doButton.textContent=t.desktopGet;
    }
    status.textContent='';
   }
-  function openInstall(){
+  function openInstall(mode){
    if(isOpen)return;
+   webOnly=mode==='web';
    lastFocus=document.activeElement;
    isOpen=true;layer.hidden=false;
    layer.classList.add('is-open');
@@ -4707,6 +4714,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    if(requestedInstall)return;
    const t=getWords(),state=deviceState();
    if(state==='installed'){closeInstall();return;}
+   if(state==='native-android'){closeInstall(true);window.location.assign('/android.html');return;}
    if(state==='ready'&&deferredPrompt){
     requestedInstall=true;doButton.disabled=true;
     const installEvent=deferredPrompt;
@@ -4723,7 +4731,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     finally{requestedInstall=false;doButton.disabled=false;refresh();status.textContent=outcomeText;}
     return;
    }
-   status.textContent=(state==='ios'?t.iosSteps:state==='android'?t.androidSteps:t.desktopSteps);
+   status.textContent=(state==='ios'?t.iosSteps:state==='android'?t.androidSteps:t.desktopInfo);
   });
   window.addEventListener('beforeinstallprompt',e=>{
    e.preventDefault();deferredPrompt=e;
@@ -4752,11 +4760,14 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   });
   // Optional one-time introduction only after repeated mobile visits; never interrupt listing or login flows.
   function maybeSuggest(){
-   if(isStandalone()||!isIOS()||document.visibilityState!=='visible')return;
+   if(isStandalone()||!(isIOS()||isAndroid()||isDesktop())||document.visibilityState!=='visible')return;
    if(location.pathname!=='/'&& !/\/index\.html$/i.test(location.pathname))return;
    if(!one('#apps')?.classList.contains('hidden'))return;
    if(one('#sell')&&!one('#sell').classList.contains('hidden'))return;
-   if(document.querySelector('.pelak-drawer.open,[role="dialog"][aria-modal="true"]:not(#pelakInstallLayer .pelak-install-card)'))return;
+   if(document.activeElement?.matches('input,textarea,select,[contenteditable=true]'))return;
+   if([...document.querySelectorAll('.pelak-drawer.open,dialog[open],[role="dialog"][aria-modal="true"]:not(#pelakInstallLayer .pelak-install-card)')].some(el=>el.getClientRects().length&&!el.closest('[hidden],.hidden')))return;
+   if(['pelakMineSection','pelakMessagesSection','admin','support','dealer','search','brands','compare','journal'].some(id=>{const el=document.getElementById(id);return el&&el.getClientRects().length&&!el.closest('[hidden],.hidden');}))return;
+   if(new URLSearchParams(location.search).has('listing')||new URLSearchParams(location.search).has('pelakView'))return;
    let until=0;try{until=Number(localStorage.getItem(suppressKey)||0);}catch(_){}
    if(until>Date.now())return;
    let visits=0;
@@ -4767,14 +4778,15 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
      localStorage.setItem(suggestedKey,String(visits));
     }else{visits=Number(localStorage.getItem(suggestedKey)||0);}
    }catch(_){return;}
-   if(visits<3)return;
+   if(visits<2)return;
    // Count this as a single introduction, even if the visitor closes by tapping X.
    try{localStorage.setItem(suppressKey,String(Date.now()+90*24*3600*1000));}catch(_){}
    openInstall();
   }
   const onReady=()=>setTimeout(maybeSuggest,15000);
   if(document.readyState==='complete')onReady();else window.addEventListener('load',onReady,{once:true});
-  window.pelakOpenInstallGuide=openInstall;
+  window.pelakOpenInstallGuide=()=>openInstall('web');
+  window.addEventListener('pelak:language-changed',()=>{if(isOpen)refresh();});
 })();
 
 </script>
@@ -5223,7 +5235,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   document.body.append(simple);
 })();
 </script>
-<script src="./pelak-platform-downloads.js?v=20261115-2" defer></script>
+<script src="./pelak-platform-downloads.js?v=20261128-1" defer></script>
 <!-- PELAK approved classic design: cosmetic/accessible improvements only, NO hero. -->
 <link rel="stylesheet" href="./pelak-visual-polish.css?v=1">
 <script src="./pelak-visual-polish.js?v=1" defer></script>

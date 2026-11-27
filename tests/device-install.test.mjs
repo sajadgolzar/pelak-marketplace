@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+const html=readFileSync('index.html','utf8');
+const script=html.split('<script id="pelak-v5495-pwa-install">')[1].split('</script>')[0];
+test('installer script syntax',()=>assert.doesNotThrow(()=>new vm.Script(script)));
+test('native Android has priority over browser prompt; explicit web choice remains available',()=>{assert.match(script,/if\(isAndroid\(\)&&!webOnly\)return 'native-android';\s*if\(deferredPrompt\)/);assert.match(script,/window\.location\.assign\('\/android\.html'\)/);assert.match(script,/pelakOpenInstallGuide=\(\)=>openInstall\('web'\)/);});
+test('auto offer covers mobile and desktop, suppresses repeats and skips active forms',()=>{assert.match(script,/isIOS\(\)\|\|isAndroid\(\)\|\|isDesktop\(\)/);assert.match(script,/if\(visits<2\)return/);assert.match(script,/90\*24\*3600\*1000/);assert.match(script,/document\.activeElement\?\.matches/);assert.match(script,/has\('listing'\)/);});
+test('release metadata matches web script and keeps Android release',()=>{const r=JSON.parse(readFileSync('pelak-release.json','utf8'));assert.match(readFileSync('pelak-platform-downloads.js','utf8'),new RegExp('bundledWebBuild = '+r.web.build));assert.equal(r.android.versionCode,14);});

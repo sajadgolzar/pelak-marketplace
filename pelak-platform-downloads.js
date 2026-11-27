@@ -8,7 +8,7 @@
     const menu = document.getElementById('pelakMenuItems');
     const menuButton = menu && menu.querySelector('button[data-target="apps"]');
     if (!apps || !actions || !footer || !menuButton || document.getElementById('pelakPlatformFooter')) return;
-    const apk = './android.html?v=20261115-2';
+    const apk = './android.html';
     const logo = {
       web: '<svg viewBox="0 0 24 24" role="img" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 12h12M12 6c-3 3-3 9 0 12M12 6c3 3 3 9 0 12" stroke="currentColor" fill="none" stroke-width="1.25"/></svg>',
       android: '<svg viewBox="0 0 24 24" role="img" focusable="false"><path d="M6.6 7.7 4.9 4.8M17.4 7.7l1.7-2.9" stroke="#3DDC84" stroke-width="1.3" stroke-linecap="round"/><path d="M5 11a7 7 0 0 1 14 0Z" fill="#3DDC84"/><rect x="5" y="11.7" width="14" height="7.2" rx="1.2" fill="#3DDC84"/><rect x="2.3" y="11.7" width="2" height="7" rx="1" fill="#3DDC84"/><rect x="19.7" y="11.7" width="2" height="7" rx="1" fill="#3DDC84"/><path d="M8 18v3M16 18v3" stroke="#3DDC84" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="9" r=".7" fill="#0D3247"/><circle cx="15" cy="9" r=".7" fill="#0D3247"/></svg>',
@@ -82,7 +82,7 @@
     }
     render();
     // This value is bumped together with pelak-release.json when the web bundle changes.
-    const bundledWebBuild = 1;
+    const bundledWebBuild = 2;
     const updateBar = document.createElement('div');
     updateBar.id = 'pelakWebUpdateBar';
     updateBar.setAttribute('role', 'status');
