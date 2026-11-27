@@ -33,7 +33,7 @@ for p in ['admin.html','android.html']:
 pages=[]
 for name in ['about','ads','buying-guides','car-guide','comparisons','guides','import-cost','prices']:
     pages.extend(Path(name).rglob('index.html'))
-assert len(pages)==28, len(pages)
+assert len(pages)==27, len(pages)
 for p in pages:
     edit(p,lambda s:exact(s,'/discovery.css?v=1','/discovery.css?v=2'))
 for p in ['scripts/build_discovery.py','pelak-public-ads.mjs']:
