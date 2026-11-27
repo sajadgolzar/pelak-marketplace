@@ -47,7 +47,7 @@ internal fun DraftPhotoEditor(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("عکس‌ها: ${photos.size} از 8")
+        Text("عکس‌ها: \u2066${photos.size}\u2069 از \u20668\u2069")
         OutlinedButton(enabled = enabled && photos.size < 8, onClick = { add.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
             Text("افزودن عکس")
         }
@@ -56,13 +56,20 @@ internal fun DraftPhotoEditor(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { photo -> key(photo.id) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Box(Modifier.height(125.dp).fillMaxWidth().clickable { preview = photo }) {
-                        if (photo.uri != null) AsyncImage(photo.uri, "پیش‌نمایش عکس",
-                            Modifier.fillMaxSize().graphicsLayer { rotationZ = photo.rotation.toFloat() },
-                            contentScale = androidx.compose.ui.layout.ContentScale.Fit)
-                        else CarPhoto(photo.path, "عکس ذخیره‌شده", jwt, Modifier.fillMaxSize())
+                    var previewFailed by remember(photo.uri) { mutableStateOf(false) }
+                    Box(Modifier.height(112.dp).fillMaxWidth().clickable { preview = photo },
+                        contentAlignment = androidx.compose.ui.Alignment.Center) {
+                        if (photo.uri != null) {
+                            AsyncImage(photo.uri, "پیش‌نمایش عکس",
+                                Modifier.fillMaxSize().graphicsLayer { rotationZ = photo.rotation.toFloat() },
+                                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                                onSuccess = { previewFailed = false },
+                                onError = { previewFailed = true })
+                            if (previewFailed) Text("پیش‌نمایش در دسترس نیست", style = MaterialTheme.typography.bodySmall)
+                        } else CarPhoto(photo.path, "عکس ذخیره‌شده", jwt, Modifier.fillMaxSize())
                     }
-                    Text(errors[photo.id] ?: if (photo.path == null) "آمادهٔ بارگذاری" else "بارگذاری‌شده",
+                    Text(errors[photo.id] ?: if (photo.path != null) "بارگذاری‌شده"
+                        else if (previewFailed) "عکس نیاز به بررسی یا جایگزینی دارد" else "آمادهٔ بارگذاری",
                         style = MaterialTheme.typography.bodySmall)
                     Row {
                         TextButton(enabled = enabled, onClick = { onChange(photos.filterNot { it.id == photo.id }) }) { Text("× حذف") }
