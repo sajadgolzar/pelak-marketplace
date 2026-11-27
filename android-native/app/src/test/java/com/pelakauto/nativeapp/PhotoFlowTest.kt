@@ -78,6 +78,16 @@ class PhotoFlowTest {
         assertTrue(runCatching { preparePhotoBounded(context.contentResolver, Uri.fromFile(missing), 0) }.isFailure)
     }
 
+    @Test fun photoRecoveryRequiresExactFilenameAndByteCount() {
+        val rows = """[{"name":"photo.jpg","metadata":{"size":200704}},{"name":"other.jpg","metadata":{"size":100}}]"""
+        assertTrue(matchesUploadedPhoto(rows, "photo.jpg", 200704))
+        assertFalse(matchesUploadedPhoto(rows, "photo.jpg", 200705))
+        assertFalse(matchesUploadedPhoto(rows, "other.jpg", 200704))
+        assertFalse(matchesUploadedPhoto(rows, "oto.jpg", 200704))
+        assertFalse(matchesUploadedPhoto("{}", "photo.jpg", 200704))
+        assertFalse(matchesUploadedPhoto("""[{"name":"photo.jpg"}]""", "photo.jpg", 200704))
+    }
+
     @Test fun serverFiltersContainRangesAndStableSortBeforePagination() {
         val query = ListingFilters(minPrice = "۵۰۰۰۰۰۰۰۰", maxYear = "۲۰۲۶",
             currency = "IRR", photos = true, sort = "ارزان‌ترین").parameters()
