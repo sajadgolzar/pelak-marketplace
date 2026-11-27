@@ -80,6 +80,12 @@ internal class PelakApi {
         .readTimeout(20, TimeUnit.SECONDS)
         .callTimeout(35, TimeUnit.SECONDS)
         .retryOnConnectionFailure(false)
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .build()
+    private val photoProbeClient = photoUploadClient.newBuilder()
+        .connectTimeout(6, TimeUnit.SECONDS)
+        .callTimeout(10, TimeUnit.SECONDS)
         .build()
 
     private fun perform(
@@ -362,30 +368,23 @@ internal class PelakApi {
             val bytes = preparePhotoBounded(resolver, image, rotation)
             val path = session.userId + "/" + photoId + ".jpg"
             var lastError: Exception? = null
-            // A mobile connection may lose the response after Storage has committed the object.
-            // The stable UUID and an authenticated existence check recover the exact same object.
+            // Retry with the same UUID over an independent HTTPS route on PELAK's own domain.
             for (attempt in 0..1) {
-                if (attempt > 0 && photoExists(session, path, bytes.size)) return@withContext path
-                val request = okhttp3.Request.Builder()
-                    .url(PelakConfig.API_ROOT + "/storage/v1/object/car-images/" + Uri.encode(path, "/"))
-                    .header("apikey", PelakConfig.PUBLIC_KEY)
+                val relay = attempt == 0
+                val endpoint = if (relay) photoRelayUrl(session.userId, photoId)
+                    else PelakConfig.API_ROOT + "/storage/v1/object/car-images/" + Uri.encode(path, "/")
+                val builder = okhttp3.Request.Builder()
+                    .url(endpoint)
                     .header("Authorization", "Bearer " + session.accessToken)
                     .header("x-upsert", "false")
                     .post(bytes.toRequestBody("image/jpeg".toMediaType()))
-                    .build()
+                if (!relay) builder.header("apikey", PelakConfig.PUBLIC_KEY)
                 try {
-                    photoUploadClient.newCall(request).execute().use { response ->
+                    photoUploadClient.newCall(builder.build()).execute().use { response ->
                         val status = response.code
                         if (response.isSuccessful) return@withContext path
-                        if (status == 409 || status == 400) {
-                            val error = response.peekBody(8192L).string()
-                            if (error.contains("Duplicate", true) || error.contains("already exists", true)
-                                || error.contains("ResourceAlreadyExists", true)) {
-                                if (photoExists(session, path, bytes.size)) return@withContext path
-                                throw java.io.IOException("وجود فایل در سرور تأیید نشد")
-                            }
-                        }
-                        if (status in listOf(400, 401, 403, 413)) throw IllegalArgumentException("پاسخ سرور: HTTP $status")
+                        if (!relay && status in listOf(401, 403, 413))
+                            throw IllegalArgumentException("پاسخ سرور: HTTP $status")
                         throw java.io.IOException("پاسخ سرور: HTTP $status")
                     }
                 } catch (cancel: kotlinx.coroutines.CancellationException) {
@@ -394,30 +393,45 @@ internal class PelakApi {
                     throw failure
                 } catch (failure: Exception) {
                     lastError = failure
-                    if (photoExists(session, path, bytes.size)) return@withContext path
+                    // A lost response must not trigger a duplicate or discard a committed photo.
+                    if (photoExists(session, path, bytes.size, relay)) return@withContext path
                 }
                 if (attempt == 0) kotlinx.coroutines.delay(750L)
             }
             throw lastError ?: IllegalStateException("آپلود عکس انجام نشد")
         }
 
-    private fun photoExists(session: PelakSession, path: String, expectedBytes: Int): Boolean {
-        // Only query metadata for this exact user-owned file; do not download its contents.
-        return try {
-            val filename = path.substringAfterLast('/')
-            val payload = JSONObject().put("prefix", session.userId)
-                .put("search", filename).put("limit", 20)
-            val request = okhttp3.Request.Builder()
-                .url(PelakConfig.API_ROOT + "/storage/v1/object/list/car-images")
-                .header("apikey", PelakConfig.PUBLIC_KEY)
-                .header("Authorization", "Bearer " + session.accessToken)
-                .header("Cache-Control", "no-cache")
-                .post(payload.toString().toRequestBody("application/json".toMediaType()))
-                .build()
-            photoUploadClient.newCall(request).execute().use { response ->
-                response.isSuccessful && matchesUploadedPhoto(response.body?.string().orEmpty(), filename, expectedBytes)
-            }
-        } catch (_: Exception) { false }
+    private fun photoRelayUrl(owner: String, photo: String): String =
+        "https://pelakauto.ir/api/native-photo-upload?owner=" + Uri.encode(owner) + "&photo=" + Uri.encode(photo)
+
+    private fun photoExists(session: PelakSession, path: String, expectedBytes: Int, relayFirst: Boolean): Boolean {
+        val filename = path.substringAfterLast('/')
+        val photoId = filename.removeSuffix(".jpg")
+        for (relay in listOf(relayFirst, !relayFirst)) {
+            try {
+                val builder = okhttp3.Request.Builder()
+                    .header("Authorization", "Bearer " + session.accessToken)
+                    .header("Cache-Control", "no-cache")
+                if (relay) {
+                    builder.url(photoRelayUrl(session.userId, photoId) + "&size=" + expectedBytes).get()
+                } else {
+                    val payload = JSONObject().put("prefix", session.userId)
+                        .put("search", filename).put("limit", 20)
+                    builder.url(PelakConfig.API_ROOT + "/storage/v1/object/list/car-images")
+                        .header("apikey", PelakConfig.PUBLIC_KEY)
+                        .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                }
+                photoProbeClient.newCall(builder.build()).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val body = response.body?.string().orEmpty()
+                        val found = if (relay) JSONObject(body).optBoolean("exists", false)
+                            else matchesUploadedPhoto(body, filename, expectedBytes)
+                        if (found) return true
+                    }
+                }
+            } catch (_: Exception) { /* The other trusted route may still respond. */ }
+        }
+        return false
     }
 
     suspend fun removeUnattachedPhoto(session: PelakSession, path: String) =
