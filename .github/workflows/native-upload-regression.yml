@@ -1,0 +1,43 @@
+name: PELAK photo transport regression QA (no publication)
+on:
+  push:
+    branches: [fix/native-upload-reconcile-20261128]
+    paths: ['.github/workflows/native-upload-regression.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 114936401f3dcb98f90bdb605d9bb8fbda42b144
+          path: relay-source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test restricted relay
+        run: node --test relay-source/tests/native-photo-relay.test.mjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK 35
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-35" "build-tools;35.0.0"'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Run Android regression tests and compile
+        working-directory: android-native
+        run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: photo-regression-test-reports
+          path: android-native/app/build/test-results/
+          retention-days: 7
