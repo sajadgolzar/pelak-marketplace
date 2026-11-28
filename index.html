@@ -791,6 +791,11 @@ header.nav.pelak-premium-header .brand .pelak-brand-icon {
   width: 82px !important;
   height: 82px !important;
   flex-shrink: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  object-fit: contain !important;
+  padding: 0 !important;
 }
 @media (max-width: 720px) {
   header.nav.pelak-premium-header .brand .pelak-brand-icon {
@@ -4240,7 +4245,7 @@ function build(){
  const form=n('form','s47-stack');form.id='s47NewForm';
  const fieldSubject=n('div');fieldSubject.append(n('label','',tr('subject')));const subject=n('input');subject.id='s47Subject';subject.maxLength=120;subject.minLength=3;subject.required=true;subject.placeholder=tr('subjectPh');fieldSubject.append(subject);
  const fieldBody=n('div');fieldBody.append(n('label','',tr('body')));const body=n('textarea');body.id='s47Body';body.maxLength=3000;body.required=true;body.placeholder=tr('bodyPh');fieldBody.append(body);
- const submit=n('button','btn primary',tr('send'));submit.type='submit';const sendNote=n('p','s47-notice');sendNote.id='s47SendNote';form.append(fieldSubject,fieldBody,submit,sendNote);form.addEventListener('submit',sendNew);create.append(form);
+ const submit=n('button','btn primary',tr('send'));submit.type='submit';const sendNote=n('p','s47-notice');sendNote.id='s47SendNote';form.append(fieldSubject,fieldBody,screenshotField('s47NewScreenshot'),submit,sendNote);form.addEventListener('submit',sendNew);create.append(form);
  const history=n('div','s47-panel');const header=n('div','s47-row');header.append(n('h3','',tr('myThreads')),btn(tr('refresh'),refreshPersonal),btn(showUserHidden?tr('showVisible'):tr('showHidden'),ev=>{showUserHidden=!showUserHidden;ev.currentTarget.textContent=showUserHidden?tr('showVisible'):tr('showHidden');selectedPersonal=null;personalMessages=[];refreshPersonal();}));history.append(header);
  const two=n('div','s47-two');const list=n('div','s47-list');list.id='s47MyList';const details=n('div','s47-stack');details.id='s47MyDetails';two.append(list,details);history.append(two);workspace.append(create,history);
  existing.append(guest,workspace);$('s47Guest').hidden=!!account();$('s47Workspace').hidden=!account();
@@ -4258,6 +4263,23 @@ function build(){
  }
  renderPersonal();renderAdmin();
 }
+function screenshotLabel(){return ({fa:'بارگذاری اسکرین‌شات',en:'Attach screenshot',ar:'إرفاق لقطة شاشة',ka:'ეკრანის სურათის მიმაგრება'})[lang]||'Attach screenshot';}
+function screenshotField(id){
+ const box=n('div','s47-stack'), label=n('label','',screenshotLabel()), input=n('input');
+ input.type='file';input.accept='image/jpeg,image/png';input.id=id;label.htmlFor=id;
+ box.append(label,input,n('small','s47-muted',({fa:'اختیاری؛ JPG یا PNG تا ۵ مگابایت. اطلاعات حساس را بپوشانید.',en:'Optional; JPG or PNG up to 5 MB. Hide sensitive information.',ar:'اختياري؛ JPG أو PNG حتى 5 MB. أخفِ البيانات الحساسة.',ka:'არასავალდებულო; JPG ან PNG, მაქსიმუმ 5 MB. დაფარეთ პირადი მონაცემები.'})[lang]));return box;
+}
+function validateScreenshot(file){
+ if(file&&(!['image/jpeg','image/png'].includes(file.type)||file.size<1||file.size>5242880))throw Error(screenshotLabel()+' — JPG/PNG, 5 MB max');
+}
+async function uploadScreenshot(file,threadId,messageId){
+ if(!file)return [];
+ validateScreenshot(file);
+ const path=account().id+'/'+threadId+'/'+messageId+(file.type==='image/png'?'.png':'.jpg');
+ const {error}=await client().storage.from('support-images').upload(path,file,{contentType:file.type,upsert:false});
+ if(error)throw error;
+ return [path];
+}
 function bubbleList(el,arr,ownerId,staffView=false){
  const wrap=n('div','s47-thread');if(!arr.length)wrap.append(n('p','s47-muted',tr('empty')));
  for(const row of arr){
@@ -4265,7 +4287,17 @@ function bubbleList(el,arr,ownerId,staffView=false){
   const mine=staffView?!fromCustomer:fromCustomer;
   const bubble=n('div','s47-bubble'+(mine?' mine':'')+(fromCustomer?' s47-from-customer':' s47-from-staff'));
   const sender=staffView?(fromCustomer?tr('owner'):tr('support')):(fromCustomer?tr('you'):tr('support'));
-  bubble.append(n('strong','',sender),n('div','',row.body),n('small','s47-muted',fmt(row.created_at)));wrap.append(bubble);
+  bubble.append(n('strong','',sender),n('div','',row.body),n('small','s47-muted',fmt(row.created_at)));
+  for(const path of (Array.isArray(row.attachment_paths)?row.attachment_paths:[])){
+   if(typeof path!=='string'||path.split('/')[1]!==row.thread_id)continue;
+   const open=btn(({fa:'مشاهده تصویر پیوست',en:'View attachment',ar:'عرض المرفق',ka:'დანართის ნახვა'})[lang]||'View attachment',async()=>{
+    open.disabled=true;
+    try{const {data,error}=await client().storage.from('support-images').createSignedUrl(path,300);if(error||!data?.signedUrl)throw error||Error('Attachment unavailable');
+     if(!bubble.isConnected||!account())return;
+     const image=n('img');image.alt=screenshotLabel();image.src=data.signedUrl;image.style.cssText='max-width:100%;max-height:420px;object-fit:contain;display:block;margin:8px 0';image.referrerPolicy='no-referrer';bubble.append(image);open.remove();
+    }catch(e){if(bubble.isConnected)bubble.append(n('small','s47-error',explain(e)));}finally{open.disabled=false;}
+   });bubble.append(open);
+  }wrap.append(bubble);
  }
  el.append(wrap);
 }
@@ -4282,9 +4314,9 @@ function renderPersonal(){const list=$('s47MyList'),d=$('s47MyDetails');if(!list
  });actions.append(hide);d.append(actions);
  if(showUserHidden)return;
  if(active.status==='closed'){d.append(n('p','s47-muted',tr('closedHint')));return;}
- const form=n('form','s47-stack');const ta=n('textarea');ta.maxLength=3000;ta.required=true;ta.placeholder=tr('replyPh');const send=n('button','btn primary',tr('reply'));send.type='submit';const notice=n('p','s47-notice');form.append(ta,send,notice);
+ const form=n('form','s47-stack');const ta=n('textarea');ta.maxLength=3000;ta.required=true;ta.placeholder=tr('replyPh');const send=n('button','btn primary',tr('reply'));send.type='submit';const notice=n('p','s47-notice');form.append(ta,screenshotField('s47ReplyScreenshot'),send,notice);
  form.onsubmit=async ev=>{ev.preventDefault();const body=ta.value.trim();if(!body||!account()||!client())return;send.disabled=true;
-  try{const {error}=await client().from('pelak_support_messages').insert({thread_id:active.id,sender_id:account().id,body});if(error)throw error;ta.value='';await Promise.all([refreshPersonal(true),selectPersonal(active.id)]);}
+  try{const file=$('s47ReplyScreenshot')?.files?.[0];validateScreenshot(file);const id=crypto.randomUUID();const attachment_paths=await uploadScreenshot(file,active.id,id);const {error}=await client().from('pelak_support_messages').insert({id,thread_id:active.id,sender_id:account().id,body,attachment_paths});if(error)throw error;ta.value='';await Promise.all([refreshPersonal(true),selectPersonal(active.id)]);}
   catch(e){notice.textContent=explain(e);notice.classList.add('s47-error');}finally{send.disabled=false;}};
  d.append(form);
 }
@@ -4292,12 +4324,14 @@ async function sendNew(ev){ev.preventDefault();const c=client(),u=account();if(!
  const form=ev.currentTarget;const subject=$('s47Subject').value.trim(),body=$('s47Body').value.trim();if(subject.length<3||!body)return;
  const send=form.querySelector('[type=submit]');send.disabled=true;msg('s47SendNote',tr('sendWait'));
  try{
+  const file=$('s47NewScreenshot')?.files?.[0];validateScreenshot(file);
   const {data,error}=await c.from('pelak_support_threads').insert({user_id:u.id,subject}).select('id').single();if(error)throw error;
-  const {error:merr}=await c.from('pelak_support_messages').insert({thread_id:data.id,sender_id:u.id,body});if(merr)throw merr;
+  const id=crypto.randomUUID();const attachment_paths=await uploadScreenshot(file,data.id,id);
+  const {error:merr}=await c.from('pelak_support_messages').insert({id,thread_id:data.id,sender_id:u.id,body,attachment_paths});if(merr)throw merr;
   selectedPersonal=data.id;form.reset();msg('s47SendNote',tr('success'));await refreshPersonal();
  }catch(e){msg('s47SendNote',explain(e),true);}finally{send.disabled=false;}
 }
-async function selectPersonal(id){if(!client()||!account())return;selectedPersonal=id;const {data,error}=await client().from('pelak_support_messages').select('id,thread_id,sender_id,body,created_at').eq('thread_id',id).order('created_at',{ascending:true}).limit(300);if(error){msg('s47SendNote',explain(error),true);return;}personalMessages=data||[];renderPersonal();}
+async function selectPersonal(id){if(!client()||!account())return;selectedPersonal=id;const {data,error}=await client().from('pelak_support_messages').select('id,thread_id,sender_id,body,created_at,attachment_paths').eq('thread_id',id).order('created_at',{ascending:true}).limit(300);if(error){msg('s47SendNote',explain(error),true);return;}personalMessages=data||[];renderPersonal();}
 async function refreshPersonal(keep=false){if(!client()||!account()){personal=[];selectedPersonal=null;personalMessages=[];renderPersonal();return;}
  const {data,error}=await client().from('pelak_support_threads').select('id,user_id,subject,status,created_at,last_message_at,hidden_for_user').eq('user_id',account().id).eq('hidden_for_user',showUserHidden).order('last_message_at',{ascending:false}).limit(100);
  if(error){msg('s47SendNote',explain(error),true);return;}personal=data||[];
@@ -4373,7 +4407,7 @@ function renderAdmin(){
  }
  manage.append(controls);details.append(manage);
 }
-async function selectAdmin(id){if(!client()||!account()||!isStaff)return;selectedAdmin=id;const {data,error}=await client().from('pelak_support_messages').select('id,thread_id,sender_id,body,created_at').eq('thread_id',id).order('created_at',{ascending:true}).limit(300);if(error){$('s47AdminDetails').textContent=explain(error);return;}adminMessages=data||[];renderAdmin();}
+async function selectAdmin(id){if(!client()||!account()||!isStaff)return;selectedAdmin=id;const {data,error}=await client().from('pelak_support_messages').select('id,thread_id,sender_id,body,created_at,attachment_paths').eq('thread_id',id).order('created_at',{ascending:true}).limit(300);if(error){$('s47AdminDetails').textContent=explain(error);return;}adminMessages=data||[];renderAdmin();}
 async function refreshAdmin(){if(!client()||!account()||!isStaff)return;
  const {data,error}=await client().from('pelak_support_threads').select('id,user_id,subject,status,created_at,last_message_at,archived_for_staff').eq('archived_for_staff',showStaffArchived).order('last_message_at',{ascending:false}).limit(100);
  if(error){$('s47AdminList').textContent=explain(error);return;}
