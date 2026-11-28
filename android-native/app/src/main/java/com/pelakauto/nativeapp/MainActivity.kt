@@ -1544,7 +1544,7 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                                         } catch (failure: Exception) {
                                             val detail = when (failure) {
                                                 is java.net.SocketTimeoutException -> "پایان مهلت ارتباط"
-                                                is java.io.IOException -> "ارتباط ناموفق"
+                                                is java.io.IOException -> Regex("HTTP [0-9]{3}").find(failure.message.orEmpty())?.value?.let { "خطای سرور ($it)" } ?: "ارتباط ناموفق"
                                                 is SecurityException -> "عدم دسترسی به فایل"
                                                 is IllegalArgumentException -> "تصویر یا درخواست نامعتبر"
                                                 else -> "عملیات کامل نشد"
