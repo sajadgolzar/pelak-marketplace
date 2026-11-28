@@ -38,7 +38,10 @@ export async function directory(request,fetcher=fetch,now=Date.now()){
  const cards=rows.slice(0,24).map(r=>'<a class="card" href="'+pathFor(r.id)+'"><h2>'+esc(titleFor(r))+'</h2><p>'+esc(priceFor(r))+' · '+esc(clean(r.city))+'</p></a>').join('');
  const body='<h1>آگهی‌های فروش خودرو در پلاک</h1><p class="lead">فقط آگهی‌های منتشرشده و دارای اعتبار نمایش داده می‌شوند.</p>'+(cards?'<div class="cards">'+cards+'</div>':'<p class="note">در حال حاضر آگهی فعالی برای نمایش وجود ندارد.</p>')+(rows.length>24?'<p><a class="button secondary" href="/ads/?after='+rows[23].id+'">صفحه بعد</a></p>':'')+'<div class="actions"><a class="button" href="/">جست‌وجو و ثبت آگهی در پلاک</a></div>';
  return shell('آگهی‌های خرید و فروش خودرو | پلاک','آگهی‌های فعال خودرو در پلاک',SITE+'/ads/'+(after?'?after='+after:''),body);
- }catch{return unavailable(503);}
+ }catch{
+ if(after)return unavailable(503);
+ return shell('آگهی‌های خرید و فروش خودرو | پلاک','بازار خرید و فروش خودرو، جست‌وجو، ثبت آگهی و راهنمای قیمت خودرو در پلاک',SITE+'/ads/','<h1>آگهی‌های فروش خودرو در پلاک</h1><p class="lead">بازار خرید و فروش خودروهای داخلی، مونتاژی و وارداتی.</p><section class="panel"><h2>مشاهده آگهی‌ها</h2><p role="status">دریافت فهرست زنده آگهی‌ها موقتاً ممکن نیست. دوباره تلاش کنید یا وارد بازار پلاک شوید.</p><div class="actions"><a class="button" href="/ads/">تلاش مجدد</a><a class="button secondary" href="/">ورود به بازار پلاک</a></div></section><section class="panel"><h2>خدمات خرید و فروش خودرو</h2><p>پیش از خرید، قیمت روز و ارزش تقریبی خودرو را بررسی کنید. برای فروش خودرو نیز می‌توانید آگهی ثبت کنید.</p><div class="actions"><a href="/prices/">قیمت روز خودرو</a> · <a href="/car-price.html">تخمین قیمت خودرو</a> · <a href="/sell-car/">ثبت آگهی فروش</a> · <a href="/car-guide/">راهنمای خرید خودرو</a></div></section>');
+ }
 }
 export async function sitemap(fetcher=fetch,now=Date.now()){
  try{const ids=[];let last='';for(let i=0;i<10;i++){const rows=await query({select:'id,listing_status,expires_at',order:'id.asc',limit:'1000',...(last?{id:'gt.'+last}:{})},fetcher,now);if(!rows.length)break;for(const r of rows){if(last&&r.id<=last)throw Error('pagination order');ids.push(r.id);last=r.id;}if(rows.length<1000)break;}
