@@ -40,6 +40,8 @@ test('Android auto offer opens official download page instead of browser install
 });
 test('iPhone gets iOS instructions, Windows gets browser PWA prompt, Mac gets manual fallback',async()=>{
  const ios=fixture('Mozilla iPhone Safari');assert.match(ios.node('#pelakInstallGuideText').textContent,/Add to Home Screen/);
+ assert.equal(ios.node('#pelakInstallDo').hidden,true);
+ await ios.click();assert.equal(ios.node('#pelakInstallStatus').textContent,'');
  const win=fixture('Mozilla Windows NT 10.0 Chrome',{prompt:true});assert.equal(win.node('#pelakInstallDo').textContent,'نصب وب‌اپ دسکتاپ');await win.click();assert.equal(win.prompted,1);
  const mac=fixture('Mozilla Macintosh Safari');assert.match(mac.node('#pelakInstallGuideText').textContent,/Add to Dock/);
 });

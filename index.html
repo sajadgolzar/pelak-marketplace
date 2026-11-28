@@ -4604,6 +4604,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 .pelak-install-actions{display:flex;gap:10px;align-items:stretch}
 .pelak-install-actions button{font:inherit;min-height:47px;border-radius:13px;font-weight:800;cursor:pointer;font-size:14px}
 .pelak-install-primary{border:1px solid #112b4a;background:#112b4a;color:#fff;flex:1.4}
+.pelak-install-primary[hidden]{display:none}
 .pelak-install-primary:disabled{opacity:.6;cursor:wait}
 .pelak-install-secondary{border:1px solid #c6d3de;background:#fff;color:#112b4a;flex:1}
 .pelak-install-status{font-size:12px;color:#445e72;margin:10px 0 0;min-height:0;line-height:1.8}
@@ -4663,6 +4664,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    one('#pelakInstallHint',layer).textContent=t.hint;
    one('#pelakInstallClose',layer).setAttribute('aria-label',t.close);
    laterButton.textContent=t.later;
+   doButton.hidden=['ios','android','desktop'].includes(state);
    guideExtra.hidden=true;
    if(state==='installed'){
     guideTitle.textContent=t.installed;guideText.textContent='';doButton.textContent=t.openApp;
@@ -4704,14 +4706,14 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   layer.addEventListener('keydown',e=>{
     if(e.key==='Escape'){e.preventDefault();closeInstall();}
     if(e.key==='Tab'){
-     const list=[one('#pelakInstallClose',layer),doButton,laterButton];
+     const list=[one('#pelakInstallClose',layer),doButton,laterButton].filter(button=>!button.hidden);
      const i=list.indexOf(document.activeElement);
      if(e.shiftKey&&i===0){e.preventDefault();list[list.length-1].focus();}
      else if(!e.shiftKey&&i===list.length-1){e.preventDefault();list[0].focus();}
     }
   });
   doButton.addEventListener('click',async()=>{
-   if(requestedInstall)return;
+   if(requestedInstall||doButton.hidden)return;
    const t=getWords(),state=deviceState();
    if(state==='installed'){closeInstall();return;}
    if(state==='native-android'){closeInstall(true);window.location.assign('/android.html');return;}
@@ -4731,7 +4733,6 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     finally{requestedInstall=false;doButton.disabled=false;refresh();status.textContent=outcomeText;}
     return;
    }
-   status.textContent=(state==='ios'?t.iosSteps:state==='android'?t.androidSteps:t.desktopInfo);
   });
   window.addEventListener('beforeinstallprompt',e=>{
    e.preventDefault();deferredPrompt=e;
