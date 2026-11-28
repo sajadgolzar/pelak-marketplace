@@ -1,0 +1,73 @@
+name: Publish verified PELAK Android 0.4.8 preview
+on:
+  push:
+    branches: [release/native-048-20261129]
+    paths: ['.github/workflows/publish-native-048.yml']
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: pelak-publication-048
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Download exact successfully verified signed APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          result=$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/46190091543 --jq '[.head_sha,.status,.conclusion]|join(" ")')
+          test "$result" = '5fd653f0c0ff994face1d93e749a2b37eaf0e642 completed success'
+          mkdir -p "$RUNNER_TEMP/pelak-048"
+          gh run download 46190091543 --repo "$GITHUB_REPOSITORY" --name pelak-native-048-signed-qa-apk --dir "$RUNNER_TEMP/pelak-048"
+          test -s "$RUNNER_TEMP/pelak-048/PELAK-Native-v0.4.8-preview.apk"
+      - name: Verify signature, package, version and upgrade compatibility
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install 'build-tools;35.0.0'
+          tools="$ANDROID_HOME/build-tools/35.0.0"
+          apk="$RUNNER_TEMP/pelak-048/PELAK-Native-v0.4.8-preview.apk"
+          previous="downloads/PELAK-Native-v0.4.7-preview.apk"
+          unzip -t "$apk" >/dev/null
+          "$tools/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/pelak-048/current-cert.txt"
+          "$tools/apksigner" verify --print-certs "$previous" > "$RUNNER_TEMP/pelak-048/previous-cert.txt"
+          current=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pelak-048/current-cert.txt")
+          prior=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pelak-048/previous-cert.txt")
+          test -n "$current" && test "$current" = "$prior"
+          test "$current" = '023d6082c50c0e1da26a3853719e149ad814bee75d575af8d5e57e1c49390ef0'
+          badging=$("$tools/aapt" dump badging "$apk")
+          grep -F "package: name='com.pelakauto.nativepreview' versionCode='15' versionName='0.4.8-native-preview'" <<< "$badging"
+          if grep -q '^application-debuggable' <<< "$badging"; then exit 1; fi
+      - name: Publish APK and version metadata atomically
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout --detach origin/main
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          release=Path('pelak-release.json')
+          config=json.loads(release.read_text(encoding='utf-8'))
+          assert config['android']['versionCode']==14, 'Public version changed; stop'
+          config['android'].update(versionCode=15, versionName='0.4.8-native-preview', apkUrl='https://pelakauto.ir/downloads/PELAK-Native-v0.4.8-preview.apk', notes='ارسال هم‌زمان دو تصویر، تلاش مجدد برای عکس ناموفق، اصلاح لوگو و ارسال اسکرین‌شات پشتیبانی. نسخه آزمایشی؛ آزمون واقعی روی گوشی هنوز تکمیل نشده است.')
+          release.write_text(json.dumps(config, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
+          page=Path('android.html')
+          html=page.read_text(encoding='utf-8')
+          assert html.count('PELAK-Native-v0.4.7-preview.apk')==1
+          assert html.count('۰٫۴٫۷')==1
+          page.write_text(html.replace('PELAK-Native-v0.4.7-preview.apk','PELAK-Native-v0.4.8-preview.apk').replace('۰٫۴٫۷','۰٫۴٫۸'),encoding='utf-8')
+          PY
+          name=PELAK-Native-v0.4.8-preview.apk
+          cp "$RUNNER_TEMP/pelak-048/$name" "downloads/$name"
+          cp "$RUNNER_TEMP/pelak-048/$name" downloads/PELAK-Android-Latest.apk
+          cmp "downloads/$name" downloads/PELAK-Android-Latest.apk
+          sha256sum "downloads/$name"
+          git add "downloads/$name" downloads/PELAK-Android-Latest.apk android.html pelak-release.json
+          git -c user.name=github-actions -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m "Publish signed PELAK Android 0.4.8 preview"
+          git push origin HEAD:main
