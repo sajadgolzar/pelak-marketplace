@@ -207,8 +207,15 @@
     improveFooter();
     var shortcuts = document.querySelector('.pelak-shortcuts');
     if (shortcuts) {
-      new MutationObserver(function () { decorateShortcuts(); })
-        .observe(shortcuts, { childList: true });
+      function updateZeroBadge(){
+        shortcuts.querySelectorAll('.pelak-fav-total').forEach(function(b){
+          var zero=/^[0۰٠]+$/.test(b.textContent.trim());
+          if(b.dataset.pvZero!==String(zero))b.dataset.pvZero=String(zero);
+        });
+      }
+      updateZeroBadge();
+      new MutationObserver(function () { decorateShortcuts(); updateZeroBadge(); })
+        .observe(shortcuts, { childList: true, subtree:true, characterData:true });
     }
     window.addEventListener('pelak:language-changed', function () {
       setTimeout(function () {
