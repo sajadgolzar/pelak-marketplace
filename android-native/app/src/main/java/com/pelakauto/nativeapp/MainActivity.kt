@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import java.math.BigDecimal
 
@@ -1527,36 +1528,43 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                                 // Persist removals first, then attach each successful upload in the selected order.
                                 api.attachPhotos(session, id, photos.mapNotNull { it.path })
                                 val pending = photos.filter { it.path == null }
-                                uploadPhotoBatch(pending,
-                                    onProgress = { index, count -> uploadProgress = "در حال آماده‌سازی عکس \u2066$index\u2069 از \u2066$count\u2069…" },
-                                    upload = { photo ->
-                                        var phase = "آماده‌سازی و ارسال"
-                                        try {
-                                            val path = api.uploadPhoto(session, context.contentResolver,
-                                                photo.uri ?: error("فایل عکس در دسترس نیست"), photo.id, photo.rotation)
-                                            val next = photos.map { if (it.id == photo.id) it.copy(path = path) else it }
-                                            phase = "اتصال به آگهی"
-                                            uploadProgress = "در حال اتصال عکس به آگهی…"
-                                            api.attachPhotos(session, id, next.mapNotNull { it.path })
-                                            photos = next
-                                        } catch (cancel: kotlinx.coroutines.CancellationException) {
-                                            throw cancel
-                                        } catch (failure: Exception) {
-                                            val detail = when (failure) {
-                                                is java.net.SocketTimeoutException -> "پایان مهلت ارتباط"
-                                                is java.io.IOException -> Regex("HTTP [0-9]{3}").find(failure.message.orEmpty())?.value?.let { "خطای سرور ($it)" } ?: "ارتباط ناموفق"
-                                                is SecurityException -> "عدم دسترسی به فایل"
-                                                is IllegalArgumentException -> "تصویر یا درخواست نامعتبر"
-                                                else -> "عملیات کامل نشد"
+                                var completed = 0
+                                for (pair in pending.chunked(2)) {
+                                    uploadProgress = "در حال ارسال تصاویر ${completed + 1} تا ${completed + pair.size} از ${pending.size}…"
+                                    val results = kotlinx.coroutines.coroutineScope {
+                                        pair.map { photo ->
+                                            async {
+                                                try {
+                                                    photo to Result.success(api.uploadPhoto(session, context.contentResolver,
+                                                        photo.uri ?: error("فایل عکس در دسترس نیست"), photo.id, photo.rotation))
+                                                } catch (cancel: kotlinx.coroutines.CancellationException) {
+                                                    throw cancel
+                                                } catch (failure: Exception) {
+                                                    photo to Result.failure<String>(failure)
+                                                }
                                             }
-                                            photoErrors = photoErrors + (photo.id to "$phase: $detail؛ دوباره تلاش کن")
-                                            throw failure
+                                        }.map { it.await() }
+                                    }
+                                    for ((photo, result) in results) {
+                                        val path = result.getOrNull()
+                                        if (path != null) {
+                                            val next = photos.map { if (it.id == photo.id) it.copy(path = path) else it }
+                                            try {
+                                                api.attachPhotos(session, id, next.mapNotNull { it.path })
+                                                photos = next
+                                            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                                                throw cancel
+                                            } catch (_: Exception) {
+                                                photoErrors = photoErrors + (photo.id to "اتصال به آگهی ناموفق؛ دوباره تلاش کن")
+                                            }
+                                        } else {
+                                            val failure = result.exceptionOrNull()
+                                            val detail = Regex("HTTP [0-9]{3}").find(failure?.message.orEmpty())?.value ?: "ارتباط یا آماده‌سازی ناموفق"
+                                            photoErrors = photoErrors + (photo.id to "$detail؛ دوباره تلاش کن")
                                         }
-                                    },
-                                    onFailure = { photo -> if (!photoErrors.containsKey(photo.id)) {
-                                        photoErrors = photoErrors + (photo.id to "ارسال ناموفق؛ دوباره تلاش کن")
-                                    } }
-                                )
+                                        completed++
+                                    }
+                                }
                                 // One final reconciliation covers an attachment whose first response was lost.
                                 api.attachPhotos(session, id, photos.mapNotNull { it.path })
                                 val missing = photos.count { it.path == null }
