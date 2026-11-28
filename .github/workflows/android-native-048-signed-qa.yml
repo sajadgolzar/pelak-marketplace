@@ -1,0 +1,150 @@
+name: Verify signed PELAK Android 0.4.8 candidate (no publication)
+on:
+  push:
+    branches: [qa/signed-native-048-20261129]
+    paths: ['.github/workflows/android-native-048-signed-qa.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  signed-qa:
+    if: github.ref == 'refs/heads/qa/signed-native-048-20261129'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 0b13342e93cb963a3743b82868f568099036ee51
+          path: native-source
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Require successful regression checks for the exact native source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 36); do
+            result=$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/46183842674 --jq '[.head_sha,.status,(.conclusion // "")]|join(" ")')
+            case "$result" in
+              '0b13342e93cb963a3743b82868f568099036ee51 completed success') exit 0 ;;
+              '0b13342e93cb963a3743b82868f568099036ee51 completed '*) echo "::error::Native regression checks did not pass"; exit 1 ;;
+              '0b13342e93cb963a3743b82868f568099036ee51 '*) sleep 10 ;;
+              *) echo "::error::Unexpected native source SHA"; exit 1 ;;
+            esac
+          done
+          echo "::error::Native regression checks did not finish in time"; exit 1
+      - name: Verify live photo relay rejects unauthorized requests
+        run: |
+          set -euo pipefail
+          node --test tests/native-photo-relay.test.mjs
+          endpoint='https://pelakauto.ir/api/native-photo-upload?owner=11111111-1111-4111-8111-111111111111&photo=22222222-2222-4222-8222-222222222222&size=100'
+          for attempt in 1 2 3; do
+            code=$(curl -sS --max-time 15 -o "$RUNNER_TEMP/relay-check.json" -w '%{http_code}' "$endpoint" || true)
+            if [ "$code" = 401 ] && python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["error"]=="auth"' "$RUNNER_TEMP/relay-check.json"; then exit 0; fi
+            sleep 10
+          done
+          echo "::error::Live photo relay unavailable or authorization response unexpected"
+          exit 1
+      - name: Read encrypted signing backup from repository secret
+        env:
+          ENCRYPTED_KEYSTORE: ${{ secrets.PELAK_ANDROID_ENCRYPTED_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$ENCRYPTED_KEYSTORE"
+          mkdir -p "$RUNNER_TEMP/pelak-signing"
+          printf '%s' "$ENCRYPTED_KEYSTORE" | tr -d '[:space:]' | base64 --decode > "$RUNNER_TEMP/pelak-signing/PELAK-android-release.jks.enc"
+          printf '%s\n' 'SHA256: 02:3D:60:82:C5:0C:0E:1D:A2:6A:38:53:71:9E:14:9A:D8:14:BE:E7:5D:57:5A:F8:D5:E5:7E:1C:49:39:0E:F0' > "$RUNNER_TEMP/pelak-signing/certificate-fingerprint.txt"
+      - name: Decrypt key and validate original certificate
+        env:
+          BACKUP_PASSWORD: ${{ secrets.PELAK_ANDROID_BACKUP_PASSWORD }}
+          PELAK_SIGNING_STORE_PASSWORD: ${{ secrets.PELAK_ANDROID_STORE_PASSWORD }}
+          PELAK_SIGNING_KEY_ALIAS: ${{ secrets.PELAK_ANDROID_KEY_ALIAS }}
+          PELAK_SIGNING_KEY_PASSWORD: ${{ secrets.PELAK_ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          for name in BACKUP_PASSWORD PELAK_SIGNING_STORE_PASSWORD PELAK_SIGNING_KEY_ALIAS PELAK_SIGNING_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then echo "::error::Missing secret $name"; exit 1; fi
+          done
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
+            -in "$RUNNER_TEMP/pelak-signing/PELAK-android-release.jks.enc" \
+            -out "$RUNNER_TEMP/pelak-signing/release.jks" -pass env:BACKUP_PASSWORD
+          keytool -list -v -keystore "$RUNNER_TEMP/pelak-signing/release.jks" \
+            -storepass:env PELAK_SIGNING_STORE_PASSWORD \
+            -alias "$PELAK_SIGNING_KEY_ALIAS" > "$RUNNER_TEMP/pelak-signing/key-info.txt"
+          expected="$(grep -m1 'SHA256:' "$RUNNER_TEMP/pelak-signing/certificate-fingerprint.txt" | sed 's/^[[:space:]]*//')"
+          actual="$(grep -m1 'SHA256:' "$RUNNER_TEMP/pelak-signing/key-info.txt" | sed 's/^[[:space:]]*//')"
+          if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+            echo "::error::Signing certificate differs from original encrypted backup"; exit 1
+          fi
+          echo "Original signing certificate verified."
+      - name: Install Android SDK 35
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build and verify signed release APK
+        env:
+          PELAK_SIGNING_STORE_PASSWORD: ${{ secrets.PELAK_ANDROID_STORE_PASSWORD }}
+          PELAK_SIGNING_KEY_ALIAS: ${{ secrets.PELAK_ANDROID_KEY_ALIAS }}
+          PELAK_SIGNING_KEY_PASSWORD: ${{ secrets.PELAK_ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          export PELAK_SIGNING_STORE_FILE="$RUNNER_TEMP/pelak-signing/release.jks"
+          cd native-source/android-native
+          gradle :app:testReleaseUnitTest :app:assembleRelease --no-daemon -Drobolectric.dependency.repo.url=https://repo.maven.apache.org/maven2
+          apk="app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/pelak-signing/apk-certificate.txt"
+          normalize_digest() { tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]'; }
+          expected=$(sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' "$RUNNER_TEMP/pelak-signing/certificate-fingerprint.txt" | head -n1 | normalize_digest)
+          actual=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pelak-signing/apk-certificate.txt" | normalize_digest)
+          test -n "$expected" && test "$expected" = "$actual"
+          previous="$GITHUB_WORKSPACE/downloads/PELAK-Native-v0.4.7-preview.apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$previous" > "$RUNNER_TEMP/pelak-signing/previous-certificate.txt"
+          previous_digest=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pelak-signing/previous-certificate.txt" | normalize_digest)
+          test "$previous_digest" = "$actual"
+          previous_badging=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$previous")
+          grep -F "package: name='com.pelakauto.nativepreview' versionCode='14'" <<< "$previous_badging"
+          badging=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk")
+          grep -F "package: name='com.pelakauto.nativepreview' versionCode='15' versionName='0.4.8-native-preview'" <<< "$badging"
+          if grep -q '^application-debuggable' <<< "$badging"; then exit 1; fi
+          icon_paths=$(sed -nE "s/^application-icon-[0-9]+:'([^']+)'$/\1/p" <<< "$badging" | sort -u)
+          test -n "$icon_paths"
+          cmp app/src/main/res/mipmap-nodpi/ic_launcher.png "$GITHUB_WORKSPACE/pelak-icon-512.png"
+          cmp app/src/main/res/mipmap-nodpi/ic_launcher.png app/src/main/res/mipmap-nodpi/pelak_app_icon.png
+          grep -Fq '<adaptive-icon' app/src/main/res/mipmap-anydpi-v26/pelak_app_icon.xml
+          python3 - "$apk" "$icon_paths" <<'PY'
+          import sys, zipfile, struct
+          with zipfile.ZipFile(sys.argv[1]) as z:
+              candidates=sys.argv[2].splitlines()
+              assert candidates and all(n in z.namelist() for n in candidates), 'APK missing launcher icon'
+              images=[z.read(n)[:24] for n in z.namelist() if n.startswith('res/') and n.endswith('.png')]
+              assert any(p.startswith(b'\x89PNG\r\n\x1a\n') and struct.unpack('>II',p[16:24])==(512,512) for p in images), 'APK missing 512px logo'
+          PY
+          unzip -p "$apk" assets/pelak-vehicle-catalog.json | cmp - app/src/main/assets/pelak-vehicle-catalog.json
+          unzip -t "$apk" >/dev/null
+          cp "$apk" "$RUNNER_TEMP/PELAK-Native-v0.4.8-preview.apk"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: pelak-native-test-failures
+          path: native-source/android-native/app/build/test-results/
+          retention-days: 3
+      - name: Erase plaintext signing material
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/pelak-signing"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pelak-native-048-signed-qa-apk
+          path: ${{ runner.temp }}/PELAK-Native-v0.4.8-preview.apk
+          retention-days: 7
+          if-no-files-found: error
