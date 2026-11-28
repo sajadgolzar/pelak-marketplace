@@ -64,8 +64,8 @@ async function testViewport(width, height, label) {
 
   assert.equal(await page.locator('footer.foot .pv-footer-links button').count(), 4,
     label + ': quick footer navigation should have four destinations');
-  assert.equal(await page.locator('footer.foot #pelakPlatformFooter .pelak-platform-choice').count(), 3,
-    label + ': keep all three existing download options');
+  assert.equal(await page.locator('footer.foot #pelakPlatformFooter .pelak-platform-choice').count(), 2,
+    label + ': show only Android and iOS download options');
   assert.ok((await page.locator('footer.foot .pv-footer-about small').innerText()).includes('PELAK'),
     label + ': footer should not show internal backend details');
 
