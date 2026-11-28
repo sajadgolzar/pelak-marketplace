@@ -133,29 +133,37 @@
       const close = document.getElementById('pelakCloseMenu');
       if (close && document.getElementById('pelakDrawer')?.classList.contains('open')) close.click();
     }
+    const webOnIos = {
+      fa: ['وب‌اپ پلاک', 'می‌توانی همین حالا در مرورگر آگهی‌ها را ببینی و از پلاک استفاده کنی. برای ساخت آیکون روی صفحهٔ اصلی، گزینهٔ «آی‌او‌اس» را بزن.'],
+      en: ['PELAK web app', 'Browse listings and use PELAK right here. For a Home Screen shortcut, choose iOS.'],
+      ar: ['تطبيق بلاك للويب', 'تصفّح الإعلانات واستخدم بلاك هنا في المتصفح. لإضافة اختصار إلى الشاشة الرئيسية، اختر آي أو إس.'],
+      ka: ['PELAK-ის ვებაპი', 'დაათვალიერეთ განცხადებები და გამოიყენეთ PELAK ბრაუზერში. მთავარ ეკრანზე დასამატებლად აირჩიეთ iOS.']
+    };
     function openWebGuide() {
-      if (typeof window.pelakOpenInstallGuide === 'function') window.pelakOpenInstallGuide();
-      else window.alert(current().webNote);
-    }
-    function openIosGuide() {
       const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
         (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-      if (isIos && typeof window.pelakOpenInstallGuide === 'function') {
+      if (isIos) {
+        const [title, instructions] = webOnIos[document.documentElement.lang] || webOnIos.fa;
+        openGuide(title, instructions);
+      } else if (typeof window.pelakOpenInstallGuide === 'function') {
         window.pelakOpenInstallGuide();
-        return;
+      } else {
+        window.alert(current().webNote);
       }
+    }
+    function openGuide(title, instructions) {
       const t = current();
       const dialog = document.createElement('dialog');
       dialog.className = 'pelak-ios-dialog';
-      const head = document.createElement('h3'); head.textContent = t.iosTitle;
-      const body = document.createElement('p'); body.textContent = t.iosGuide;
+      const head = document.createElement('h3'); head.textContent = title;
+      const body = document.createElement('p'); body.textContent = instructions;
       const close = document.createElement('button'); close.type = 'button'; close.textContent = t.close;
       close.addEventListener('click', function () { dialog.close(); });
       dialog.addEventListener('close', function () { dialog.remove(); });
       dialog.append(head, body, close);
       document.body.appendChild(dialog);
       if (typeof dialog.showModal === 'function') dialog.showModal();
-      else { window.alert(t.iosGuide); dialog.remove(); }
+      else { window.alert(instructions); dialog.remove(); }
     }
     document.addEventListener('click', function (event) {
       const choice = event.target.closest('[data-pelak-platform]');
@@ -163,7 +171,7 @@
       const type = choice.getAttribute('data-pelak-platform');
       closeMenu();
       if (type === 'web') { event.preventDefault(); openWebGuide(); }
-      else if (type === 'ios') { event.preventDefault(); openIosGuide(); window.pelakTrackIosGuide?.(); }
+      else if (type === 'ios') { event.preventDefault(); openGuide(current().iosTitle, current().iosGuide); window.pelakTrackIosGuide?.(); }
       /* Android: keep the normal download link; no WebView APK or fake app-store link. */
     });
   }
