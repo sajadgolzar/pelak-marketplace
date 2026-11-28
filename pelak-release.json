@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "android": {
-    "versionCode": 14,
-    "versionName": "0.4.7-native-preview",
-    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.4.7-preview.apk",
+    "versionCode": 15,
+    "versionName": "0.4.8-native-preview",
+    "apkUrl": "https://pelakauto.ir/downloads/PELAK-Native-v0.4.8-preview.apk",
     "minimumVersionCode": 1,
-    "notes": "گالری و بزرگ‌نمایی تصاویر، کارت آگهی خواناتر، راهنمای ثبت آگهی و لوگوی اصلاح‌شده."
+    "notes": "ارسال هم‌زمان دو تصویر، تلاش مجدد برای عکس ناموفق، اصلاح لوگو و ارسال اسکرین‌شات پشتیبانی. نسخه آزمایشی؛ آزمون واقعی روی گوشی هنوز تکمیل نشده است."
   },
   "web": {
     "version": "2026-11-28.2",
