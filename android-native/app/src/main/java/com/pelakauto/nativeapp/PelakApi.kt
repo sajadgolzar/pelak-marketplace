@@ -567,10 +567,12 @@ internal class PelakApi {
     suspend fun supportMessages(session: PelakSession, thread: SupportThread): List<SupportMessage> =
         withContext(Dispatchers.IO) {
             val rows = JSONArray(perform("/rest/v1/pelak_support_messages" +
-                "?select=sender_id,body&thread_id=eq.${thread.id}&order=created_at.asc,id.asc", jwt = session.accessToken))
+                "?select=sender_id,body,attachment_paths&thread_id=eq.${thread.id}&order=created_at.asc,id.asc", jwt = session.accessToken))
             List(rows.length()) { index ->
                 val row = rows.getJSONObject(index)
-                SupportMessage(row.getString("sender_id") == session.userId, row.getString("body"))
+                val attachments = row.optJSONArray("attachment_paths") ?: JSONArray()
+                SupportMessage(row.getString("sender_id") == session.userId, row.getString("body"),
+                    List(attachments.length()) { attachments.optString(it) }.filter { it.isNotBlank() })
             }
         }
 
@@ -581,10 +583,44 @@ internal class PelakApi {
                 session.accessToken, "resolution=ignore-duplicates,return=minimal")
         }
 
-    suspend fun sendSupportMessage(session: PelakSession, thread: SupportThread, id: String, body: String): Unit =
+    suspend fun uploadSupportScreenshot(session: PelakSession, thread: SupportThread, id: String,
+        resolver: ContentResolver, image: Uri): String = withContext(Dispatchers.IO) {
+        val bytes = preparePhotoBounded(resolver, image, 0)
+        require(bytes.size in 1..(5 * 1024 * 1024)) { "حجم تصویر بیش از ۵ مگابایت است" }
+        val path = "${session.userId}/${thread.id}/$id.jpg"
+        val request = okhttp3.Request.Builder()
+            .url(PelakConfig.API_ROOT + "/storage/v1/object/support-images/" + Uri.encode(path, "/"))
+            .header("apikey", PelakConfig.PUBLIC_KEY)
+            .header("Authorization", "Bearer " + session.accessToken)
+            .header("x-upsert", "false")
+            .post(bytes.toRequestBody("image/jpeg".toMediaType())).build()
+        photoUploadClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                val rows = perform("/storage/v1/object/list/support-images", "POST",
+                    JSONObject().put("prefix", "${session.userId}/${thread.id}").put("search", "$id.jpg").put("limit", 20),
+                    session.accessToken)
+                check(matchesUploadedPhoto(rows, "$id.jpg", bytes.size)) { "ارسال تصویر تأیید نشد" }
+            }
+        }
+        path
+    }
+
+    suspend fun signedSupportScreenshot(session: PelakSession, path: String): String? = withContext(Dispatchers.IO) {
+        val signed = JSONObject(perform("/storage/v1/object/sign/support-images/" + Uri.encode(path, "/"),
+            "POST", JSONObject().put("expiresIn", 300), session.accessToken)).optString("signedURL")
+        when {
+            signed.startsWith("/storage/v1/") -> PelakConfig.API_ROOT + signed
+            signed.startsWith("/object/sign/") -> PelakConfig.API_ROOT + "/storage/v1" + signed
+            else -> null
+        }
+    }
+
+    suspend fun sendSupportMessage(session: PelakSession, thread: SupportThread, id: String, body: String,
+        attachment: String? = null): Unit =
         withContext(Dispatchers.IO) {
             perform("/rest/v1/pelak_support_messages", "POST", JSONObject().put("id", id)
-                .put("thread_id", thread.id).put("sender_id", session.userId).put("body", body),
+                .put("thread_id", thread.id).put("sender_id", session.userId).put("body", body)
+                .apply { if (attachment != null) put("attachment_paths", JSONArray().put(attachment)) },
                 session.accessToken, "resolution=ignore-duplicates,return=minimal")
         }
 

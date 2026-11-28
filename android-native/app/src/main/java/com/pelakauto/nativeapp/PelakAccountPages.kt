@@ -1,6 +1,12 @@
 package com.pelakauto.nativeapp
 
 import androidx.compose.foundation.clickable
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,7 +21,7 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 internal data class SupportThread(val id: String, val subject: String, val status: String)
-internal data class SupportMessage(val mine: Boolean, val body: String)
+internal data class SupportMessage(val mine: Boolean, val body: String, val attachments: List<String> = emptyList())
 internal data class ShowroomProfile(
     val name: String = "", val city: String = "", val phone: String = "",
     val bio: String = "", val status: String = ""
@@ -30,6 +36,12 @@ internal fun PelakSupportPage(api: PelakApi, session: PelakSession, messageId: S
     var composing by remember { mutableStateOf(false) }
     var pendingThread by remember { mutableStateOf<SupportThread?>(null) }
     var pendingMessageId by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    var screenshot by remember { mutableStateOf<Uri?>(null) }
+    var uploadedScreenshot by remember { mutableStateOf<String?>(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) { screenshot = uri; uploadedScreenshot = null }
+    }
     var subject by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -70,6 +82,8 @@ internal fun PelakSupportPage(api: PelakApi, session: PelakSession, messageId: S
                         composing = false
                         pendingThread = null
                         pendingMessageId = null
+                        screenshot = null
+                        uploadedScreenshot = null
                         subject = ""
                         body = ""
                         messages = emptyList()
@@ -98,7 +112,22 @@ internal fun PelakSupportPage(api: PelakApi, session: PelakSession, messageId: S
                 item { Text(thread.subject, style = MaterialTheme.typography.titleMedium) }
                 items(messages) { message ->
                     ListItem(headlineContent = { Text(if (message.mine) "شما" else "پشتیبانی پلاک") },
-                        supportingContent = { Text(message.body) })
+                        supportingContent = {
+                            Column {
+                                Text(message.body)
+                                message.attachments.forEach { path ->
+                                    var url by remember(path, refresh) { mutableStateOf<String?>(null) }
+                                    LaunchedEffect(path, refresh) {
+                                        try { url = api.signedSupportScreenshot(session, path) }
+                                        catch (cancel: CancellationException) { throw cancel }
+                                        catch (_: Exception) { url = null }
+                                    }
+                                    if (url != null) AsyncImage(model = url, contentDescription = "تصویر پیوست",
+                                        modifier = Modifier.fillMaxWidth().height(220.dp), contentScale = ContentScale.Fit)
+                                    else Text("تصویر پیوست؛ برای دریافت دوباره تازه‌سازی کن")
+                                }
+                            }
+                        })
                 }
             } else item {
                 OutlinedTextField(subject, { subject = it.take(120) }, enabled = !busy && pendingThread == null,
@@ -108,7 +137,17 @@ internal fun PelakSupportPage(api: PelakApi, session: PelakSession, messageId: S
             else item {
                 OutlinedTextField(body, { body = it.take(3000) }, enabled = !busy && pendingMessageId == null, label = { Text("پیام") },
                     minLines = 2, modifier = Modifier.fillMaxWidth())
-                Button(enabled = !busy && body.isNotBlank() && (thread != null || subject.trim().length >= 3), onClick = {
+                if (screenshot != null) {
+                    AsyncImage(model = screenshot, contentDescription = "پیش‌نمایش اسکرین‌شات",
+                        modifier = Modifier.fillMaxWidth().height(180.dp), contentScale = ContentScale.Fit)
+                    TextButton(enabled = !busy && pendingMessageId == null, onClick = {
+                        screenshot = null; uploadedScreenshot = null
+                    }) { Text("حذف تصویر") }
+                } else OutlinedButton(enabled = !busy && pendingMessageId == null, onClick = {
+                    picker.launch("image/*")
+                }) { Text("بارگذاری اسکرین‌شات") }
+                Text("تصویر فقط برای شما و پشتیبانی قابل مشاهده است؛ اطلاعات حساس را پیش از ارسال بپوشان.")
+                Button(enabled = !busy && (body.isNotBlank() || screenshot != null) && (thread != null || subject.trim().length >= 3), onClick = {
                     if (!busy) {
                         busy = true
                         error = ""
@@ -119,7 +158,13 @@ internal fun PelakSupportPage(api: PelakApi, session: PelakSession, messageId: S
                                 ).also { pendingThread = it }
                                 if (thread == null) api.createSupportThread(session, target)
                                 val messageId = pendingMessageId ?: UUID.randomUUID().toString().also { pendingMessageId = it }
-                                api.sendSupportMessage(session, target, messageId, body.trim())
+                                val attachment = uploadedScreenshot ?: screenshot?.let { uri ->
+                                    api.uploadSupportScreenshot(session, target, messageId, context.contentResolver, uri)
+                                        .also { uploadedScreenshot = it }
+                                }
+                                api.sendSupportMessage(session, target, messageId, body.trim().ifBlank { "تصویر پیوست" }, attachment)
+                                screenshot = null
+                                uploadedScreenshot = null
                                 body = ""
                                 pendingMessageId = null
                                 pendingThread = null

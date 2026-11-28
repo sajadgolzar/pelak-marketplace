@@ -58,6 +58,17 @@ class PhotoFlowTest {
         assertEquals(photos[2].id, uploadPhotoPair(listOf(photos[2])) { it.id }.single().second.getOrThrow())
     }
 
+    @Test fun pairedPhotoUploadUsesFourWavesForEightImages() = runBlocking {
+        val photos = List(8) { DraftPhoto() }
+        var waves = 0
+        val outcomes = photos.chunked(2).flatMap { pair ->
+            waves++
+            uploadPhotoPair(pair) { kotlinx.coroutines.delay(10); it.id }
+        }
+        assertEquals(4, waves)
+        assertEquals(8, outcomes.count { it.second.isSuccess })
+    }
+
     @Test fun encodingHonorsAllExifOrientationsAndDropsMetadata() {
         val context = RuntimeEnvironment.getApplication() as Context
         val bitmap = Bitmap.createBitmap(120, 80, Bitmap.Config.ARGB_8888)

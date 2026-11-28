@@ -444,8 +444,8 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Image(painterResource(R.mipmap.ic_launcher), contentDescription = "لوگوی PELAK",
-                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)).then(Modifier.graphicsLayer { scaleX = 1.12f; scaleY = 1.12f }),
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.size(58.dp),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit,
                         alignment = Alignment.Center)
                     Column {
                         Text("پلاک", color = Navy, fontWeight = FontWeight.Bold, fontSize = 20.sp)
