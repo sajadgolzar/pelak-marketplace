@@ -786,7 +786,7 @@ private fun PelakNativeApp(notification: NotificationRoute?) {
                                 "قیمت: ${car.priceLabel()}",
                                 "موقعیت: ${car.city}، ${car.country}",
                                 "شناسه آگهی: ${car.id}",
-                                "پلاک: https://pelakauto.ir/?listing=${Uri.encode(car.id)}&src=share"
+                                "پلاک: https://pelakauto.ir/?listing=${Uri.encode(car.id)}&src=share&model=${Uri.encode(listOf(car.make, car.model).filter { it.isNotBlank() }.joinToString(" ").take(80))}"
                             ).filter { it.isNotBlank() }.joinToString("\n")
                             try {
                                 context.startActivity(Intent.createChooser(
@@ -1201,7 +1201,7 @@ private fun CarRow(car: Car, session: PelakSession?, onClick: () -> Unit) {
                         val message = listOf(car.title, details, "سال ساخت: ${car.year}",
                             car.mileageKm?.let { "کارکرد: " + listingMileageLabel(it) }.orEmpty(),
                             "قیمت: ${car.priceLabel()}", "موقعیت: ${car.city}، ${car.country}",
-                            "شناسه آگهی: ${car.id}", "https://pelakauto.ir/?listing=${Uri.encode(car.id)}&src=share")
+                            "شناسه آگهی: ${car.id}", "https://pelakauto.ir/?listing=${Uri.encode(car.id)}&src=share&model=${Uri.encode(listOf(car.make, car.model).filter { it.isNotBlank() }.joinToString(" ").take(80))}")
                             .filter { it.isNotBlank() }.joinToString("\n")
                         try {
                             context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
