@@ -74,18 +74,19 @@ internal fun matchesUploadedPhoto(body: String, filename: String, bytes: Int): B
 }.getOrDefault(false)
 
 internal class PelakApi {
+    private val preferredPhotoRelay = java.util.concurrent.atomic.AtomicBoolean(true)
     private val photoUploadClient = okhttp3.OkHttpClient.Builder()
-        .connectTimeout(12, TimeUnit.SECONDS)
+        .connectTimeout(7, TimeUnit.SECONDS)
         .writeTimeout(18, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
-        .callTimeout(35, TimeUnit.SECONDS)
+        .callTimeout(25, TimeUnit.SECONDS)
         .retryOnConnectionFailure(false)
         .followRedirects(false)
         .followSslRedirects(false)
         .build()
     private val photoProbeClient = photoUploadClient.newBuilder()
         .connectTimeout(6, TimeUnit.SECONDS)
-        .callTimeout(10, TimeUnit.SECONDS)
+        .callTimeout(6, TimeUnit.SECONDS)
         .build()
 
     private fun perform(
@@ -369,8 +370,9 @@ internal class PelakApi {
             val path = session.userId + "/" + photoId + ".jpg"
             var lastError: Exception? = null
             // Retry with the same UUID over an independent HTTPS route on PELAK's own domain.
+            val firstRelay = preferredPhotoRelay.get()
             for (attempt in 0..1) {
-                val relay = attempt == 0
+                val relay = if (attempt == 0) firstRelay else !firstRelay
                 val endpoint = if (relay) photoRelayUrl(session.userId, photoId)
                     else PelakConfig.API_ROOT + "/storage/v1/object/car-images/" + Uri.encode(path, "/")
                 val builder = okhttp3.Request.Builder()
@@ -382,7 +384,10 @@ internal class PelakApi {
                 try {
                     photoUploadClient.newCall(builder.build()).execute().use { response ->
                         val status = response.code
-                        if (response.isSuccessful) return@withContext path
+                        if (response.isSuccessful) {
+                            preferredPhotoRelay.set(relay)
+                            return@withContext path
+                        }
                         if (!relay && status in listOf(401, 403, 413))
                             throw IllegalArgumentException("پاسخ سرور: HTTP $status")
                         throw java.io.IOException("پاسخ سرور: HTTP $status")
@@ -394,9 +399,12 @@ internal class PelakApi {
                 } catch (failure: Exception) {
                     lastError = failure
                     // A lost response must not trigger a duplicate or discard a committed photo.
-                    if (photoExists(session, path, bytes.size, relay)) return@withContext path
+                    if (photoExists(session, path, bytes.size, relay)) {
+                        preferredPhotoRelay.set(relay)
+                        return@withContext path
+                    }
                 }
-                if (attempt == 0) kotlinx.coroutines.delay(750L)
+                if (attempt == 0) kotlinx.coroutines.delay(250L)
             }
             throw lastError ?: IllegalStateException("آپلود عکس انجام نشد")
         }
