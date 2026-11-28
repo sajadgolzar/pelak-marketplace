@@ -266,3 +266,28 @@ footer.foot #pelakPlatformFooter .pelak-platform-icon{color:#f8fafc!important}
   #apps .app-panel [aria-label="بستن"],#apps .app-panel .close-btn{width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;padding:7px!important}
   .pelak-shortcuts > button.pv-shortcut .pelak-fav-total{top:5px!important;left:5px!important;min-width:18px!important;height:18px!important;font-size:10px!important}
 }
+
+/* Compact home services, preserving original routes. */
+#pelak-discovery-links{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px!important;margin-block:8px!important}
+#pelak-discovery-links>a{display:flex!important;align-items:center;justify-content:center;min-width:0;min-height:44px!important;margin:0!important;padding:7px 5px!important;text-align:center;white-space:normal!important;font-size:13px!important;line-height:1.5;border-radius:11px!important}
+#pelak-discovery-links>a::before{display:inline-block;flex:none;margin-inline-end:5px;color:#98702d;font-size:17px}
+#pelak-discovery-links>a[href="/prices/"]::before{content:"↗"}
+#pelak-discovery-links>a[href="/comparisons/"]::before{content:"⇄"}
+#pelak-discovery-links>a[href="/import-cost/"]::before{content:"▤"}
+#pelak-discovery-links>#pelak-price-shortcut::before{content:"▦"}
+.pelak-shortcuts .pelak-fav-total[data-pv-zero="true"]{display:none!important}
+@media(max-width:720px){
+ #pelak-discovery-links{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #pelak-discovery-links>a{font-size:12px!important}
+ .pelak-shortcuts{margin:8px auto!important;gap:7px!important}
+ .pelak-shortcuts>button.pv-shortcut{min-height:68px!important;padding:7px 3px!important;gap:3px!important}
+ .pelak-shortcuts>button.pv-shortcut .pv-shortcut-icon{width:21px;height:21px}
+ header.nav .pelak-header-brand-stack{padding-block:6px!important;min-height:0!important}
+ header.nav .pelak-header-brand-stack .pelak-brand-icon{width:54px!important;height:54px!important}
+ main#home .pelak-new-intro{padding-top:3px!important;padding-bottom:0!important}
+ main#home .pelak-quick-search{margin-block:5px!important;min-height:50px!important;padding-block:3px!important}
+ #pelakQuickQuery{min-width:0!important;font-size:16px!important}
+ #cars.section{padding-top:10px!important}
+ #cars .pelak-listing-heading{margin-bottom:8px!important;padding-bottom:8px!important}
+ #cars .pelak-list-refresh{font-size:11px!important;padding:6px 8px!important;min-height:40px!important}
+}
