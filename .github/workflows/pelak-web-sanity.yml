@@ -44,6 +44,33 @@ jobs:
           for f in pelak-simple.js pelak-android-bridge.js pelak-sw.js pelak-analytics.js pelak-listing-reports.js pelak-listing-review.js pelak-platform-downloads.js pelak-visual-polish.js; do
             node --check "$f"
           done
+      - name: Parse inline JavaScript, including support screenshot handlers
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import subprocess, tempfile
+          class Scripts(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.capture = False; self.parts = []; self.scripts = []
+              def handle_starttag(self, tag, attrs):
+                  a = dict(attrs)
+                  if tag == 'script' and not a.get('src') and a.get('type', '').lower() in ('', 'text/javascript', 'application/javascript', 'module'):
+                      self.capture = True; self.parts = []; self.module = a.get('type') == 'module'
+              def handle_data(self, data):
+                  if self.capture: self.parts.append(data)
+              def handle_endtag(self, tag):
+                  if tag == 'script' and self.capture:
+                      self.scripts.append((''.join(self.parts), self.module)); self.capture = False
+          parser = Scripts(); parser.feed(Path('index.html').read_text(encoding='utf-8'))
+          assert parser.scripts, 'No inline scripts found'
+          with tempfile.TemporaryDirectory() as d:
+              for i, (code, module) in enumerate(parser.scripts):
+                  p = Path(d) / (str(i) + ('.mjs' if module else '.js'))
+                  p.write_text(code, encoding='utf-8')
+                  subprocess.run(['node', '--check', str(p)], check=True)
+          print('Verified', len(parser.scripts), 'inline scripts')
+          PY
       - name: Verify website entrypoints exist
         run: |
           set -euo pipefail
@@ -56,8 +83,8 @@ jobs:
           set -euo pipefail
           test -s pelak-visual-polish.css
           test -s pelak-visual-polish.js
-          grep -Fq 'src="./pelak-visual-polish.js?v=1"' index.html
-          grep -Fq 'href="./pelak-visual-polish.css?v=1"' index.html
+          grep -Eq 'src="\./pelak-visual-polish\.js\?v=[0-9]+"' index.html
+          grep -Eq 'href="\./pelak-visual-polish\.css\?v=[0-9]+"' index.html
           if grep -Fq 'class="pelak-sales-banner"' index.html; then
             echo 'Unexpected marketing banner found in approved compact layout' >&2
             exit 1
