@@ -18,9 +18,29 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.util.UUID
+
+// Start no more than two transfers; return outcomes in selected order, not completion order.
+internal suspend fun <T> uploadPhotoPair(
+    pair: List<DraftPhoto>,
+    upload: suspend (DraftPhoto) -> T
+): List<Pair<DraftPhoto, Result<T>>> = kotlinx.coroutines.coroutineScope {
+    require(pair.size <= 2)
+    pair.map { photo ->
+        async {
+            try {
+                photo to Result.success(upload(photo))
+            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                throw cancel
+            } catch (failure: Exception) {
+                photo to Result.failure<T>(failure)
+            }
+        }
+    }.map { it.await() }
+}
 
 internal suspend fun uploadPhotoBatch(
     pending: List<DraftPhoto>,

@@ -1531,19 +1531,9 @@ private fun DraftPanel(api: PelakApi, session: PelakSession, editing: Car?, onSa
                                 var completed = 0
                                 for (pair in pending.chunked(2)) {
                                     uploadProgress = "در حال ارسال تصاویر ${completed + 1} تا ${completed + pair.size} از ${pending.size}…"
-                                    val results = kotlinx.coroutines.coroutineScope {
-                                        pair.map { photo ->
-                                            async {
-                                                try {
-                                                    photo to Result.success(api.uploadPhoto(session, context.contentResolver,
-                                                        photo.uri ?: error("فایل عکس در دسترس نیست"), photo.id, photo.rotation))
-                                                } catch (cancel: kotlinx.coroutines.CancellationException) {
-                                                    throw cancel
-                                                } catch (failure: Exception) {
-                                                    photo to Result.failure<String>(failure)
-                                                }
-                                            }
-                                        }.map { it.await() }
+                                    val results = uploadPhotoPair(pair) { photo ->
+                                        api.uploadPhoto(session, context.contentResolver,
+                                            photo.uri ?: error("فایل عکس در دسترس نیست"), photo.id, photo.rotation)
                                     }
                                     for ((photo, result) in results) {
                                         val path = result.getOrNull()

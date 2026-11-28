@@ -36,6 +36,28 @@ class PhotoFlowTest {
         assertEquals(photos.map { it.id }.toSet(), completed.toSet())
     }
 
+    @Test fun pairedUploadsOverlapPreserveOrderAndIsolateFailures() = runBlocking {
+        val photos = List(8) { DraftPhoto() }
+        var active = 0
+        var peak = 0
+        val outcomes = photos.chunked(2).flatMap { pair ->
+            uploadPhotoPair(pair) { photo ->
+                active++
+                peak = maxOf(peak, active)
+                try {
+                    kotlinx.coroutines.delay(if (photo == pair.first()) 20L else 1L)
+                    if (photo == photos[2]) error("Simulated network failure")
+                    photo.id
+                } finally { active-- }
+            }
+        }
+        assertEquals(2, peak)
+        assertEquals(photos.map { it.id }, outcomes.map { it.first.id })
+        assertEquals(7, outcomes.count { it.second.isSuccess })
+        assertTrue(outcomes[2].second.isFailure)
+        assertEquals(photos[2].id, uploadPhotoPair(listOf(photos[2])) { it.id }.single().second.getOrThrow())
+    }
+
     @Test fun encodingHonorsAllExifOrientationsAndDropsMetadata() {
         val context = RuntimeEnvironment.getApplication() as Context
         val bitmap = Bitmap.createBitmap(120, 80, Bitmap.Config.ARGB_8888)

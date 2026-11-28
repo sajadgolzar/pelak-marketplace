@@ -1,8 +1,8 @@
 name: PELAK photo transport regression QA (no publication)
 on:
   push:
-    branches: [fix/native-upload-reconcile-20261128]
-    paths: ['.github/workflows/native-upload-regression.yml']
+    branches: [fix/native-upload-reconcile-20261128, native-0.4.8-photo-fix]
+    paths: ['.github/workflows/native-upload-regression.yml', 'android-native/**']
 permissions:
   contents: read
 jobs:
@@ -51,4 +51,12 @@ jobs:
         with:
           name: photo-regression-test-reports
           path: android-native/app/build/test-results/
+          retention-days: 7
+      - name: Validate debug APK archive
+        run: unzip -t android-native/app/build/outputs/apk/debug/app-debug.apk >/dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pelak-native-048-qa-debug
+          path: android-native/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
           retention-days: 7
